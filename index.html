@@ -163,6 +163,10 @@ tr:hover { background: var(--bg2); }
   <!-- Sidebar -->
   <aside class="sidebar">
     <div class="sidebar-brand">💰 Money IntX</div>
+    <div style="padding:0 12px 12px;">
+      <input type="search" id="global-search" placeholder="Search..." oninput="doGlobalSearch(this.value)" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg2);">
+      <div id="search-results" style="display:none;position:absolute;left:12px;right:12px;background:var(--bg);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);z-index:200;max-height:300px;overflow-y:auto;margin-top:4px;"></div>
+    </div>
     <nav class="sidebar-nav" id="sidebar-nav">
       <a data-page="dash" class="active" onclick="app.navigate('dash')"><span>📊</span> Dashboard</a>
       <a data-page="contacts" onclick="app.navigate('contacts')"><span>👤</span> Contacts</a>
@@ -213,6 +217,7 @@ import { listGroups, getGroup, createGroup, deleteGroup, archiveGroup, addGroupM
 import { listInvestments, getInvestment, createInvestment, deleteInvestment, addInvestmentMember, addInvestmentTransaction, calcInvestmentStats, INV_TYPES, INV_STATUSES } from './js/investments.js';
 import { listTemplates, listPublicTemplates, createTemplate, updateTemplate, deleteTemplate, copyPublicTemplate, togglePublic, archiveTemplate } from './js/templates.js';
 import { listAllUsers, updateUserRole, updateUserStatus, getAuditLog, logAudit, getPlatformStats } from './js/admin.js';
+import { globalSearch } from './js/search.js';
 import { listTrustees, createTrustee, deleteTrustee, verifyTrustee, activateTrustee } from './js/nok.js';
 import { listRecurring, createRecurring, deleteRecurring, toggleRecurring, processDueRecurring, FREQUENCIES } from './js/recurring.js';
 import { toast, esc, navigate, statusBadge, TX_LABELS, TX_COLORS, fmtDate, fmtRelative, openModal, closeModal } from './js/ui.js';
@@ -1973,6 +1978,46 @@ window.saveSettings = async function() {
 };
 
 // ── Action menu toggle (global) ───────────────────────────────────
+// ── Global Search ─────────────────────────────────────────────────
+let _searchTimer = null;
+window.doGlobalSearch = function(q) {
+  clearTimeout(_searchTimer);
+  const resultsEl = document.getElementById('search-results');
+  if (!q || q.length < 2) { resultsEl.style.display = 'none'; return; }
+  _searchTimer = setTimeout(async () => {
+    if (!currentUser) return;
+    const results = await globalSearch(currentUser.id, q);
+    let html = '';
+    if (results.contacts.length > 0) {
+      html += '<div style="padding:8px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Contacts</div>';
+      results.contacts.forEach(c => {
+        html += `<div style="padding:8px 12px;cursor:pointer;font-size:13px;" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''" onclick="openContactDetail('${c.id}');document.getElementById('search-results').style.display='none';document.getElementById('global-search').value='';">
+          <strong>${esc(c.name)}</strong> <span style="color:var(--muted);">${esc(c.email || '')}</span>
+        </div>`;
+      });
+    }
+    if (results.entries.length > 0) {
+      html += '<div style="padding:8px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;border-top:1px solid var(--border);">Entries</div>';
+      results.entries.forEach(e => {
+        html += `<div style="padding:8px 12px;cursor:pointer;font-size:13px;" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''" onclick="openEntryDetail('${e.id}');document.getElementById('search-results').style.display='none';document.getElementById('global-search').value='';">
+          <strong>${fmtMoney(e.amount, e.currency)}</strong> <span style="color:var(--muted);">${esc(e.contact?.name || '')} · ${esc(e.invoice_number || '')}</span>
+        </div>`;
+      });
+    }
+    if (!html) html = '<div style="padding:12px;font-size:13px;color:var(--muted);">No results</div>';
+    resultsEl.innerHTML = html;
+    resultsEl.style.display = '';
+  }, 300);
+};
+
+// Close search results when clicking outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#global-search') && !e.target.closest('#search-results')) {
+    const r = document.getElementById('search-results');
+    if (r) r.style.display = 'none';
+  }
+});
+
 window.toggleActionMenu = function(btn) {
   const dd = btn.nextElementSibling;
   document.querySelectorAll('.action-dropdown.open').forEach(d => { if (d !== dd) d.classList.remove('open'); });
