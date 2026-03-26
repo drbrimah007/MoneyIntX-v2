@@ -2759,7 +2759,7 @@ onAuthChange(async (event, session) => {
     currentUser = null; currentProfile = null;
     document.getElementById('shell').classList.remove('active');
     document.getElementById('landing').style.display = '';
-  } else if (event === 'SIGNED_IN' && session?.user && !currentUser) {
+  } else if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user && !currentUser) {
     enterApp(session.user);
   }
 });
