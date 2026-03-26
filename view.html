@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Money IntX — Shared Record</title>
+<style>
+:root { --bg:#0f1117; --bg2:#1a1d27; --bg3:#222636; --border:#2e3348; --text:#e2e8f0; --muted:#8892a4; --accent:#6c63ff; --green:#4ade80; --red:#f87171; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+.card { background:var(--bg2); border:1px solid var(--border); border-radius:14px; padding:28px; max-width:500px; width:100%; }
+.badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; }
+.btn { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:12px 24px; cursor:pointer; font-size:14px; font-weight:600; width:100%; }
+.btn:hover { opacity:.85; }
+.btn-green { background:var(--green); color:#000; }
+.btn-outline { background:transparent; border:1px solid var(--border); color:var(--text); }
+input,textarea { background:var(--bg3); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:14px; width:100%; outline:none; }
+</style>
+</head>
+<body>
+<div class="card" id="view-card">
+  <div style="text-align:center;padding:20px 0;">
+    <div style="font-size:32px;margin-bottom:8px;">💰</div>
+    <p style="color:var(--muted);font-size:14px;">Loading shared record...</p>
+  </div>
+</div>
+
+<script type="module">
+import { supabase } from './js/supabase.js';
+
+const TX_LABELS = {
+  they_owe_you:'They Owe Me', you_owe_them:'I Owe Them',
+  they_paid_you:'They Settled Me', you_paid_them:'I Settled Them',
+  invoice:'Invoice', bill:'Bill'
+};
+const FLIP = {
+  they_owe_you:'you_owe_them', you_owe_them:'they_owe_you',
+  they_paid_you:'you_paid_them', you_paid_them:'they_paid_you',
+  invoice:'invoice', bill:'bill'
+};
+
+function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+function fmtMoney(cents, cur='USD') {
+  try { return new Intl.NumberFormat('en-US',{style:'currency',currency:cur}).format(cents/100); }
+  catch(_) { return '$'+(cents/100).toFixed(2); }
+}
+
+async function loadRecord() {
+  const card = document.getElementById('view-card');
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('t');
+  if (!token) { card.innerHTML = '<p style="text-align:center;color:var(--red);padding:20px;">No token provided.</p>'; return; }
+
+  const { data: share, error } = await supabase
+    .from('share_tokens')
+    .select('*, entry:entries(*, contact:contacts(name,email))')
+    .eq('token', token)
+    .single();
+
+  if (error || !share) { card.innerHTML = '<p style="text-align:center;color:var(--red);padding:20px;">Record not found or expired.</p>'; return; }
+
+  // Mark as viewed
+  if (share.status === 'created' || share.status === 'sent') {
+    await supabase.from('share_tokens').update({ status:'viewed', viewed_at:new Date().toISOString() }).eq('id', share.id);
+  }
+
+  const e = share.entry || {};
+  const snap = share.entry_snapshot || {};
+  const amount = e.amount || snap.amount || 0;
+  const currency = e.currency || snap.currency || 'USD';
+  const txType = e.tx_type || snap.tx_type || 'they_owe_you';
+  const flippedType = FLIP[txType] || txType;
+  const fromName = snap.from_name || e.from_name || 'Someone';
+  const date = e.date || snap.date || '';
+  const note = e.note || snap.note || '';
+  const invNum = e.invoice_number || snap.invoice_number || '';
+  const status = e.status || snap.status || 'posted';
+  const settled = e.settled_amount || 0;
+  const remaining = amount - settled;
+
+  const recipientLabel = TX_LABELS[flippedType] || flippedType;
+  const isOwe = flippedType === 'you_owe_them' || flippedType === 'bill';
+
+  card.innerHTML = `
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:28px;margin-bottom:6px;">💰</div>
+      <p style="font-size:13px;color:var(--accent);font-weight:600;">Money IntX — Shared Record</p>
+    </div>
+
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">From</div>
+      <div style="font-size:18px;font-weight:700;margin-top:4px;">${esc(fromName)}</div>
+    </div>
+
+    <div style="background:var(--bg3);border-radius:12px;padding:20px;text-align:center;margin-bottom:20px;">
+      <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">${esc(recipientLabel)}</div>
+      <div style="font-size:36px;font-weight:900;margin:8px 0;color:${isOwe ? 'var(--red)' : 'var(--green)'};">${fmtMoney(remaining > 0 ? remaining : amount, currency)}</div>
+      ${settled > 0 ? `<div style="font-size:13px;color:var(--muted);">Original: ${fmtMoney(amount,currency)} · Settled: ${fmtMoney(settled,currency)}</div>` : ''}
+      <div style="margin-top:8px;">
+        <span class="badge" style="background:${status==='settled'?'rgba(74,222,128,.15)':status==='partially_settled'?'rgba(251,191,36,.15)':'rgba(96,165,250,.15)'};color:${status==='settled'?'var(--green)':status==='partially_settled'?'var(--amber)':'var(--accent)'};">${status}</span>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
+      <div style="background:var(--bg3);border-radius:10px;padding:12px;">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Date</div>
+        <div style="font-weight:600;margin-top:4px;">${date ? new Date(date).toLocaleDateString() : '—'}</div>
+      </div>
+      ${invNum ? `<div style="background:var(--bg3);border-radius:10px;padding:12px;">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Reference</div>
+        <div style="font-weight:600;margin-top:4px;">${esc(invNum)}</div>
+      </div>` : `<div style="background:var(--bg3);border-radius:10px;padding:12px;">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Type</div>
+        <div style="font-weight:600;margin-top:4px;">${esc(recipientLabel)}</div>
+      </div>`}
+    </div>
+
+    ${note ? `<div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:20px;font-size:14px;">${esc(note)}</div>` : ''}
+
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      ${share.status !== 'confirmed' ? `<button class="btn btn-green" onclick="confirmRecord('${share.id}')">Confirm & Track</button>` : `<button class="btn btn-outline" disabled>Already Confirmed</button>`}
+      ${share.status !== 'confirmed' ? `<button class="btn btn-outline" onclick="dismissRecord('${share.id}')">Dismiss</button>` : ''}
+      <a href="/" style="text-align:center;color:var(--accent);font-size:13px;margin-top:8px;">Open Money IntX →</a>
+    </div>
+  `;
+}
+
+window.confirmRecord = async function(shareId) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    alert('Please sign in first to track this record.');
+    window.location.href = '/';
+    return;
+  }
+  await supabase.from('share_tokens').update({ status:'confirmed', confirmed_at:new Date().toISOString(), recipient_id:session.user.id }).eq('id', shareId);
+  alert('Record confirmed! It will appear in your entries.');
+  window.location.reload();
+};
+
+window.dismissRecord = async function(shareId) {
+  await supabase.from('share_tokens').update({ status:'dismissed' }).eq('id', shareId);
+  document.getElementById('view-card').innerHTML = '<div style="text-align:center;padding:30px;"><p style="font-size:16px;font-weight:600;">Record dismissed.</p><a href="/" style="color:var(--accent);font-size:13px;">Open Money IntX →</a></div>';
+};
+
+loadRecord();
+</script>
+</body>
+</html>
