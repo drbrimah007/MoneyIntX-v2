@@ -273,6 +273,7 @@ import { listTemplates, listPublicTemplates, createTemplate, updateTemplate, del
 import { listAllUsers, updateUserRole, updateUserStatus, getAuditLog, logAudit, getPlatformStats } from './js/admin.js';
 import { globalSearch } from './js/search.js';
 import { exportEntriesToCSV, exportLedgerToCSV, exportContactsToCSV } from './js/export.js';
+import { subscribeToEntries, subscribeToContacts, subscribeToNotifications as subNotifs, unsubscribeAll } from './js/realtime.js';
 import { listTrustees, createTrustee, deleteTrustee, verifyTrustee, activateTrustee } from './js/nok.js';
 import { listRecurring, createRecurring, deleteRecurring, toggleRecurring, processDueRecurring, FREQUENCIES } from './js/recurring.js';
 import { toast, esc, navigate, statusBadge, TX_LABELS, TX_COLORS, fmtDate, fmtRelative, openModal, closeModal } from './js/ui.js';
@@ -358,6 +359,7 @@ window.doResetPassword = async function() {
 
 async function handleLogOut() {
   if (notifChannel) supabase.removeChannel(notifChannel);
+  unsubscribeAll();
   await logOut();
   currentUser = null;
   currentProfile = null;
@@ -390,6 +392,20 @@ async function enterApp(user) {
   setInterval(() => { processDueReminders(user.id); processDueRecurring(user.id); }, 60000);
   processDueReminders(user.id);
   processDueRecurring(user.id);
+
+  // Realtime: live updates across devices
+  subscribeToEntries(user.id,
+    () => { if (window._currentPage === 'entries' || window._currentPage === 'dash') navTo(window._currentPage); },
+    () => { if (window._currentPage === 'entries' || window._currentPage === 'dash') navTo(window._currentPage); },
+    () => { if (window._currentPage === 'entries' || window._currentPage === 'dash') navTo(window._currentPage); }
+  );
+  subscribeToContacts(user.id, () => {
+    if (window._currentPage === 'contacts' || window._currentPage === 'dash') navTo(window._currentPage);
+  });
+  subNotifs(user.id, (notif) => {
+    updateNotifBadge();
+    toast(notif.message || 'New notification');
+  });
 }
 
 // ── Notification badge ────────────────────────────────────────────
