@@ -274,6 +274,7 @@ import { listAllUsers, updateUserRole, updateUserStatus, getAuditLog, logAudit, 
 import { globalSearch } from './js/search.js';
 import { exportEntriesToCSV, exportLedgerToCSV, exportContactsToCSV } from './js/export.js';
 import { subscribeToEntries, subscribeToContacts, subscribeToNotifications as subNotifs, unsubscribeAll } from './js/realtime.js';
+import { generateInvoiceHTML, openInvoiceWindow } from './js/invoices.js';
 import { listTrustees, createTrustee, deleteTrustee, verifyTrustee, activateTrustee } from './js/nok.js';
 import { listRecurring, createRecurring, deleteRecurring, toggleRecurring, processDueRecurring, FREQUENCIES } from './js/recurring.js';
 import { toast, esc, navigate, statusBadge, TX_LABELS, TX_COLORS, fmtDate, fmtRelative, openModal, closeModal } from './js/ui.js';
@@ -840,6 +841,7 @@ window.openEntryDetail = async function(id) {
       <button class="btn btn-secondary btn-sm" onclick="openEditEntryModal('${entry.id}')">Edit</button>
       ${canSettle ? `<button class="btn btn-primary btn-sm" onclick="closeModal();openSettleModal('${entry.id}')">Settle</button>` : ''}
       ${!isTerminal ? `<button class="btn btn-secondary btn-sm" onclick="closeModal();openSendReminderModal('${entry.id}')">Send Reminder</button>` : ''}
+      <button class="btn btn-secondary btn-sm" onclick="printInvoice('${entry.id}')">Print / PDF</button>
       <button class="btn btn-secondary btn-sm" onclick="confirmDeleteEntry('${entry.id}');closeModal();" style="color:var(--red);">Delete</button>
     </div>
   `, { maxWidth: '560px' });
@@ -2116,6 +2118,16 @@ window.saveSettings = async function() {
 };
 
 // ── Action menu toggle (global) ───────────────────────────────────
+// ── Print Invoice ─────────────────────────────────────────────────
+window.printInvoice = async function(entryId) {
+  const entry = await getEntry(entryId);
+  if (!entry) return;
+  const contact = entry.contact || {};
+  const settlements = entry.settlements || [];
+  const html = generateInvoiceHTML(entry, contact, currentProfile, settlements);
+  openInvoiceWindow(html);
+};
+
 // ── Exports ───────────────────────────────────────────────────────
 window.doExportEntries = async function() {
   toast('Exporting entries...'); await exportEntriesToCSV(currentUser.id); toast('Entries exported!', 'success');
