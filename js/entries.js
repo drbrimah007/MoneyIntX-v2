@@ -111,13 +111,11 @@ export async function updateEntry(id, updates) {
 
 // ── Delete entry (soft delete — archives it, never truly removed) ─
 export async function deleteEntry(id) {
-  const { data, error } = await supabase.from('entries')
-    .update({ archived_at: new Date().toISOString(), status: 'cancelled', updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select()
-    .single();
+  // Delete linked settlements first to avoid FK constraint errors
+  await supabase.from('settlements').delete().eq('entry_id', id);
+  const { error } = await supabase.from('entries').delete().eq('id', id);
   if (error) console.error('[deleteEntry]', error.message);
-  return !!data;
+  return !error;
 }
 
 // ── Restore entry (admin — unarchive) ─────────────────────────────
