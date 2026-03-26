@@ -195,6 +195,11 @@ tr:last-child td { border-bottom: none; }
 .lp-btn-secondary { background:transparent; color:var(--text); border:1.5px solid var(--border); border-radius:10px; padding:14px 32px; font-size:16px; font-weight:600; cursor:pointer; }
 .auth-modal { max-width:420px; }
 
+/* Landing tabs */
+.landing-tabs { display: flex; gap: 0; margin-bottom: 24px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.landing-tab { flex: 1; padding: 10px; text-align: center; font-size: 14px; font-weight: 600; cursor: pointer; background: var(--bg3); color: var(--muted); border: none; }
+.landing-tab.active { background: var(--accent); color: #fff; }
+
 /* Nav badge */
 .nav-badge { background: #ef4444; color: #fff; font-size: 10px; font-weight: 700; border-radius: 50%; min-width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
 
@@ -229,30 +234,30 @@ tr:last-child td { border-bottom: none; }
 <!-- Landing / Auth -->
 <div id="landing" style="min-height:100vh;background:var(--bg);">
   <!-- Hero section -->
-  <div style="text-align:center;padding:40px 20px 24px;">
+  <div class="lp-hero">
     <div style="font-size:48px;margin-bottom:12px;">💰</div>
-    <h1 style="font-size:28px;font-weight:800;margin-bottom:8px;">Money IntX</h1>
-    <p style="color:var(--muted);font-size:16px;max-width:360px;margin:0 auto;line-height:1.6;">Track who owes you, who you owe, and settle with confidence.</p>
+    <h1>Money IntX</h1>
+    <p>Track who owes you, who you owe, and settle with confidence.</p>
   </div>
 
   <!-- Feature cards -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 20px 24px;max-width:440px;margin:0 auto;">
-    <div style="background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center;">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center;">
       <div style="font-size:24px;margin-bottom:6px;">📋</div>
       <div style="font-size:13px;font-weight:700;">Track Entries</div>
       <div style="font-size:11px;color:var(--muted);margin-top:2px;">Invoices, debts, settlements</div>
     </div>
-    <div style="background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center;">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center;">
       <div style="font-size:24px;margin-bottom:6px;">👥</div>
       <div style="font-size:13px;font-weight:700;">Groups</div>
       <div style="font-size:11px;color:var(--muted);margin-top:2px;">Savings circles, ventures</div>
     </div>
-    <div style="background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center;">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center;">
       <div style="font-size:24px;margin-bottom:6px;">📈</div>
       <div style="font-size:13px;font-weight:700;">Investments</div>
       <div style="font-size:11px;color:var(--muted);margin-top:2px;">Track ROI, partners</div>
     </div>
-    <div style="background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center;">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center;">
       <div style="font-size:24px;margin-bottom:6px;">🔔</div>
       <div style="font-size:13px;font-weight:700;">Reminders</div>
       <div style="font-size:11px;color:var(--muted);margin-top:2px;">Scheduled, repeating</div>
@@ -261,7 +266,7 @@ tr:last-child td { border-bottom: none; }
 
   <!-- Auth card -->
   <div style="display:flex;justify-content:center;padding:0 20px 40px;">
-  <div class="landing-card" style="background:var(--bg);border-radius:16px;padding:28px;max-width:420px;width:100%;box-shadow:var(--shadow-lg);">
+  <div class="landing-card" style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:28px;max-width:420px;width:100%;box-shadow:var(--shadow-lg);">
     <div style="text-align:center;margin-bottom:16px;">
       <p style="font-size:14px;color:var(--muted);">Sign in to get started</p>
     </div>
