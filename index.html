@@ -394,7 +394,6 @@ window.handleLogin = async function() {
   const pass = document.getElementById('login-pass').value;
   if (!email || !pass) return toast('Email and password required.', 'error');
   const user = await logIn({ email, password: pass });
-  if (user) enterApp(user);
 };
 
 window.handleSignup = async function() {
@@ -404,7 +403,6 @@ window.handleSignup = async function() {
   if (!name || !email || !pass) return toast('All fields required.', 'error');
   if (pass.length < 6) return toast('Password must be at least 6 characters.', 'error');
   const user = await signUp({ email, password: pass, displayName: name });
-  if (user) enterApp(user);
 };
 
 window.handleForgotPassword = async function() {
@@ -2821,7 +2819,13 @@ onAuthChange(async (event, session) => {
     document.getElementById('shell').classList.remove('active');
     document.getElementById('landing').style.display = '';
   } else if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user && !currentUser) {
-    enterApp(session.user);
+    try {
+      await enterApp(session.user);
+    } catch(e) {
+      console.error('[auth] enterApp failed', e);
+      currentUser = null;
+      document.getElementById('landing').style.display = '';
+    }
   }
 });
 
