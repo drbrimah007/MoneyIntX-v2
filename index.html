@@ -353,6 +353,14 @@ tr:last-child td { border-bottom: none; }
   </div>
 </div>
 
+<!-- Fallback: if module fails, at least show error on button click -->
+<script>
+window.handleLogin = window.handleLogin || function() { alert('App loading... If this persists, clear cache and refresh.'); };
+window.handleSignup = window.handleSignup || function() { alert('App loading... If this persists, clear cache and refresh.'); };
+window.showAuthTab = window.showAuthTab || function() {};
+window.handleForgotPassword = window.handleForgotPassword || function() { alert('App loading...'); };
+</script>
+
 <script type="module">
 import { supabase, getCurrentUser, getProfile } from './js/supabase.js';
 import { signUp, logIn, logOut, onAuthChange } from './js/auth.js';
