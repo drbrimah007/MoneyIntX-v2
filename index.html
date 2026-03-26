@@ -1261,10 +1261,12 @@ window.doSendReminder = async function(entryId) {
       entry_id: entryId, contact_name: cName,
       amount: entry?.amount, currency: entry?.currency
     });
-    await updateEntry(entryId, {
+    // Direct update — bypass updateEntry to avoid amount conversion
+    await supabase.from('entries').update({
       reminder_count: (entry?.reminder_count || 0) + 1,
-      last_reminder_at: new Date().toISOString()
-    });
+      last_reminder_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }).eq('id', entryId);
     closeModal();
     toast('Reminder sent.', 'success');
   } else {
