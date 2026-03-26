@@ -422,6 +422,15 @@ async function handleLogOut() {
 async function enterApp(user) {
   currentUser = user;
   currentProfile = await getProfile(user.id);
+  // If profile doesn't exist (trigger failed), create it now
+  if (!currentProfile) {
+    const { data } = await supabase.from('users').upsert({
+      id: user.id,
+      email: user.email,
+      display_name: user.user_metadata?.display_name || user.email.split('@')[0]
+    }, { onConflict: 'id' }).select().single();
+    currentProfile = data;
+  }
   document.getElementById('landing').style.display = 'none';
   document.getElementById('shell').classList.add('active');
   document.getElementById('sidebar-user-name').textContent = currentProfile?.display_name || user.email;
