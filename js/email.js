@@ -1,8 +1,4 @@
 // Money IntX v2 — Email Module
-// Uses Supabase Edge Functions or direct Resend API for transactional emails
-import { supabase } from './supabase.js';
-
-// Money IntX v2 — Email Module
 // Sends transactional emails via /api/send-email (Vercel serverless → Resend)
 import { supabase } from './supabase.js';
 
