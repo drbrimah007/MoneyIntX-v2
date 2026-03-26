@@ -2022,6 +2022,7 @@ async function renderTemplatesPage(el) {
           ${(t.fields || []).map(f => `<span style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:11px;">${esc(f.label || '?')} <span style="color:var(--muted);">[${f.type}]</span></span>`).join('')}
         </div>` : ''}
         <div style="display:flex;gap:6px;margin-top:8px;">
+          ${!t.archived_at ? `<button class="btn btn-primary btn-sm" onclick="useTemplateForEntry('${t.id}')">Use Template</button>` : ''}
           <button class="btn btn-secondary btn-sm" onclick="openEditTemplate('${t.id}')">Edit Fields</button>
         </div>
       </div>`;
@@ -2038,37 +2039,52 @@ const FIELD_TYPES = {
   textarea: 'Long Text', currency: 'Currency', computed: 'Computed',
   paired: 'Item + Amount (Paired)'
 };
+const CALC_TYPES = {
+  '': 'None', multiply: 'Multiply by factor', add: 'Add to field',
+  subtract: 'Subtract from field', aggregate: 'Sum all numeric fields',
+  select_aggregate: 'Sum selected fields'
+};
+const LEDGER_EFFECTS = { '': 'None', toy: 'They Owe (TOY)', toy_credit: 'TOY Credit', yot: 'I Owe (YOT)', yot_credit: 'YOT Credit' };
 
-window.openNewTemplateModal = function() {
-  window._tplFields = [];
-  openModal(`
-    <h3 style="margin-bottom:16px;">New Template</h3>
-    <div class="form-group"><label>Name *</label><input type="text" id="nt-name" placeholder="Invoice Template"></div>
-    <div class="form-group"><label>Description</label><textarea id="nt-desc" rows="2"></textarea></div>
+// ── Template Builder ──────────────────────────────────────────────
+window._tplFields = [];
+
+function _tplModalHtml(title, idPrefix, tpl = {}) {
+  return `
+    <h3 style="margin-bottom:16px;">${title}</h3>
+    <div class="form-group"><label>Name *</label><input type="text" id="${idPrefix}-name" value="${esc(tpl.name || '')}" placeholder="Invoice Template"></div>
+    <div class="form-group"><label>Description</label><textarea id="${idPrefix}-desc" rows="2">${esc(tpl.description || '')}</textarea></div>
     <div class="form-row">
-      <div class="form-group"><label>Default Type</label><select id="nt-type">
+      <div class="form-group"><label>Default Type</label><select id="${idPrefix}-type">
         <option value="">None</option>
-        ${Object.entries(TX_LABELS).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}
+        ${Object.entries(TX_LABELS).map(([k,v]) => `<option value="${k}" ${tpl.tx_type===k?'selected':''}>${v}</option>`).join('')}
       </select></div>
-      <div class="form-group"><label>Invoice Prefix</label><input type="text" id="nt-prefix" value="INV-"></div>
+      <div class="form-group"><label>Invoice Prefix</label><input type="text" id="${idPrefix}-prefix" value="${esc(tpl.invoice_prefix || 'INV-')}"></div>
     </div>
     <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <label style="font-weight:700;font-size:14px;">Fields</label>
+        <label style="font-weight:700;font-size:14px;">Fields (${window._tplFields.length})</label>
         <button class="btn btn-secondary btn-sm" onclick="addTemplateField()">+ Add Field</button>
       </div>
       <div id="tpl-fields-list"></div>
-    </div>
+    </div>`;
+}
+
+window.openNewTemplateModal = function() {
+  window._tplFields = [];
+  openModal(_tplModalHtml('New Template', 'nt') + `
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="doCreateTemplate()">Create Template</button>
     </div>
-  `, { maxWidth: '560px' });
+  `, { maxWidth: '600px' });
 };
 
 window.addTemplateField = function() {
   const id = 'f' + Math.random().toString(36).substr(2, 6);
-  window._tplFields.push({ id, label: '', type: 'text', required: false, options: '' });
+  window._tplFields.push({ id, label: '', type: 'text', required: false, options: '',
+    calcType: '', calcFactor: '', ledgerEffect: '', isFinalTotal: false,
+    textLabel: 'Item', numericLabel: 'Amount' });
   renderFieldList();
 };
 
@@ -2082,6 +2098,11 @@ window.moveFieldUp = function(id) {
   if (idx > 0) { [window._tplFields[idx-1], window._tplFields[idx]] = [window._tplFields[idx], window._tplFields[idx-1]]; renderFieldList(); }
 };
 
+window.moveFieldDown = function(id) {
+  const idx = window._tplFields.findIndex(f => f.id === id);
+  if (idx < window._tplFields.length - 1) { [window._tplFields[idx], window._tplFields[idx+1]] = [window._tplFields[idx+1], window._tplFields[idx]]; renderFieldList(); }
+};
+
 function renderFieldList() {
   const el = document.getElementById('tpl-fields-list');
   if (!el) return;
@@ -2089,38 +2110,68 @@ function renderFieldList() {
     el.innerHTML = '<p style="color:var(--muted);font-size:13px;">No fields yet. Add fields to define the template structure.</p>';
     return;
   }
-  el.innerHTML = window._tplFields.map((f, i) => `
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-        <span style="font-size:12px;color:var(--muted);font-weight:700;">#${i+1}</span>
+  el.innerHTML = window._tplFields.map((f, i) => {
+    const showCalc = f.type === 'computed' || f.type === 'number' || f.type === 'currency';
+    const showPaired = f.type === 'paired';
+    const showOptions = f.type === 'select';
+    return `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;" data-field-idx="${i}">
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
+        <span style="font-size:11px;color:var(--muted);font-weight:700;min-width:24px;">#${i+1}</span>
         <input type="text" placeholder="Field label" value="${esc(f.label)}" onchange="window._tplFields[${i}].label=this.value" style="flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
-        <select onchange="window._tplFields[${i}].type=this.value" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+        <select onchange="window._tplFields[${i}].type=this.value;renderFieldList();" style="padding:6px 6px;border:1px solid var(--border);border-radius:6px;font-size:11px;max-width:120px;">
           ${Object.entries(FIELD_TYPES).map(([k,v]) => `<option value="${k}" ${f.type===k?'selected':''}>${v}</option>`).join('')}
         </select>
-        <button onclick="moveFieldUp('${f.id}')" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;" title="Move up">↑</button>
-        <button onclick="removeTemplateField('${f.id}')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px;padding:2px;" title="Remove">✕</button>
+        <button onclick="moveFieldUp('${f.id}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px;" title="Move up">↑</button>
+        <button onclick="moveFieldDown('${f.id}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px;" title="Move down">↓</button>
+        <button onclick="removeTemplateField('${f.id}')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:13px;padding:2px;" title="Remove">✕</button>
       </div>
-      ${f.type === 'select' ? `<input type="text" placeholder="Options (comma separated)" value="${esc(f.options || '')}" onchange="window._tplFields[${i}].options=this.value" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;">` : ''}
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:6px;cursor:pointer;">
-        <input type="checkbox" ${f.required?'checked':''} onchange="window._tplFields[${i}].required=this.checked" style="width:auto;"> Required
-      </label>
-    </div>
-  `).join('');
+      ${showOptions ? `<div style="margin-bottom:6px;"><input type="text" placeholder="Options (comma separated)" value="${esc(f.options || '')}" onchange="window._tplFields[${i}].options=this.value" style="width:100%;padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;"></div>` : ''}
+      ${showPaired ? `<div style="display:flex;gap:6px;margin-bottom:6px;">
+        <input type="text" placeholder="Text label (e.g. Item)" value="${esc(f.textLabel || 'Item')}" onchange="window._tplFields[${i}].textLabel=this.value" style="flex:1;padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+        <input type="text" placeholder="Number label (e.g. Amount)" value="${esc(f.numericLabel || 'Amount')}" onchange="window._tplFields[${i}].numericLabel=this.value" style="flex:1;padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+      </div>` : ''}
+      ${showCalc ? `<div style="display:flex;gap:6px;margin-bottom:6px;">
+        <select onchange="window._tplFields[${i}].calcType=this.value" style="flex:1;padding:5px 6px;border:1px solid var(--border);border-radius:6px;font-size:11px;">
+          ${Object.entries(CALC_TYPES).map(([k,v]) => `<option value="${k}" ${f.calcType===k?'selected':''}>${v}</option>`).join('')}
+        </select>
+        ${f.calcType === 'multiply' ? `<input type="number" placeholder="Factor" value="${f.calcFactor||''}" onchange="window._tplFields[${i}].calcFactor=this.value" style="width:80px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">` : ''}
+      </div>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+        <select onchange="window._tplFields[${i}].ledgerEffect=this.value" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:11px;">
+          ${Object.entries(LEDGER_EFFECTS).map(([k,v]) => `<option value="${k}" ${f.ledgerEffect===k?'selected':''}>${v}</option>`).join('')}
+        </select>
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);cursor:pointer;">
+          <input type="checkbox" ${f.required?'checked':''} onchange="window._tplFields[${i}].required=this.checked" style="width:auto;"> Required
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);cursor:pointer;">
+          <input type="checkbox" ${f.isFinalTotal?'checked':''} onchange="window._tplFields[${i}].isFinalTotal=this.checked" style="width:auto;"> Final Total
+        </label>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _collectFields() {
+  window._tplFields.forEach((f, i) => {
+    const card = document.querySelectorAll('[data-field-idx]')[i];
+    if (card) {
+      const labelInput = card.querySelector('input[type="text"]');
+      if (labelInput) f.label = labelInput.value.trim();
+    }
+  });
+  return window._tplFields.filter(f => f.label).map(f => ({
+    id: f.id, label: f.label, type: f.type, required: f.required,
+    options: f.type === 'select' ? (f.options || '').split(',').map(o => o.trim()).filter(Boolean) : undefined,
+    calcType: f.calcType || undefined, calcFactor: f.calcFactor || undefined,
+    ledgerEffect: f.ledgerEffect || undefined, isFinalTotal: f.isFinalTotal || undefined,
+    textLabel: f.type === 'paired' ? (f.textLabel || 'Item') : undefined,
+    numericLabel: f.type === 'paired' ? (f.numericLabel || 'Amount') : undefined
+  }));
 }
 
 window.doCreateTemplate = async function() {
-  // Read latest field values from DOM
-  window._tplFields.forEach((f, i) => {
-    const inputs = document.querySelectorAll(`#tpl-fields-list > div`);
-    if (inputs[i]) {
-      const label = inputs[i].querySelector('input[type="text"]');
-      if (label) f.label = label.value.trim();
-    }
-  });
-  const fields = window._tplFields.filter(f => f.label).map(f => ({
-    id: f.id, label: f.label, type: f.type, required: f.required,
-    options: f.type === 'select' ? (f.options || '').split(',').map(o => o.trim()).filter(Boolean) : undefined
-  }));
+  const fields = _collectFields();
   const name = document.getElementById('nt-name').value.trim();
   if (!name) return toast('Name required.', 'error');
   await createTemplate(currentUser.id, {
@@ -2137,46 +2188,25 @@ window.openEditTemplate = async function(id) {
   const t = await supabase.from('templates').select('*').eq('id', id).single();
   if (!t.data) return;
   const tpl = t.data;
-  window._tplFields = (tpl.fields || []).map(f => ({ ...f, id: f.id || 'f' + Math.random().toString(36).substr(2, 6) }));
+  window._tplFields = (tpl.fields || []).map(f => ({
+    ...f, id: f.id || 'f' + Math.random().toString(36).substr(2, 6),
+    calcType: f.calcType || '', calcFactor: f.calcFactor || '',
+    ledgerEffect: f.ledgerEffect || '', isFinalTotal: f.isFinalTotal || false,
+    textLabel: f.textLabel || 'Item', numericLabel: f.numericLabel || 'Amount',
+    options: Array.isArray(f.options) ? f.options.join(', ') : (f.options || '')
+  }));
   closeModal();
-  openModal(`
-    <h3 style="margin-bottom:16px;">Edit Template</h3>
-    <div class="form-group"><label>Name *</label><input type="text" id="et-name" value="${esc(tpl.name)}"></div>
-    <div class="form-group"><label>Description</label><textarea id="et-desc" rows="2">${esc(tpl.description || '')}</textarea></div>
-    <div class="form-row">
-      <div class="form-group"><label>Default Type</label><select id="et-type">
-        <option value="">None</option>
-        ${Object.entries(TX_LABELS).map(([k,v]) => `<option value="${k}" ${tpl.tx_type===k?'selected':''}>${v}</option>`).join('')}
-      </select></div>
-      <div class="form-group"><label>Invoice Prefix</label><input type="text" id="et-prefix" value="${esc(tpl.invoice_prefix || 'INV-')}"></div>
-    </div>
-    <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <label style="font-weight:700;font-size:14px;">Fields (${window._tplFields.length})</label>
-        <button class="btn btn-secondary btn-sm" onclick="addTemplateField()">+ Add Field</button>
-      </div>
-      <div id="tpl-fields-list"></div>
-    </div>
+  openModal(_tplModalHtml('Edit Template', 'et', tpl) + `
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="doSaveTemplate('${id}')">Save</button>
     </div>
-  `, { maxWidth: '560px' });
+  `, { maxWidth: '600px' });
   renderFieldList();
 };
 
 window.doSaveTemplate = async function(id) {
-  window._tplFields.forEach((f, i) => {
-    const inputs = document.querySelectorAll(`#tpl-fields-list > div`);
-    if (inputs[i]) {
-      const label = inputs[i].querySelector('input[type="text"]');
-      if (label) f.label = label.value.trim();
-    }
-  });
-  const fields = window._tplFields.filter(f => f.label).map(f => ({
-    id: f.id, label: f.label, type: f.type, required: f.required,
-    options: f.type === 'select' ? (f.options || '').split(',').map(o => o.trim()).filter(Boolean) : undefined
-  }));
+  const fields = _collectFields();
   await updateTemplate(id, {
     name: document.getElementById('et-name').value.trim(),
     description: document.getElementById('et-desc').value.trim(),
@@ -2185,6 +2215,129 @@ window.doSaveTemplate = async function(id) {
     invoice_prefix: document.getElementById('et-prefix').value.trim()
   });
   closeModal(); toast('Template saved!', 'success'); navTo('templates');
+};
+
+// ── Use Template for Entry ────────────────────────────────────────
+window.useTemplateForEntry = async function(templateId) {
+  const tpl = await supabase.from('templates').select('*').eq('id', templateId).single();
+  if (!tpl.data) return;
+  const t = tpl.data;
+  const contacts = await listContacts(currentUser.id);
+  const contactOpts = contacts.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  const fields = t.fields || [];
+
+  // Generate invoice number
+  const invNum = (t.invoice_prefix || 'INV-') + String(t.invoice_next_num || 1).padStart(4, '0');
+
+  let fieldsHtml = fields.map((f, i) => {
+    if (f.type === 'text') return `<div class="form-group"><label>${esc(f.label)}${f.required?' *':''}</label><input type="text" id="tf-${f.id}" class="tpl-field"></div>`;
+    if (f.type === 'number' || f.type === 'currency') return `<div class="form-group"><label>${esc(f.label)}${f.required?' *':''}</label><input type="number" id="tf-${f.id}" step="0.01" class="tpl-field" oninput="recalcTemplateFields()"></div>`;
+    if (f.type === 'date') return `<div class="form-group"><label>${esc(f.label)}</label><input type="date" id="tf-${f.id}" class="tpl-field" value="${new Date().toISOString().slice(0,10)}"></div>`;
+    if (f.type === 'textarea') return `<div class="form-group"><label>${esc(f.label)}</label><textarea id="tf-${f.id}" rows="2" class="tpl-field"></textarea></div>`;
+    if (f.type === 'select') return `<div class="form-group"><label>${esc(f.label)}</label><select id="tf-${f.id}" class="tpl-field">${(f.options||[]).map(o => `<option>${esc(o)}</option>`).join('')}</select></div>`;
+    if (f.type === 'computed') return `<div class="form-group"><label>${esc(f.label)}</label><div id="tf-${f.id}" class="tpl-field" style="padding:10px 14px;background:var(--bg3);border-radius:10px;font-weight:700;font-size:16px;" data-computed="0">$0.00</div></div>`;
+    if (f.type === 'paired') return `<div class="form-group"><label>${esc(f.label)} (${esc(f.textLabel||'Item')} + ${esc(f.numericLabel||'Amount')})</label>
+      <div id="tf-${f.id}-rows" class="paired-rows"></div>
+      <button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="addPairedRow('${f.id}')">+ Add Row</button>
+    </div>`;
+    return '';
+  }).join('');
+
+  openModal(`
+    <h3 style="margin-bottom:4px;">New Entry from Template</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">${esc(t.name)} · ${invNum}</p>
+    <div class="form-group"><label>Contact *</label><select id="tfe-contact">${contactOpts || '<option value="">No contacts</option>'}</select></div>
+    <div class="form-group"><label>Type</label><select id="tfe-type">
+      ${t.tx_type ? `<option value="${t.tx_type}" selected>${TX_LABELS[t.tx_type]}</option>` : Object.entries(TX_LABELS).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}
+    </select></div>
+    <div class="form-row">
+      <div class="form-group"><label>Date</label><input type="date" id="tfe-date" value="${new Date().toISOString().slice(0,10)}"></div>
+      <div class="form-group"><label>Amount</label><input type="number" id="tfe-amount" step="0.01" placeholder="Auto-calculated or manual"></div>
+    </div>
+    ${fieldsHtml}
+    <div class="form-group"><label>Note</label><textarea id="tfe-note" rows="2"></textarea></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveTemplateEntry('${templateId}','${invNum}')">Save Entry</button>
+    </div>
+  `, { maxWidth: '560px' });
+
+  // Add initial paired rows
+  fields.filter(f => f.type === 'paired').forEach(f => addPairedRow(f.id));
+};
+
+window.addPairedRow = function(fieldId) {
+  const container = document.getElementById('tf-' + fieldId + '-rows');
+  if (!container) return;
+  const row = document.createElement('div');
+  row.className = 'paired-row';
+  row.style.cssText = 'display:flex;gap:6px;margin-bottom:4px;';
+  row.innerHTML = `
+    <input type="text" placeholder="Item" class="pr-text" style="flex:2;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
+    <input type="number" placeholder="Qty" class="pr-qty" step="1" style="width:60px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;" oninput="recalcTemplateFields()">
+    <input type="number" placeholder="Amount" class="pr-num" step="0.01" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;" oninput="recalcTemplateFields()">
+    <button onclick="this.parentElement.remove();recalcTemplateFields();" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;">✕</button>
+  `;
+  container.appendChild(row);
+};
+
+window.recalcTemplateFields = function() {
+  // Sum all paired rows and numeric fields for computed fields
+  let total = 0;
+  document.querySelectorAll('.paired-row').forEach(row => {
+    const qty = parseFloat(row.querySelector('.pr-qty')?.value) || 1;
+    const num = parseFloat(row.querySelector('.pr-num')?.value) || 0;
+    total += qty * num;
+  });
+  document.querySelectorAll('.tpl-field[data-computed]').forEach(el => {
+    el.dataset.computed = total;
+    el.textContent = '$' + total.toFixed(2);
+  });
+  // Auto-fill amount if empty
+  const amtField = document.getElementById('tfe-amount');
+  if (amtField && !amtField._userEdited) amtField.value = total > 0 ? total.toFixed(2) : '';
+};
+
+window.saveTemplateEntry = async function(templateId, invNum) {
+  const contactId = document.getElementById('tfe-contact').value;
+  const txType = document.getElementById('tfe-type').value;
+  const amount = parseFloat(document.getElementById('tfe-amount').value);
+  if (!contactId) return toast('Select a contact.', 'error');
+  if (!amount || amount <= 0) return toast('Enter an amount.', 'error');
+
+  // Collect template field data
+  const tplData = {};
+  window._tplFields?.forEach(f => {
+    const el = document.getElementById('tf-' + f.id);
+    if (el) {
+      if (f.type === 'computed') tplData[f.id] = { label: f.label, value: parseFloat(el.dataset.computed) || 0, type: 'computed' };
+      else tplData[f.id] = { label: f.label, value: el.value, type: f.type };
+    }
+    // Paired rows
+    const rows = document.getElementById('tf-' + f.id + '-rows');
+    if (rows) {
+      const items = [];
+      rows.querySelectorAll('.paired-row').forEach(row => {
+        const text = row.querySelector('.pr-text')?.value || '';
+        const qty = parseFloat(row.querySelector('.pr-qty')?.value) || 1;
+        const num = parseFloat(row.querySelector('.pr-num')?.value) || 0;
+        if (text || num) items.push({ text, qty, numeric: num });
+      });
+      tplData[f.id] = { label: f.label, type: 'paired', rows: items, value: items.reduce((s, r) => s + (r.qty * r.numeric), 0) };
+    }
+  });
+
+  await createEntry(currentUser.id, {
+    contactId, txType, amount, date: document.getElementById('tfe-date').value,
+    note: document.getElementById('tfe-note').value.trim(),
+    invoiceNumber: invNum, templateId, templateData: tplData
+  });
+
+  // Increment template invoice counter
+  const { data: tpl } = await supabase.from('templates').select('invoice_next_num').eq('id', templateId).single();
+  if (tpl) await supabase.from('templates').update({ invoice_next_num: (tpl.invoice_next_num || 1) + 1 }).eq('id', templateId);
+
+  closeModal(); toast('Entry created from template!', 'success'); navTo('entries');
 };
 
 window.openPublicTemplateDB = async function() {
