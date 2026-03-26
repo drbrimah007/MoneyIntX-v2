@@ -588,7 +588,7 @@ async function renderDash(el) {
         <td style="font-weight:700;">${amtHtml}</td>
         <td><span style="font-weight:600;color:${txColor};">${esc(txLabel)}</span></td>
         <td style="color:var(--muted);">${fmtDate(e.date)}</td>
-        <td>${statusBadge(e.status)}${reminderHtml}</td>
+        <td>${statusBadge(e.status)}${reminderHtml}${noLedgerHtml}</td>
       </tr>`;
     });
     html += `</tbody></table></div>`;
@@ -799,13 +799,14 @@ async function renderEntries(el) {
       const isTerminal = ['settled','voided','cancelled','fulfilled'].includes(e.status);
       const canSettle = ['they_owe_you','you_owe_them','invoice','bill'].includes(e.tx_type) && !isTerminal;
       const reminderHtml = e.reminder_count > 0 ? `<span class="badge badge-red" style="margin-left:4px;cursor:pointer;" onclick="openEntryDetail('${e.id}')">🚩${e.reminder_count}</span>` : '';
+      const noLedgerHtml = e.no_ledger ? `<span class="badge badge-gray" style="margin-left:4px;" title="Excluded from ledger">⊘</span>` : '';
 
       html += `<tr class="entry-row" data-search="${esc(cName + ' ' + txLabel + ' ' + e.invoice_number + ' ' + e.status).toLowerCase()}">
         <td><a style="font-weight:600;cursor:pointer;" onclick="openEntryDetail('${e.id}')">${esc(cName)}</a></td>
         <td style="font-weight:700;">${amtHtml}</td>
         <td><span style="font-weight:600;color:${txColor};">${esc(txLabel)}</span></td>
         <td style="color:var(--muted);">${fmtDate(e.date)}</td>
-        <td>${statusBadge(e.status)}${reminderHtml}</td>
+        <td>${statusBadge(e.status)}${reminderHtml}${noLedgerHtml}</td>
         <td>
           <div class="action-menu">
             <button class="action-menu-btn" onclick="toggleActionMenu(this)">⋮</button>
@@ -817,6 +818,8 @@ async function renderEntries(el) {
               ${canSettle ? `<button onclick="openSettleModal('${e.id}')" style="color:var(--green);font-weight:600;">Settle</button>` : ''}
               ${!isTerminal ? `<button onclick="openSendReminderModal('${e.id}')">Send Reminder</button>` : ''}
               <hr style="border:none;border-top:1px solid var(--border);margin:4px 0;">
+              <button onclick="toggleNoLedger('${e.id}',${!e.no_ledger})">${e.no_ledger ? 'Restore to Ledger' : 'Remove from Ledger'}</button>
+              <button onclick="duplicateEntry('${e.id}')">Duplicate</button>
               <button onclick="handleArchiveEntry('${e.id}','${e.archived_at ? 'unarchive' : 'archive'}')">${e.archived_at ? 'Unarchive' : 'Archive'}</button>
               ${!isTerminal ? `<button onclick="handleVoidEntry('${e.id}')" style="color:var(--amber);">Void</button>` : ''}
               <button onclick="confirmDeleteEntry('${e.id}')" style="color:var(--red);">Delete</button>
@@ -2470,20 +2473,52 @@ window.confirmDeleteRecurring = async function(id) {
 // ── Settings ──────────────────────────────────────────────────────
 async function renderSettings(el) {
   const p = currentProfile || {};
+  const isAdmin = p.role === 'platform_admin';
   let html = `<div class="page-header"><h2>Settings</h2></div>`;
+
+  // Profile
   html += `<div class="card">
     <h3 style="font-size:16px;font-weight:700;margin-bottom:16px;">Profile</h3>
-    <div class="form-group"><label>Display Name</label><input type="text" id="s-name" value="${esc(p.display_name || '')}"></div>
-    <div class="form-group"><label>Email</label><input type="email" value="${esc(p.email || '')}" disabled style="opacity:0.6;"></div>
-    <div class="form-group"><label>Phone</label><input type="text" id="s-phone" value="${esc(p.phone || '')}"></div>
-    <div class="form-group"><label>City</label><input type="text" id="s-city" value="${esc(p.city || '')}"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Display Name</label><input type="text" id="s-name" value="${esc(p.display_name || '')}"></div>
+      <div class="form-group"><label>Email</label><input type="email" value="${esc(p.email || '')}" disabled style="opacity:0.6;"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Phone</label><input type="text" id="s-phone" value="${esc(p.phone || '')}"></div>
+      <div class="form-group"><label>City</label><input type="text" id="s-city" value="${esc(p.city || '')}"></div>
+    </div>
+    <div class="form-group"><label>Bio</label><textarea id="s-bio" rows="2">${esc(p.bio || '')}</textarea></div>
     <div class="form-group"><label>Default Currency</label><select id="s-currency">
-      ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR'].map(c =>
+      ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','BHD','OMR','EGP','MAD','TZS','UGX','ETB','XOF'].map(c =>
         `<option value="${c}" ${p.default_currency === c ? 'selected' : ''}>${c}</option>`
       ).join('')}
     </select></div>
-    <button class="btn btn-primary btn-sm" onclick="saveSettings()">Save</button>
+    <button class="btn btn-primary btn-sm" onclick="saveSettings()">Save Profile</button>
   </div>`;
+
+  // Branding & Company (admin)
+  if (isAdmin) {
+    html += `<div class="card" style="margin-top:12px;">
+      <h3 style="font-size:16px;font-weight:700;margin-bottom:16px;">Branding & Company</h3>
+      <div class="form-row">
+        <div class="form-group"><label>App / Site Name</label><input type="text" id="s-appname" value="${esc(p.app_name || 'Money IntX')}"></div>
+        <div class="form-group"><label>Tagline</label><input type="text" id="s-tagline" value="${esc(p.tagline || '')}"></div>
+      </div>
+      <div class="form-group"><label>Site URL</label><input type="text" id="s-siteurl" value="${esc(p.site_url || '')}" placeholder="https://moneyinteractions.com"></div>
+      <div class="form-group"><label>Logo URL</label><input type="text" id="s-logourl" value="${esc(p.logo_url || '')}" placeholder="https://...logo.png"></div>
+      ${p.logo_url ? `<div style="margin-bottom:12px;"><img src="${esc(p.logo_url)}" style="max-height:48px;border-radius:8px;"></div>` : ''}
+      <hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">
+      <div class="form-row">
+        <div class="form-group"><label>Company Name</label><input type="text" id="s-company" value="${esc(p.company_name || '')}"></div>
+        <div class="form-group"><label>Company Email</label><input type="email" id="s-comemail" value="${esc(p.company_email || '')}"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Company Phone</label><input type="text" id="s-comphone" value="${esc(p.company_phone || '')}"></div>
+        <div class="form-group"><label>Company Address</label><input type="text" id="s-comaddr" value="${esc(p.company_address || '')}"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="saveBranding()">Save Branding</button>
+    </div>`;
+  }
   // Theme picker
   const currentTheme = localStorage.getItem('mxi_theme') || 'purple';
   const themes = [
@@ -2521,16 +2556,55 @@ window.saveSettings = async function() {
     display_name: document.getElementById('s-name').value.trim(),
     phone: document.getElementById('s-phone').value.trim(),
     city: document.getElementById('s-city').value.trim(),
+    bio: document.getElementById('s-bio').value.trim(),
     default_currency: document.getElementById('s-currency').value,
     updated_at: new Date().toISOString()
   }).eq('id', currentUser.id);
   if (error) return toast(error.message, 'error');
   currentProfile = await getProfile(currentUser.id);
   document.getElementById('sidebar-user-name').textContent = currentProfile.display_name;
-  toast('Settings saved.', 'success');
+  toast('Profile saved.', 'success');
+};
+
+window.saveBranding = async function() {
+  const { error } = await supabase.from('users').update({
+    app_name: document.getElementById('s-appname').value.trim(),
+    tagline: document.getElementById('s-tagline').value.trim(),
+    site_url: document.getElementById('s-siteurl').value.trim(),
+    logo_url: document.getElementById('s-logourl').value.trim(),
+    company_name: document.getElementById('s-company').value.trim(),
+    company_email: document.getElementById('s-comemail').value.trim(),
+    company_phone: document.getElementById('s-comphone').value.trim(),
+    company_address: document.getElementById('s-comaddr').value.trim(),
+    updated_at: new Date().toISOString()
+  }).eq('id', currentUser.id);
+  if (error) return toast(error.message, 'error');
+  currentProfile = await getProfile(currentUser.id);
+  toast('Branding saved.', 'success');
 };
 
 // ── Action menu toggle (global) ───────────────────────────────────
+// ── No Ledger Toggle ──────────────────────────────────────────────
+window.toggleNoLedger = async function(id, noLedger) {
+  await supabase.from('entries').update({ no_ledger: noLedger, updated_at: new Date().toISOString() }).eq('id', id);
+  toast(noLedger ? 'Removed from ledger.' : 'Restored to ledger.', 'success');
+  navTo('entries');
+};
+
+// ── Duplicate Entry ───────────────────────────────────────────────
+window.duplicateEntry = async function(id) {
+  const entry = await getEntry(id);
+  if (!entry) return;
+  await createEntry(currentUser.id, {
+    contactId: entry.contact_id, txType: entry.tx_type,
+    amount: entry.amount / 100, currency: entry.currency,
+    note: (entry.note || '') + ' (copy)', date: new Date().toISOString().slice(0, 10),
+    templateId: entry.template_id, templateData: entry.template_data || {}
+  });
+  toast('Entry duplicated.', 'success');
+  navTo('entries');
+};
+
 // ── Print Invoice ─────────────────────────────────────────────────
 window.printInvoice = async function(entryId) {
   const entry = await getEntry(entryId);
