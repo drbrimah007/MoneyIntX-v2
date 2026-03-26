@@ -8,9 +8,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-:root {
+/* Theme: default (purple) */
+:root, [data-theme="purple"] {
   --accent: #6c63ff;
   --accent-hover: #5a52e0;
+  --accent-light: rgba(108,99,255,0.08);
   --green: #16a34a;
   --red: #dc2626;
   --amber: #d97706;
@@ -23,11 +25,64 @@
   --radius: 12px;
   --shadow: 0 1px 3px rgba(0,0,0,0.08);
   --shadow-lg: 0 8px 24px rgba(0,0,0,0.08);
+  --sidebar-bg: var(--bg);
+  --sidebar-active: var(--bg3);
+}
+/* Theme: teal */
+[data-theme="teal"] {
+  --accent: #0d9488;
+  --accent-hover: #0f766e;
+  --accent-light: rgba(13,148,136,0.08);
+  --bg: #ffffff;
+  --bg2: #f0fdfa;
+  --bg3: #ccfbf1;
+  --border: #99f6e4;
+  --sidebar-bg: #f0fdfa;
+  --sidebar-active: #ccfbf1;
+}
+/* Theme: ocean */
+[data-theme="ocean"] {
+  --accent: #0284c7;
+  --accent-hover: #0369a1;
+  --accent-light: rgba(2,132,199,0.08);
+  --bg: #ffffff;
+  --bg2: #f0f9ff;
+  --bg3: #e0f2fe;
+  --border: #bae6fd;
+  --sidebar-bg: #f0f9ff;
+  --sidebar-active: #e0f2fe;
+}
+/* Theme: rose */
+[data-theme="rose"] {
+  --accent: #e11d48;
+  --accent-hover: #be123c;
+  --accent-light: rgba(225,29,72,0.08);
+  --bg: #ffffff;
+  --bg2: #fff1f2;
+  --bg3: #ffe4e6;
+  --border: #fecdd3;
+  --sidebar-bg: #fff1f2;
+  --sidebar-active: #ffe4e6;
+}
+/* Theme: dark */
+[data-theme="dark"] {
+  --accent: #6c63ff;
+  --accent-hover: #5a52e0;
+  --accent-light: rgba(108,99,255,0.15);
+  --bg: #0f172a;
+  --bg2: #1e293b;
+  --bg3: #334155;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --border: #334155;
+  --sidebar-bg: #0f172a;
+  --sidebar-active: #1e293b;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     --bg: #0f172a; --bg2: #1e293b; --bg3: #334155;
     --text: #f1f5f9; --muted: #94a3b8; --border: #334155;
+    --sidebar-bg: #0f172a; --sidebar-active: #1e293b;
   }
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -37,7 +92,7 @@ a { color: var(--accent); text-decoration: none; }
 /* Shell */
 .shell { display: none; min-height: 100vh; }
 .shell.active { display: flex; }
-.sidebar { width: 240px; background: var(--bg); border-right: 1px solid var(--border); padding: 20px 0; display: flex; flex-direction: column; position: fixed; top: 0; bottom: 0; z-index: 50; }
+.sidebar { width: 240px; background: var(--sidebar-bg, var(--bg)); border-right: 1px solid var(--border); padding: 20px 0; display: flex; flex-direction: column; position: fixed; top: 0; bottom: 0; z-index: 50; }
 .sidebar-brand { padding: 0 20px 20px; font-size: 18px; font-weight: 800; color: var(--accent); }
 .sidebar-nav { flex: 1; }
 .sidebar-nav a { display: flex; align-items: center; gap: 10px; padding: 10px 20px; font-size: 14px; font-weight: 500; color: var(--muted); transition: all 0.15s; cursor: pointer; }
@@ -1994,6 +2049,31 @@ async function renderSettings(el) {
     </select></div>
     <button class="btn btn-primary btn-sm" onclick="saveSettings()">Save</button>
   </div>`;
+  // Theme picker
+  const currentTheme = localStorage.getItem('mxi_theme') || 'purple';
+  const themes = [
+    { id: 'purple', name: 'Purple', color: '#6c63ff' },
+    { id: 'teal', name: 'Teal', color: '#0d9488' },
+    { id: 'ocean', name: 'Ocean', color: '#0284c7' },
+    { id: 'rose', name: 'Rose', color: '#e11d48' },
+    { id: 'dark', name: 'Dark', color: '#334155' }
+  ];
+  html += `<div class="card" style="margin-top:12px;">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:12px;">Theme</h3>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      ${themes.map(t => `
+        <button onclick="setTheme('${t.id}')" style="
+          width:56px;height:56px;border-radius:14px;border:3px solid ${currentTheme === t.id ? t.color : 'var(--border)'};
+          background:${t.id === 'dark' ? '#1e293b' : '#fff'};cursor:pointer;display:flex;align-items:center;justify-content:center;
+          transition:all 0.15s;box-shadow:${currentTheme === t.id ? '0 0 0 2px ' + t.color + '40' : 'none'};
+        ">
+          <div style="width:28px;height:28px;border-radius:50%;background:${t.color};"></div>
+        </button>
+      `).join('')}
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px;">Current: ${themes.find(t => t.id === currentTheme)?.name || 'Purple'}</p>
+  </div>`;
+
   html += `<div class="card" style="margin-top:12px;">
     <h3 style="font-size:16px;font-weight:700;margin-bottom:12px;">Account</h3>
     <button class="btn btn-danger btn-sm" onclick="app.logOut()">Sign Out</button>
@@ -2016,6 +2096,20 @@ window.saveSettings = async function() {
 };
 
 // ── Action menu toggle (global) ───────────────────────────────────
+// ── Theme ─────────────────────────────────────────────────────────
+window.setTheme = function(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('mxi_theme', theme);
+  toast('Theme updated to ' + theme.charAt(0).toUpperCase() + theme.slice(1), 'success');
+  if (window._currentPage === 'settings') navTo('settings');
+};
+
+// Load saved theme on startup
+(function() {
+  const saved = localStorage.getItem('mxi_theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+})();
+
 // ── Global Search ─────────────────────────────────────────────────
 let _searchTimer = null;
 window.doGlobalSearch = function(q) {
