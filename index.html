@@ -1951,10 +1951,17 @@ async function renderTemplatesPage(el) {
           <div class="action-menu">
             <button class="action-menu-btn" onclick="toggleActionMenu(this)">⋮</button>
             <div class="action-dropdown">
+              <button onclick="openEditTemplate('${t.id}')">Edit Fields</button>
               <button onclick="toggleTemplatePublic('${t.id}',${!t.is_public})">${t.is_public ? 'Make Private' : 'Make Public'}</button>
               <button onclick="confirmDeleteTemplate('${t.id}')" style="color:var(--red);">Delete</button>
             </div>
           </div>
+        </div>
+        ${fCount > 0 ? `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;display:flex;flex-wrap:wrap;gap:4px;">
+          ${(t.fields || []).map(f => `<span style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:11px;">${esc(f.label || '?')} <span style="color:var(--muted);">[${f.type}]</span></span>`).join('')}
+        </div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:8px;">
+          <button class="btn btn-secondary btn-sm" onclick="openEditTemplate('${t.id}')">Edit Fields</button>
         </div>
       </div>`;
     });
@@ -1962,32 +1969,161 @@ async function renderTemplatesPage(el) {
   el.innerHTML = html;
 }
 
+// ── Template Builder ──────────────────────────────────────────────
+window._tplFields = [];
+
+const FIELD_TYPES = {
+  text: 'Text', number: 'Number', date: 'Date', select: 'Dropdown',
+  textarea: 'Long Text', currency: 'Currency', computed: 'Computed',
+  paired: 'Item + Amount (Paired)'
+};
+
 window.openNewTemplateModal = function() {
+  window._tplFields = [];
   openModal(`
     <h3 style="margin-bottom:16px;">New Template</h3>
     <div class="form-group"><label>Name *</label><input type="text" id="nt-name" placeholder="Invoice Template"></div>
     <div class="form-group"><label>Description</label><textarea id="nt-desc" rows="2"></textarea></div>
-    <div class="form-group"><label>Default Type</label><select id="nt-type">
-      <option value="">None</option>
-      ${Object.entries(TX_LABELS).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}
-    </select></div>
-    <div class="form-group"><label>Invoice Prefix</label><input type="text" id="nt-prefix" value="INV-"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Default Type</label><select id="nt-type">
+        <option value="">None</option>
+        ${Object.entries(TX_LABELS).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}
+      </select></div>
+      <div class="form-group"><label>Invoice Prefix</label><input type="text" id="nt-prefix" value="INV-"></div>
+    </div>
+    <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <label style="font-weight:700;font-size:14px;">Fields</label>
+        <button class="btn btn-secondary btn-sm" onclick="addTemplateField()">+ Add Field</button>
+      </div>
+      <div id="tpl-fields-list"></div>
+    </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="doCreateTemplate()">Create</button>
+      <button class="btn btn-primary btn-sm" onclick="doCreateTemplate()">Create Template</button>
     </div>
-  `);
+  `, { maxWidth: '560px' });
 };
 
+window.addTemplateField = function() {
+  const id = 'f' + Math.random().toString(36).substr(2, 6);
+  window._tplFields.push({ id, label: '', type: 'text', required: false, options: '' });
+  renderFieldList();
+};
+
+window.removeTemplateField = function(id) {
+  window._tplFields = window._tplFields.filter(f => f.id !== id);
+  renderFieldList();
+};
+
+window.moveFieldUp = function(id) {
+  const idx = window._tplFields.findIndex(f => f.id === id);
+  if (idx > 0) { [window._tplFields[idx-1], window._tplFields[idx]] = [window._tplFields[idx], window._tplFields[idx-1]]; renderFieldList(); }
+};
+
+function renderFieldList() {
+  const el = document.getElementById('tpl-fields-list');
+  if (!el) return;
+  if (window._tplFields.length === 0) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:13px;">No fields yet. Add fields to define the template structure.</p>';
+    return;
+  }
+  el.innerHTML = window._tplFields.map((f, i) => `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <span style="font-size:12px;color:var(--muted);font-weight:700;">#${i+1}</span>
+        <input type="text" placeholder="Field label" value="${esc(f.label)}" onchange="window._tplFields[${i}].label=this.value" style="flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
+        <select onchange="window._tplFields[${i}].type=this.value" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+          ${Object.entries(FIELD_TYPES).map(([k,v]) => `<option value="${k}" ${f.type===k?'selected':''}>${v}</option>`).join('')}
+        </select>
+        <button onclick="moveFieldUp('${f.id}')" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;" title="Move up">↑</button>
+        <button onclick="removeTemplateField('${f.id}')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px;padding:2px;" title="Remove">✕</button>
+      </div>
+      ${f.type === 'select' ? `<input type="text" placeholder="Options (comma separated)" value="${esc(f.options || '')}" onchange="window._tplFields[${i}].options=this.value" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;">` : ''}
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:6px;cursor:pointer;">
+        <input type="checkbox" ${f.required?'checked':''} onchange="window._tplFields[${i}].required=this.checked" style="width:auto;"> Required
+      </label>
+    </div>
+  `).join('');
+}
+
 window.doCreateTemplate = async function() {
+  // Read latest field values from DOM
+  window._tplFields.forEach((f, i) => {
+    const inputs = document.querySelectorAll(`#tpl-fields-list > div`);
+    if (inputs[i]) {
+      const label = inputs[i].querySelector('input[type="text"]');
+      if (label) f.label = label.value.trim();
+    }
+  });
+  const fields = window._tplFields.filter(f => f.label).map(f => ({
+    id: f.id, label: f.label, type: f.type, required: f.required,
+    options: f.type === 'select' ? (f.options || '').split(',').map(o => o.trim()).filter(Boolean) : undefined
+  }));
   const name = document.getElementById('nt-name').value.trim();
   if (!name) return toast('Name required.', 'error');
   await createTemplate(currentUser.id, {
     name, description: document.getElementById('nt-desc').value.trim(),
     txType: document.getElementById('nt-type').value || null,
+    fields,
     invoicePrefix: document.getElementById('nt-prefix').value.trim()
   });
   closeModal(); toast('Template created!', 'success'); navTo('templates');
+};
+
+// ── Edit Template ────────────────────────────────────────────────
+window.openEditTemplate = async function(id) {
+  const t = await supabase.from('templates').select('*').eq('id', id).single();
+  if (!t.data) return;
+  const tpl = t.data;
+  window._tplFields = (tpl.fields || []).map(f => ({ ...f, id: f.id || 'f' + Math.random().toString(36).substr(2, 6) }));
+  closeModal();
+  openModal(`
+    <h3 style="margin-bottom:16px;">Edit Template</h3>
+    <div class="form-group"><label>Name *</label><input type="text" id="et-name" value="${esc(tpl.name)}"></div>
+    <div class="form-group"><label>Description</label><textarea id="et-desc" rows="2">${esc(tpl.description || '')}</textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label>Default Type</label><select id="et-type">
+        <option value="">None</option>
+        ${Object.entries(TX_LABELS).map(([k,v]) => `<option value="${k}" ${tpl.tx_type===k?'selected':''}>${v}</option>`).join('')}
+      </select></div>
+      <div class="form-group"><label>Invoice Prefix</label><input type="text" id="et-prefix" value="${esc(tpl.invoice_prefix || 'INV-')}"></div>
+    </div>
+    <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <label style="font-weight:700;font-size:14px;">Fields (${window._tplFields.length})</label>
+        <button class="btn btn-secondary btn-sm" onclick="addTemplateField()">+ Add Field</button>
+      </div>
+      <div id="tpl-fields-list"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="doSaveTemplate('${id}')">Save</button>
+    </div>
+  `, { maxWidth: '560px' });
+  renderFieldList();
+};
+
+window.doSaveTemplate = async function(id) {
+  window._tplFields.forEach((f, i) => {
+    const inputs = document.querySelectorAll(`#tpl-fields-list > div`);
+    if (inputs[i]) {
+      const label = inputs[i].querySelector('input[type="text"]');
+      if (label) f.label = label.value.trim();
+    }
+  });
+  const fields = window._tplFields.filter(f => f.label).map(f => ({
+    id: f.id, label: f.label, type: f.type, required: f.required,
+    options: f.type === 'select' ? (f.options || '').split(',').map(o => o.trim()).filter(Boolean) : undefined
+  }));
+  await updateTemplate(id, {
+    name: document.getElementById('et-name').value.trim(),
+    description: document.getElementById('et-desc').value.trim(),
+    tx_type: document.getElementById('et-type').value || null,
+    fields,
+    invoice_prefix: document.getElementById('et-prefix').value.trim()
+  });
+  closeModal(); toast('Template saved!', 'success'); navTo('templates');
 };
 
 window.openPublicTemplateDB = async function() {
