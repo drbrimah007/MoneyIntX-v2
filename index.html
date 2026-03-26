@@ -704,46 +704,136 @@ window.openContactDetail = async function(id) {
   const contact = await supabase.from('contacts').select('*').eq('id', id).single();
   if (!contact.data) return;
   const c = contact.data;
-  const entries = await listEntries(currentUser.id, { contactId: id, limit: 20 });
+  const entries = await listEntries(currentUser.id, { contactId: id, limit: 30 });
   const ledger = (await getLedgerSummary(currentUser.id)).find(l => l.contact_id === id) || {};
   const toy = ledger.they_owe_me || 0;
   const yot = ledger.i_owe_them || 0;
   const net = toy - yot;
 
+  // Ledger breakdown by type
+  const toyEntries = entries.filter(e => ['they_owe_you','invoice','bill'].includes(e.tx_type) && !e.no_ledger);
+  const yotEntries = entries.filter(e => e.tx_type === 'you_owe_them' && !e.no_ledger);
+  const toyCredits = entries.filter(e => e.tx_type === 'they_paid_you' && !e.no_ledger);
+  const yotCredits = entries.filter(e => e.tx_type === 'you_paid_them' && !e.no_ledger);
+
   openModal(`
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
       <div>
-        <h3 style="margin:0;">${esc(c.name)}</h3>
+        <h3 style="margin:0;font-size:18px;">${esc(c.name)}</h3>
         <p style="font-size:13px;color:var(--muted);margin-top:4px;">${esc(c.email || '')} ${c.phone ? '· ' + esc(c.phone) : ''}</p>
       </div>
-      <button class="btn btn-secondary btn-sm" onclick="closeModal()">Close</button>
+      <button class="bs sm" onclick="closeModal()">✕</button>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
-      <div class="stat-card"><div class="stat-lbl">They Owe Me</div><div class="stat-val" style="font-size:18px;color:var(--green);">${fmtMoney(toy)}</div></div>
-      <div class="stat-card"><div class="stat-lbl">I Owe Them</div><div class="stat-val" style="font-size:18px;color:var(--red);">${fmtMoney(yot)}</div></div>
-      <div class="stat-card"><div class="stat-lbl">Net</div><div class="stat-val" style="font-size:18px;color:${net >= 0 ? 'var(--green)' : 'var(--red)'};">${fmtMoney(net)}</div></div>
+    <!-- Ledger stats -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+      <div class="stat-card"><div class="stat-lbl">They Owe Me</div><div class="stat-val" style="font-size:20px;color:var(--green);">${fmtMoney(toy)}</div></div>
+      <div class="stat-card"><div class="stat-lbl">I Owe Them</div><div class="stat-val" style="font-size:20px;color:var(--red);">${fmtMoney(yot)}</div></div>
+    </div>
+    <div style="background:${net >= 0 ? 'rgba(74,222,128,.1)' : 'rgba(248,113,113,.1)'};border:1px solid ${net >= 0 ? 'rgba(74,222,128,.2)' : 'rgba(248,113,113,.2)'};border-radius:10px;padding:12px;text-align:center;margin-bottom:16px;">
+      <div style="font-size:12px;color:var(--muted);text-transform:uppercase;">Net Balance</div>
+      <div style="font-size:24px;font-weight:800;color:${net >= 0 ? 'var(--green)' : 'var(--red)'};">${fmtMoney(Math.abs(net))}</div>
+      <div style="font-size:12px;color:var(--muted);">${net > 0 ? 'They owe you' : net < 0 ? 'You owe them' : 'All settled'}</div>
     </div>
 
-    ${c.notes ? `<div style="background:var(--bg3);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:13px;">${esc(c.notes)}</div>` : ''}
-    ${c.tags?.length ? `<div style="margin-bottom:16px;display:flex;gap:4px;flex-wrap:wrap;">${c.tags.map(t => `<span class="badge badge-blue">${esc(t)}</span>`).join('')}</div>` : ''}
+    <!-- Tabs -->
+    <div class="tabs" style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px;">
+      <button class="tab on" onclick="showCPTab('entries','${id}')">Entries (${entries.length})</button>
+      <button class="tab" onclick="showCPTab('ledger','${id}')">Ledger</button>
+      <button class="tab" onclick="showCPTab('info','${id}')">Info</button>
+    </div>
 
-    <h4 style="font-size:14px;font-weight:700;margin-bottom:8px;">Recent Entries</h4>
-    ${entries.length === 0 ? '<p style="color:var(--muted);font-size:13px;">No entries with this contact.</p>' :
-      `<div class="tbl-wrap"><table><thead><tr><th>Amount</th><th>Type</th><th>Date</th><th>Status</th></tr></thead><tbody>
-      ${entries.map(e => `<tr style="cursor:pointer;" onclick="closeModal();openEntryDetail('${e.id}')">
-        <td style="font-weight:700;">${fmtMoney(e.amount, e.currency)}</td>
-        <td><span style="font-weight:600;color:${TX_COLORS[e.tx_type] || 'var(--text)'};">${esc(TX_LABELS[e.tx_type] || e.tx_type)}</span></td>
-        <td style="color:var(--muted);">${fmtDate(e.date)}</td>
-        <td>${statusBadge(e.status)}</td>
-      </tr>`).join('')}
-      </tbody></table></div>`}
+    <div id="cp-tab-content">
+      <!-- Entries tab (default) -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <span style="font-size:13px;color:var(--muted);">${entries.length} entries</span>
+        <button class="btn sm" onclick="closeModal();openNewEntryModal()" style="font-size:12px;">+ New Entry</button>
+      </div>
+      ${entries.length === 0 ? '<p style="color:var(--muted);font-size:13px;">No entries with this contact.</p>' :
+        `<div class="tbl-wrap"><table><thead><tr><th>Amount</th><th>Type</th><th>Date</th><th>Status</th></tr></thead><tbody>
+        ${entries.map(e => `<tr style="cursor:pointer;" onclick="closeModal();openEntryDetail('${e.id}')">
+          <td style="font-weight:700;">${fmtMoney(e.amount, e.currency)}</td>
+          <td><span style="font-weight:600;color:${TX_COLORS[e.tx_type] || 'var(--text)'};">${esc(TX_LABELS[e.tx_type] || e.tx_type)}</span></td>
+          <td style="color:var(--muted);">${fmtDate(e.date)}</td>
+          <td>${statusBadge(e.status)}</td>
+        </tr>`).join('')}
+        </tbody></table></div>`}
+    </div>
 
     <div style="display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
-      <button class="btn btn-secondary btn-sm" onclick="openEditContactModal('${c.id}')">Edit Contact</button>
-      <button class="btn btn-secondary btn-sm" onclick="confirmDeleteContact('${c.id}','${esc(c.name)}');closeModal();" style="color:var(--red);">Delete</button>
+      <button class="bs sm" onclick="openEditContactModal('${c.id}')">Edit</button>
+      <button class="bs sm" onclick="closeModal();openNewEntryModal()">+ Entry</button>
+      <button class="bs sm" onclick="confirmDeleteContact('${c.id}','${esc(c.name)}');closeModal();" style="color:var(--red);">Delete</button>
     </div>
   `, { maxWidth: '600px' });
+
+  // Store data for tab switching
+  window._cpData = { id, c, entries, toy, yot, net, toyEntries, yotEntries, toyCredits, yotCredits };
+};
+
+window.showCPTab = function(tab, contactId) {
+  const d = window._cpData;
+  if (!d) return;
+  const el = document.getElementById('cp-tab-content');
+  if (!el) return;
+
+  // Update tab active state
+  document.querySelectorAll('.tabs .tab').forEach((t, i) => {
+    t.classList.toggle('on', ['entries','ledger','info'][i] === tab);
+  });
+
+  if (tab === 'entries') {
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <span style="font-size:13px;color:var(--muted);">${d.entries.length} entries</span>
+        <button class="btn sm" onclick="closeModal();openNewEntryModal()" style="font-size:12px;">+ New Entry</button>
+      </div>
+      ${d.entries.length === 0 ? '<p style="color:var(--muted);font-size:13px;">No entries.</p>' :
+        `<div class="tbl-wrap"><table><thead><tr><th>Amount</th><th>Type</th><th>Date</th><th>Status</th></tr></thead><tbody>
+        ${d.entries.map(e => `<tr style="cursor:pointer;" onclick="closeModal();openEntryDetail('${e.id}')">
+          <td style="font-weight:700;">${fmtMoney(e.amount, e.currency)}</td>
+          <td><span style="font-weight:600;color:${TX_COLORS[e.tx_type] || 'var(--text)'};">${esc(TX_LABELS[e.tx_type] || e.tx_type)}</span></td>
+          <td style="color:var(--muted);">${fmtDate(e.date)}</td>
+          <td>${statusBadge(e.status)}</td>
+        </tr>`).join('')}
+        </tbody></table></div>`}`;
+  } else if (tab === 'ledger') {
+    el.innerHTML = `
+      <div style="margin-bottom:16px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div class="stat-card"><div class="stat-lbl">They Owe Me</div><div class="stat-val" style="font-size:18px;color:var(--green);">${fmtMoney(d.toy)}</div></div>
+          <div class="stat-card"><div class="stat-lbl">I Owe Them</div><div class="stat-val" style="font-size:18px;color:var(--red);">${fmtMoney(d.yot)}</div></div>
+        </div>
+        <div style="margin-top:12px;font-weight:700;">Net: <span style="color:${d.net >= 0 ? 'var(--green)' : 'var(--red)'};">${fmtMoney(d.net)}</span></div>
+      </div>
+      <div class="section-title">Ledger Breakdown</div>
+      <div style="font-size:13px;">
+        <div style="padding:6px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+          <span>They Owe entries</span><span style="color:var(--green);font-weight:600;">${d.toyEntries.length}</span>
+        </div>
+        <div style="padding:6px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+          <span>I Owe entries</span><span style="color:var(--red);font-weight:600;">${d.yotEntries.length}</span>
+        </div>
+        <div style="padding:6px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+          <span>They Settled credits</span><span style="font-weight:600;">${d.toyCredits.length}</span>
+        </div>
+        <div style="padding:6px 0;display:flex;justify-content:space-between;">
+          <span>I Settled credits</span><span style="font-weight:600;">${d.yotCredits.length}</span>
+        </div>
+      </div>`;
+  } else if (tab === 'info') {
+    const c = d.c;
+    el.innerHTML = `
+      <div style="font-size:14px;">
+        <div style="padding:8px 0;border-bottom:1px solid var(--border);"><span style="color:var(--muted);font-size:12px;">Name</span><div style="font-weight:600;">${esc(c.name)}</div></div>
+        <div style="padding:8px 0;border-bottom:1px solid var(--border);"><span style="color:var(--muted);font-size:12px;">Email</span><div>${esc(c.email || '—')}</div></div>
+        <div style="padding:8px 0;border-bottom:1px solid var(--border);"><span style="color:var(--muted);font-size:12px;">Phone</span><div>${esc(c.phone || '—')}</div></div>
+        <div style="padding:8px 0;border-bottom:1px solid var(--border);"><span style="color:var(--muted);font-size:12px;">Address</span><div>${esc(c.address || '—')}</div></div>
+        <div style="padding:8px 0;border-bottom:1px solid var(--border);"><span style="color:var(--muted);font-size:12px;">Notes</span><div>${esc(c.notes || '—')}</div></div>
+        ${c.tags?.length ? `<div style="padding:8px 0;"><span style="color:var(--muted);font-size:12px;">Tags</span><div style="margin-top:4px;">${c.tags.map(t => `<span class="badge badge-blue">${esc(t)}</span>`).join(' ')}</div></div>` : ''}
+        <div style="padding:8px 0;"><span style="color:var(--muted);font-size:12px;">Created</span><div>${fmtDate(c.created_at)}</div></div>
+      </div>`;
+  }
 };
 
 // ── Edit Contact Modal ────────────────────────────────────────────
