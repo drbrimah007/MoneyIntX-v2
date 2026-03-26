@@ -2751,10 +2751,12 @@ async function checkAuth() {
     if (session?.user) {
       enterApp(session.user);
     }
-    // Landing is visible by default — no need to show it
+    } else {
+      document.getElementById('landing').style.display = '';
+    }
   } catch(e) {
     console.error('[checkAuth] error:', e);
-    // Landing is already visible
+    document.getElementById('landing').style.display = '';
   }
 }
 
