@@ -1090,12 +1090,16 @@ window.openEntryDetail = async function(id) {
     ` : ''}
     ${entry.note ? `<div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:16px;font-size:14px;">${esc(entry.note)}</div>` : ''}
     ${settleHtml}
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
-      <button class="btn btn-secondary btn-sm" onclick="openEditEntryModal('${entry.id}')">Edit</button>
-      ${canSettle ? `<button class="btn btn-primary btn-sm" onclick="closeModal();openSettleModal('${entry.id}')">Settle</button>` : ''}
-      ${!isTerminal ? `<button class="btn btn-secondary btn-sm" onclick="closeModal();openSendReminderModal('${entry.id}')">Send Reminder</button>` : ''}
-      <button class="btn btn-secondary btn-sm" onclick="printInvoice('${entry.id}')">Print / PDF</button>
-      <button class="btn btn-secondary btn-sm" onclick="confirmDeleteEntry('${entry.id}');closeModal();" style="color:var(--red);">Delete</button>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+      <button class="bs sm" onclick="openEditEntryModal('${entry.id}')">Edit</button>
+      <button class="bs sm" onclick="closeModal();openShareModal('${entry.id}')">Share</button>
+      ${canSettle ? `<button class="btn sm" onclick="closeModal();openSettleModal('${entry.id}')">Settle</button>` : ''}
+      ${!isTerminal ? `<button class="bs sm" onclick="closeModal();openSendReminderModal('${entry.id}')">Remind</button>` : ''}
+      <button class="bs sm" onclick="printInvoice('${entry.id}')">Print</button>
+      <button class="bs sm" onclick="duplicateEntry('${entry.id}');closeModal();">Duplicate</button>
+      <button class="bs sm" onclick="toggleNoLedger('${entry.id}',${!entry.no_ledger});closeModal();">${entry.no_ledger ? 'Restore Ledger' : 'Rm Ledger'}</button>
+      <button class="bs sm" onclick="handleVoidEntry('${entry.id}');closeModal();" style="color:var(--amber);">Void</button>
+      <button class="bs sm" onclick="confirmDeleteEntry('${entry.id}');closeModal();" style="color:var(--red);">Delete</button>
     </div>
   `, { maxWidth: '560px' });
 };
