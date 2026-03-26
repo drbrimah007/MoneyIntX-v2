@@ -2223,8 +2223,9 @@ async function renderAdmin(el) {
       <td style="font-size:13px;color:var(--muted);">${fmtDate(u.created_at)}</td>
       <td>
         ${u.status === 'active'
-          ? `<button class="btn btn-secondary btn-sm" onclick="suspendUser('${u.id}')" style="font-size:11px;color:var(--amber);">Suspend</button>`
-          : `<button class="btn btn-secondary btn-sm" onclick="activateUser('${u.id}')" style="font-size:11px;color:var(--green);">Activate</button>`}
+          ? `<button class="bs sm" onclick="suspendUser('${u.id}')" style="font-size:11px;color:var(--amber);">Suspend</button>`
+          : `<button class="bs sm" onclick="activateUser('${u.id}')" style="font-size:11px;color:var(--green);">Activate</button>`}
+        <button class="bs sm" onclick="impersonateUser('${u.id}','${esc(u.display_name)}')" style="font-size:11px;margin-left:4px;">View As</button>
       </td>
     </tr>`;
   });
@@ -2888,6 +2889,42 @@ window.doExportLedger = async function() {
 };
 window.doExportContacts = async function() {
   toast('Exporting contacts...'); await exportContactsToCSV(currentUser.id); toast('Contacts exported!', 'success');
+};
+
+// ── Impersonation ─────────────────────────────────────────────────
+window._impersonating = null;
+window._originalUser = null;
+
+window.impersonateUser = async function(userId, name) {
+  if (!confirm(`View as ${name}? You will see their data.`)) return;
+  window._originalUser = { id: currentUser.id, profile: currentProfile };
+  const { data: profile } = await supabase.from('users').select('*').eq('id', userId).single();
+  window._impersonating = { id: userId, profile };
+  currentUser = { id: userId, email: profile?.email };
+  currentProfile = profile;
+  document.getElementById('sidebar-user-name').textContent = profile?.display_name || 'User';
+  // Show banner
+  let banner = document.getElementById('impersonate-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'impersonate-banner';
+    banner.style.cssText = 'background:#7c6800;color:#fbbf24;padding:10px 16px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:8px;';
+    document.getElementById('topbar').after(banner);
+  }
+  banner.innerHTML = `<span>👁 Viewing as: ${esc(profile?.display_name || 'User')}</span><button class="bs sm" onclick="stopImpersonation()" style="background:rgba(251,191,36,.2);border-color:rgba(251,191,36,.3);color:#fbbf24;">Exit</button>`;
+  navTo('dash');
+};
+
+window.stopImpersonation = function() {
+  if (!window._originalUser) return;
+  currentUser = { id: window._originalUser.id, email: window._originalUser.profile?.email };
+  currentProfile = window._originalUser.profile;
+  document.getElementById('sidebar-user-name').textContent = currentProfile?.display_name || '';
+  window._originalUser = null;
+  window._impersonating = null;
+  document.getElementById('impersonate-banner')?.remove();
+  navTo('admin');
+  toast('Impersonation ended.', 'success');
 };
 
 // ── Mobile More Sheet ─────────────────────────────────────────────
