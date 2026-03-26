@@ -272,6 +272,7 @@ import { listInvestments, getInvestment, createInvestment, deleteInvestment, add
 import { listTemplates, listPublicTemplates, createTemplate, updateTemplate, deleteTemplate, copyPublicTemplate, togglePublic, archiveTemplate } from './js/templates.js';
 import { listAllUsers, updateUserRole, updateUserStatus, getAuditLog, logAudit, getPlatformStats } from './js/admin.js';
 import { globalSearch } from './js/search.js';
+import { exportEntriesToCSV, exportLedgerToCSV, exportContactsToCSV } from './js/export.js';
 import { listTrustees, createTrustee, deleteTrustee, verifyTrustee, activateTrustee } from './js/nok.js';
 import { listRecurring, createRecurring, deleteRecurring, toggleRecurring, processDueRecurring, FREQUENCIES } from './js/recurring.js';
 import { toast, esc, navigate, statusBadge, TX_LABELS, TX_COLORS, fmtDate, fmtRelative, openModal, closeModal } from './js/ui.js';
@@ -679,7 +680,11 @@ async function renderEntries(el) {
   const entries = await listEntries(currentUser.id);
 
   let html = `<div class="page-header"><h2>Entries</h2>
-    <button class="btn btn-primary btn-sm" onclick="openNewEntryModal()">+ Add Entry</button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary btn-sm" onclick="openNewEntryModal()">+ Add Entry</button>
+      <button class="btn btn-secondary btn-sm" onclick="doExportEntries()">Export CSV</button>
+      <button class="btn btn-secondary btn-sm" onclick="doExportLedger()">Export Ledger</button>
+    </div>
   </div>`;
 
   // Search
@@ -2095,6 +2100,17 @@ window.saveSettings = async function() {
 };
 
 // ── Action menu toggle (global) ───────────────────────────────────
+// ── Exports ───────────────────────────────────────────────────────
+window.doExportEntries = async function() {
+  toast('Exporting entries...'); await exportEntriesToCSV(currentUser.id); toast('Entries exported!', 'success');
+};
+window.doExportLedger = async function() {
+  toast('Exporting ledger...'); await exportLedgerToCSV(currentUser.id); toast('Ledger exported!', 'success');
+};
+window.doExportContacts = async function() {
+  toast('Exporting contacts...'); await exportContactsToCSV(currentUser.id); toast('Contacts exported!', 'success');
+};
+
 // ── Theme ─────────────────────────────────────────────────────────
 window.setTheme = function(theme) {
   document.documentElement.setAttribute('data-theme', theme);
