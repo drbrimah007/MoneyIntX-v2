@@ -3026,7 +3026,7 @@ async function checkAuth() {
     const { data: { session }, error } = await supabase.auth.getSession();
     console.log('[checkAuth] session:', !!session, error?.message || 'ok');
     if (session?.user) {
-      if (!window._isRecovery) enterApp(session.user);
+      if (!window._isRecovery) { enterApp(session.user); } else { document.getElementById('landing').style.display = ''; }
     } else {
       document.getElementById('landing').style.display = '';
     }
@@ -3042,7 +3042,7 @@ onAuthChange(async (event, session) => {
     currentUser = null; currentProfile = null;
     document.getElementById('shell').classList.remove('active');
     document.getElementById('landing').style.display = '';
-  } else if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user && !currentUser) {
+  } else if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user && !currentUser && !window._isRecovery) {
     try {
       await enterApp(session.user);
     } catch(e) {
