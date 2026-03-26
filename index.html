@@ -258,9 +258,47 @@ window.handleSignup = async function() {
 window.handleForgotPassword = async function() {
   const email = prompt('Enter your email address:');
   if (!email) return;
-  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/#reset'
+  });
   if (error) toast(error.message, 'error');
-  else toast('Password reset email sent.', 'success');
+  else toast('Password reset email sent — check your inbox.', 'success');
+};
+
+// Handle password reset from email link
+if (window.location.hash.includes('type=recovery') || window.location.hash.includes('#reset')) {
+  // Supabase puts the token in the URL hash
+  const hashParams = new URLSearchParams(window.location.hash.substring(1));
+  if (hashParams.get('type') === 'recovery' || hashParams.get('access_token')) {
+    document.addEventListener('DOMContentLoaded', () => {
+      const landing = document.getElementById('landing');
+      if (landing) {
+        landing.style.display = '';
+        landing.querySelector('.landing-card').innerHTML = `
+          <div style="text-align:center;margin-bottom:20px;">
+            <div style="font-size:36px;margin-bottom:8px;">🔐</div>
+            <h1 style="font-size:24px;font-weight:800;">Reset Password</h1>
+            <p style="color:#64748b;font-size:14px;">Enter your new password</p>
+          </div>
+          <div class="form-group"><label>New Password</label><input type="password" id="reset-pass" placeholder="Min 6 characters"></div>
+          <div class="form-group"><label>Confirm Password</label><input type="password" id="reset-pass2" placeholder="Confirm password"></div>
+          <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="doResetPassword()">Update Password</button>
+        `;
+      }
+    });
+  }
+}
+
+window.doResetPassword = async function() {
+  const pass = document.getElementById('reset-pass').value;
+  const pass2 = document.getElementById('reset-pass2').value;
+  if (!pass || pass.length < 6) return toast('Password must be at least 6 characters.', 'error');
+  if (pass !== pass2) return toast('Passwords do not match.', 'error');
+  const { error } = await supabase.auth.updateUser({ password: pass });
+  if (error) return toast(error.message, 'error');
+  toast('Password updated! Logging you in...', 'success');
+  window.location.hash = '';
+  setTimeout(() => window.location.reload(), 1500);
 };
 
 async function handleLogOut() {
