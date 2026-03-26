@@ -598,18 +598,18 @@ async function renderDash(el) {
   </div>`;
 
   // Quick actions
-  html += `<div class="card" style="margin-bottom:16px;">
-    <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">Quick Actions</div>
+  html += `<div class="card card-sm" style="margin-bottom:16px;">
+    <div class="section-title">Quick Actions</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;">
-      <button class="btn btn-primary btn-sm" onclick="openNewEntryModal()">+ Add Entry</button>
-      <button class="btn btn-secondary btn-sm" onclick="openNewContactModal()">+ Add Contact</button>
-      <button class="btn btn-secondary btn-sm" onclick="navTo('contacts')">Contacts</button>
-      <button class="btn btn-secondary btn-sm" onclick="navTo('entries')">Entries</button>
-      <button class="btn btn-secondary btn-sm" onclick="navTo('groups')">Groups</button>
-      <button class="btn btn-secondary btn-sm" onclick="navTo('investments')">Investments</button>
-      <button class="btn btn-secondary btn-sm" onclick="navTo('templates')">Templates</button>
-      <button class="btn btn-secondary btn-sm" onclick="navTo('recurring')">Recurring</button>
-      <button class="btn btn-secondary btn-sm" onclick="navTo('nok')">Trusted Access</button>
+      <button class="btn sm" onclick="openNewEntryModal('they_owe_you')" style="background:var(--green);">They Owe Me</button>
+      <button class="btn sm" onclick="openNewEntryModal('you_owe_them')" style="background:var(--red);">I Owe Them</button>
+      <button class="bs sm" onclick="openNewContactModal()">+ Add Contact</button>
+      <button class="bs sm" onclick="navTo('contacts')">👤 Contacts</button>
+      <button class="bs sm" onclick="navTo('entries')">📋 Entries</button>
+      <button class="bs sm" onclick="navTo('templates')">📄 Templates</button>
+      <button class="bs sm" onclick="navTo('recurring')">🔁 Recurring</button>
+      <button class="bs sm" onclick="navTo('notifications')">🔔 Notifications</button>
+      <button class="bs sm" onclick="navTo('nok')">🔐 Trusted Access</button>
     </div>
   </div>`;
 
@@ -1361,30 +1361,85 @@ window.doSendReminder = async function(entryId) {
   navTo('entries');
 };
 
-window.openNewEntryModal = async function() {
+window.openNewEntryModal = async function(defaultDirection) {
   const contacts = await listContacts(currentUser.id);
   const contactOpts = contacts.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  const templates = await listTemplates(currentUser.id);
+  const dir = defaultDirection || 'they_owe_you';
+  const isToy = dir === 'they_owe_you';
+
   openModal(`
-    <h3 style="margin-bottom:16px;">New Entry</h3>
-    <div class="form-group"><label>Contact *</label><select id="ne-contact">${contactOpts || '<option value="">No contacts — add one first</option>'}</select></div>
-    <div class="form-group"><label>Type *</label><select id="ne-type">
-      <option value="they_owe_you">They Owe Me</option>
-      <option value="you_owe_them">I Owe Them</option>
-      <option value="invoice">Invoice</option>
-      <option value="bill">Bill</option>
-      <option value="they_paid_you">They Settled Me</option>
-      <option value="you_paid_them">I Settled Them</option>
-    </select></div>
+    <div class="modal-title">New Entry</div>
+
+    <!-- Direction picker (v1 style) -->
+    <div class="entry-type-tabs" style="display:flex;gap:6px;margin-bottom:16px;">
+      <button class="entry-type-tab ${isToy ? 'active' : ''}" onclick="setEntryDirection('they_owe_you')" id="dir-toy"
+        style="flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:600;border:2px solid ${isToy ? 'var(--green)' : 'var(--border)'};background:${isToy ? 'rgba(74,222,128,.12)' : 'var(--bg3)'};color:${isToy ? 'var(--green)' : 'var(--muted)'};cursor:pointer;text-align:center;">
+        They Owe Me
+      </button>
+      <button class="entry-type-tab ${!isToy ? 'active' : ''}" onclick="setEntryDirection('you_owe_them')" id="dir-yot"
+        style="flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:600;border:2px solid ${!isToy ? 'var(--red)' : 'var(--border)'};background:${!isToy ? 'rgba(248,113,113,.12)' : 'var(--bg3)'};color:${!isToy ? 'var(--red)' : 'var(--muted)'};cursor:pointer;text-align:center;">
+        I Owe Them
+      </button>
+    </div>
+
+    <div class="form-group"><label>Contact *</label>
+      <select id="ne-contact">${contactOpts || '<option value="">No contacts — add one first</option>'}</select>
+    </div>
+
+    <div class="form-group"><label>Transaction Type</label>
+      <select id="ne-type">
+        ${isToy ? `
+          <option value="they_owe_you">They Owe Me</option>
+          <option value="invoice">Invoice</option>
+          <option value="they_paid_you">They Settled Me</option>
+        ` : `
+          <option value="you_owe_them">I Owe Them</option>
+          <option value="bill">Bill</option>
+          <option value="you_paid_them">I Settled Them</option>
+        `}
+      </select>
+    </div>
+
     <div class="form-row">
       <div class="form-group"><label>Amount *</label><input type="number" id="ne-amount" min="0" step="0.01" placeholder="0.00"></div>
       <div class="form-group"><label>Date</label><input type="date" id="ne-date" value="${new Date().toISOString().slice(0,10)}"></div>
     </div>
+
     <div class="form-group"><label>Note</label><textarea id="ne-note" rows="2" placeholder="Optional note..."></textarea></div>
+
+    ${templates.length > 0 ? `
+      <div class="form-group"><label>Or use a template</label>
+        <select id="ne-template" onchange="if(this.value){closeModal();useTemplateForEntry(this.value);}">
+          <option value="">— Select template —</option>
+          ${templates.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}
+        </select>
+      </div>
+    ` : ''}
+
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
-      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('modal')?.remove()">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="saveNewEntry()">Save Entry</button>
+      <button class="bs sm" onclick="closeModal()">Cancel</button>
+      <button class="btn sm" onclick="saveNewEntry()">Save Entry</button>
     </div>
   `, { maxWidth: '480px' });
+  window._entryDirection = dir;
+};
+
+window.setEntryDirection = function(dir) {
+  window._entryDirection = dir;
+  const isToy = dir === 'they_owe_you';
+  // Update tabs
+  const toyBtn = document.getElementById('dir-toy');
+  const yotBtn = document.getElementById('dir-yot');
+  if (toyBtn) { toyBtn.style.borderColor = isToy ? 'var(--green)' : 'var(--border)'; toyBtn.style.background = isToy ? 'rgba(74,222,128,.12)' : 'var(--bg3)'; toyBtn.style.color = isToy ? 'var(--green)' : 'var(--muted)'; }
+  if (yotBtn) { yotBtn.style.borderColor = !isToy ? 'var(--red)' : 'var(--border)'; yotBtn.style.background = !isToy ? 'rgba(248,113,113,.12)' : 'var(--bg3)'; yotBtn.style.color = !isToy ? 'var(--red)' : 'var(--muted)'; }
+  // Update type dropdown
+  const sel = document.getElementById('ne-type');
+  if (sel) {
+    sel.innerHTML = isToy
+      ? '<option value="they_owe_you">They Owe Me</option><option value="invoice">Invoice</option><option value="they_paid_you">They Settled Me</option>'
+      : '<option value="you_owe_them">I Owe Them</option><option value="bill">Bill</option><option value="you_paid_them">I Settled Them</option>';
+  }
 };
 
 window.saveNewEntry = async function() {
