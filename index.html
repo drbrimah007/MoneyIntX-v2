@@ -333,25 +333,47 @@ function navTo(page) {
 // ── Dashboard ─────────────────────────────────────────────────────
 async function renderDash(el) {
   el.innerHTML = '<div class="page-header"><h2>Dashboard</h2></div><p style="color:var(--muted);">Loading...</p>';
-  const [totals, recent] = await Promise.all([
+  const [totals, recent, contacts, unread] = await Promise.all([
     getDashboardTotals(currentUser.id),
-    recentEntries(currentUser.id)
+    recentEntries(currentUser.id, 15),
+    listContacts(currentUser.id),
+    getUnreadCount(currentUser.id)
   ]);
-  const toyFmt = fmtMoney(totals.total_they_owe_me || 0);
-  const yotFmt = fmtMoney(totals.total_i_owe_them || 0);
-  const netFmt = fmtMoney(totals.total_net || 0);
-  const netColor = (totals.total_net || 0) >= 0 ? 'var(--green)' : 'var(--red)';
+  const toy = totals.total_they_owe_me || 0;
+  const yot = totals.total_i_owe_them || 0;
+  const net = totals.total_net || 0;
+  const netColor = net >= 0 ? 'var(--green)' : 'var(--red)';
 
   let html = `<div class="page-header"><h2>Dashboard</h2>
     <div style="display:flex;gap:8px;">
-      <button class="btn btn-primary btn-sm" onclick="app.navigate('entries')">+ Add Entry</button>
-      <button class="btn btn-secondary btn-sm" onclick="app.navigate('contacts')">+ Add Contact</button>
+      <button class="btn btn-primary btn-sm" onclick="openNewEntryModal()">+ Add Entry</button>
+      <button class="btn btn-secondary btn-sm" onclick="openNewContactModal()">+ Add Contact</button>
     </div>
   </div>`;
-  html += `<div class="grid3">
-    <div class="stat-card"><div class="stat-lbl">They Owe Me</div><div class="stat-val" style="color:var(--green)">${toyFmt}</div></div>
-    <div class="stat-card"><div class="stat-lbl">I Owe Them</div><div class="stat-val" style="color:var(--red)">${yotFmt}</div></div>
-    <div class="stat-card"><div class="stat-lbl">Net Balance</div><div class="stat-val" style="color:${netColor}">${netFmt}</div></div>
+
+  // Stat cards
+  html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;">
+    <div class="stat-card"><div class="stat-lbl">Contacts</div><div class="stat-val">${contacts.length}</div></div>
+    <div class="stat-card"><div class="stat-lbl">They Owe Me</div><div class="stat-val" style="color:var(--green)">${fmtMoney(toy)}</div></div>
+    <div class="stat-card"><div class="stat-lbl">I Owe Them</div><div class="stat-val" style="color:var(--red)">${fmtMoney(yot)}</div></div>
+    <div class="stat-card"><div class="stat-lbl">Net Balance</div><div class="stat-val" style="color:${netColor}">${fmtMoney(net)}</div></div>
+    ${unread > 0 ? `<div class="stat-card" style="cursor:pointer;" onclick="navTo('notifications')"><div class="stat-lbl">Notifications</div><div class="stat-val" style="color:var(--accent);">${unread}</div></div>` : ''}
+  </div>`;
+
+  // Quick actions
+  html += `<div class="card" style="margin-bottom:16px;">
+    <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">Quick Actions</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <button class="btn btn-primary btn-sm" onclick="openNewEntryModal()">+ Add Entry</button>
+      <button class="btn btn-secondary btn-sm" onclick="openNewContactModal()">+ Add Contact</button>
+      <button class="btn btn-secondary btn-sm" onclick="navTo('contacts')">Contacts</button>
+      <button class="btn btn-secondary btn-sm" onclick="navTo('entries')">Entries</button>
+      <button class="btn btn-secondary btn-sm" onclick="navTo('groups')">Groups</button>
+      <button class="btn btn-secondary btn-sm" onclick="navTo('investments')">Investments</button>
+      <button class="btn btn-secondary btn-sm" onclick="navTo('templates')">Templates</button>
+      <button class="btn btn-secondary btn-sm" onclick="navTo('recurring')">Recurring</button>
+      <button class="btn btn-secondary btn-sm" onclick="navTo('nok')">Trusted Access</button>
+    </div>
   </div>`;
 
   html += `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
