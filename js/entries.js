@@ -109,11 +109,37 @@ export async function updateEntry(id, updates) {
   return data;
 }
 
-// ── Delete entry ──────────────────────────────────────────────────
+// ── Delete entry (soft delete — archives it, never truly removed) ─
 export async function deleteEntry(id) {
-  const { error } = await supabase.from('entries').delete().eq('id', id);
+  const { data, error } = await supabase.from('entries')
+    .update({ archived_at: new Date().toISOString(), status: 'cancelled', updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
   if (error) console.error('[deleteEntry]', error.message);
-  return !error;
+  return !!data;
+}
+
+// ── Restore entry (admin — unarchive) ─────────────────────────────
+export async function restoreEntry(id) {
+  const { data, error } = await supabase.from('entries')
+    .update({ archived_at: null, status: 'posted', updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) console.error('[restoreEntry]', error.message);
+  return !!data;
+}
+
+// ── List archived/deleted entries (admin only) ────────────────────
+export async function listArchivedEntries(userId) {
+  const { data, error } = await supabase.from('entries')
+    .select('*, contact:contacts(id, name)')
+    .eq('user_id', userId)
+    .not('archived_at', 'is', null)
+    .order('archived_at', { ascending: false });
+  if (error) console.error('[listArchivedEntries]', error.message);
+  return data || [];
 }
 
 // ── Archive / Unarchive ───────────────────────────────────────────

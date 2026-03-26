@@ -282,6 +282,7 @@ tr:hover { background: var(--bg2); }
       <a data-page="recurring" onclick="app.navigate('recurring')"><span>🔁</span> Recurring</a>
       <a data-page="notifications" onclick="app.navigate('notifications')"><span>🔔</span> Notifications <span id="notif-badge" class="nav-badge" style="display:none;">0</span></a>
       <a data-page="nok" onclick="app.navigate('nok')"><span>🔐</span> Trusted Access</a>
+      <a data-page="trash" onclick="app.navigate('trash')" id="trash-link" style="display:none;"><span>🗑️</span> Trash</a>
       <a data-page="admin" onclick="app.navigate('admin')" id="admin-link" style="display:none;"><span>🛡️</span> Admin</a>
       <a data-page="settings" onclick="app.navigate('settings')"><span>⚙️</span> Settings</a>
     </nav>
@@ -311,7 +312,7 @@ tr:hover { background: var(--bg2); }
 import { supabase, getCurrentUser, getProfile } from './js/supabase.js';
 import { signUp, logIn, logOut, onAuthChange } from './js/auth.js';
 import { listContacts, createContact, deleteContact } from './js/contacts.js';
-import { listEntries, recentEntries, createEntry, deleteEntry, updateEntry, getEntry, getDashboardTotals, getLedgerSummary, fmtMoney, toCents, toDollars, voidEntry, archiveEntry, unarchiveEntry } from './js/entries.js';
+import { listEntries, recentEntries, createEntry, deleteEntry, updateEntry, getEntry, getDashboardTotals, getLedgerSummary, fmtMoney, toCents, toDollars, voidEntry, archiveEntry, unarchiveEntry, restoreEntry, listArchivedEntries } from './js/entries.js';
 import { listSettlements, createSettlement, reviewSettlement, deleteSettlement } from './js/settlements.js';
 import { listNotifications, getUnreadCount, markAllRead, subscribeToNotifications } from './js/notifications.js';
 import { createShareToken, getShareByToken, listSentShares, listReceivedShares, confirmShare, dismissShare, expireShare, getShareUrl } from './js/sharing.js';
@@ -428,6 +429,8 @@ async function enterApp(user) {
   // Show admin link for admin users
   const adminLink = document.getElementById('admin-link');
   if (adminLink) adminLink.style.display = currentProfile?.role === 'platform_admin' ? '' : 'none';
+  const trashLink = document.getElementById('trash-link');
+  if (trashLink) trashLink.style.display = currentProfile?.role === 'platform_admin' ? '' : 'none';
 
   // Start realtime notifications
   notifChannel = subscribeToNotifications(user.id, (notif) => {
@@ -487,6 +490,7 @@ function navTo(page) {
     case 'recurring': renderRecurringPage(content); break;
     case 'notifications': renderNotifications(content); break;
     case 'nok': renderNokPage(content); break;
+    case 'trash': renderTrash(content); break;
     case 'admin': renderAdmin(content); break;
     case 'settings': renderSettings(content); break;
     default: renderDash(content);
@@ -1839,6 +1843,54 @@ window.confirmDeleteTrustee = async function(id) {
   if (!confirm('Remove this trustee?')) return;
   await deleteTrustee(id);
   toast('Trustee removed.', 'success'); navTo('nok');
+};
+
+// ── Trash ─────────────────────────────────────────────────────────
+async function renderTrash(el) {
+  if (currentProfile?.role !== 'platform_admin') {
+    el.innerHTML = '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--red);">Admin access required.</p></div>';
+    return;
+  }
+  el.innerHTML = '<div class="page-header"><h2>🗑️ Trash</h2></div><p style="color:var(--muted);">Loading...</p>';
+  const archived = await listArchivedEntries(currentUser.id);
+
+  let html = `<div class="page-header"><h2>🗑️ Trash</h2>
+    <span style="font-size:13px;color:var(--muted);">${archived.length} deleted item${archived.length !== 1 ? 's' : ''}</span>
+  </div>`;
+
+  if (archived.length === 0) {
+    html += `<div class="card" style="text-align:center;padding:40px;">
+      <p style="font-size:32px;margin-bottom:12px;">🗑️</p>
+      <p style="color:var(--muted);">Trash is empty. Deleted entries will appear here.</p>
+    </div>`;
+  } else {
+    html += `<div class="card"><div class="tbl-wrap"><table><thead><tr>
+      <th>Contact</th><th>Amount</th><th>Type</th><th>Date</th><th>Deleted</th><th></th>
+    </tr></thead><tbody>`;
+    archived.forEach(e => {
+      const cName = e.contact?.name || '—';
+      const txLabel = TX_LABELS[e.tx_type] || e.tx_type;
+      const deletedDate = e.archived_at ? new Date(e.archived_at).toLocaleDateString() : '—';
+      html += `<tr style="opacity:0.7;">
+        <td style="font-weight:600;">${esc(cName)}</td>
+        <td style="font-weight:700;">${fmtMoney(e.amount, e.currency)}</td>
+        <td>${esc(txLabel)}</td>
+        <td style="color:var(--muted);">${fmtDate(e.date)}</td>
+        <td style="color:var(--muted);font-size:12px;">${deletedDate}</td>
+        <td>
+          <button class="btn btn-primary btn-sm" onclick="doRestoreEntry('${e.id}')">Restore</button>
+        </td>
+      </tr>`;
+    });
+    html += `</tbody></table></div></div>`;
+  }
+  el.innerHTML = html;
+}
+
+window.doRestoreEntry = async function(id) {
+  await restoreEntry(id);
+  toast('Entry restored!', 'success');
+  navTo('trash');
 };
 
 // ── Admin ─────────────────────────────────────────────────────────
