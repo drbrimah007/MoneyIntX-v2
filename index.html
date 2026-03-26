@@ -348,7 +348,38 @@ tr:last-child td { border-bottom: none; }
       <button data-page="contacts" onclick="app.navigate('contacts')"><span class="tab-icon">👤</span>Contacts</button>
       <button data-page="entries" onclick="app.navigate('entries')"><span class="tab-icon">📋</span>Entries</button>
       <button data-page="notifications" onclick="app.navigate('notifications')"><span class="tab-icon">🔔</span>Notifs</button>
-      <button data-page="settings" onclick="app.navigate('settings')"><span class="tab-icon">⚙</span>More</button>
+      <button onclick="openMobileMore()"><span class="tab-icon">☰</span>More</button>
+    </div>
+  </div>
+
+  <!-- Mobile More Sheet -->
+  <div id="mobile-more-sheet" style="display:none;position:fixed;inset:0;z-index:9500;">
+    <div style="position:absolute;inset:0;background:rgba(0,0,0,.55);" onclick="closeMobileMore()"></div>
+    <div style="position:absolute;bottom:0;left:0;right:0;background:var(--bg2);border-radius:18px 18px 0 0;border-top:1px solid var(--border);padding:12px 0 calc(12px + env(safe-area-inset-bottom));animation:slideUp .22s ease;">
+      <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px;"></div>
+      <button onclick="closeMobileMore();app.navigate('groups')" style="display:flex;align-items:center;gap:14px;padding:14px 24px;font-size:15px;font-weight:500;cursor:pointer;color:var(--text);background:none;border:none;width:100%;text-align:left;">
+        <span style="font-size:20px;width:28px;text-align:center;">👥</span> Groups
+      </button>
+      <button onclick="closeMobileMore();app.navigate('investments')" style="display:flex;align-items:center;gap:14px;padding:14px 24px;font-size:15px;font-weight:500;cursor:pointer;color:var(--text);background:none;border:none;width:100%;text-align:left;">
+        <span style="font-size:20px;width:28px;text-align:center;">📈</span> Investments
+      </button>
+      <button onclick="closeMobileMore();app.navigate('templates')" style="display:flex;align-items:center;gap:14px;padding:14px 24px;font-size:15px;font-weight:500;cursor:pointer;color:var(--text);background:none;border:none;width:100%;text-align:left;">
+        <span style="font-size:20px;width:28px;text-align:center;">📄</span> Templates
+      </button>
+      <button onclick="closeMobileMore();app.navigate('recurring')" style="display:flex;align-items:center;gap:14px;padding:14px 24px;font-size:15px;font-weight:500;cursor:pointer;color:var(--text);background:none;border:none;width:100%;text-align:left;">
+        <span style="font-size:20px;width:28px;text-align:center;">🔁</span> Recurring
+      </button>
+      <div style="height:1px;background:var(--border);margin:6px 0;"></div>
+      <button onclick="closeMobileMore();app.navigate('nok')" style="display:flex;align-items:center;gap:14px;padding:14px 24px;font-size:15px;font-weight:500;cursor:pointer;color:var(--text);background:none;border:none;width:100%;text-align:left;">
+        <span style="font-size:20px;width:28px;text-align:center;">🔐</span> Trusted Access
+      </button>
+      <button onclick="closeMobileMore();app.navigate('settings')" style="display:flex;align-items:center;gap:14px;padding:14px 24px;font-size:15px;font-weight:500;cursor:pointer;color:var(--text);background:none;border:none;width:100%;text-align:left;">
+        <span style="font-size:20px;width:28px;text-align:center;">⚙️</span> Settings
+      </button>
+      <div style="height:1px;background:var(--border);margin:6px 0;"></div>
+      <button onclick="closeMobileMore();app.logOut()" style="display:flex;align-items:center;gap:14px;padding:14px 24px;font-size:15px;font-weight:500;cursor:pointer;color:var(--red);background:none;border:none;width:100%;text-align:left;">
+        <span style="font-size:20px;width:28px;text-align:center;">🚪</span> Sign Out
+      </button>
     </div>
   </div>
 </div>
@@ -2856,6 +2887,14 @@ window.doExportLedger = async function() {
 };
 window.doExportContacts = async function() {
   toast('Exporting contacts...'); await exportContactsToCSV(currentUser.id); toast('Contacts exported!', 'success');
+};
+
+// ── Mobile More Sheet ─────────────────────────────────────────────
+window.openMobileMore = function() {
+  document.getElementById('mobile-more-sheet').style.display = '';
+};
+window.closeMobileMore = function() {
+  document.getElementById('mobile-more-sheet').style.display = 'none';
 };
 
 // ── Theme ─────────────────────────────────────────────────────────
