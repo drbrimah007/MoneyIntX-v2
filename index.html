@@ -2886,6 +2886,18 @@ document.addEventListener('click', (e) => {
 // Single auth check — no duplicate enterApp calls
 let _authChecked = false;
 async function checkAuth() {
+  // Handle Supabase auth error hash params (e.g. expired email link)
+  const _hashStr = window.location.hash.slice(1);
+  if (_hashStr.includes('error=')) {
+    const _hp = new URLSearchParams(_hashStr);
+    const _ec = _hp.get('error_code') || '';
+    let _em = _hp.get('error_description') || _hp.get('error') || 'Authentication error.';
+    if (_ec === 'otp_expired') _em = 'That email link has expired — please sign up or log in again.';
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    document.getElementById('landing').style.display = '';
+    setTimeout(() => toast(_em, 'error'), 100);
+    return;
+  }
   if (_authChecked) return;
   _authChecked = true;
   try {
