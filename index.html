@@ -528,13 +528,25 @@ async function renderDash(el) {
     </div>
   </div>`;
 
+  // Net Balance hero card
+  const netAbs = Math.abs(net);
+  const netLabel = net > 0 ? 'You are owed' : net < 0 ? 'You owe' : 'All settled';
+  const netIcon = net > 0 ? '📈' : net < 0 ? '📉' : '✅';
+  html += `<div style="background:linear-gradient(135deg,${net >= 0 ? 'var(--accent)' : '#dc2626'},${net >= 0 ? '#4338ca' : '#991b1b'});border-radius:16px;padding:24px;color:#fff;margin-bottom:16px;position:relative;overflow:hidden;">
+    <div style="position:absolute;right:-20px;top:-20px;font-size:100px;opacity:0.1;">${netIcon}</div>
+    <div style="font-size:13px;opacity:0.8;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">${netLabel}</div>
+    <div style="font-size:36px;font-weight:800;margin-top:4px;">${fmtMoney(netAbs)}</div>
+    <div style="display:flex;gap:24px;margin-top:12px;font-size:13px;opacity:0.85;">
+      <span>They owe me: ${fmtMoney(toy)}</span>
+      <span>I owe them: ${fmtMoney(yot)}</span>
+    </div>
+  </div>`;
+
   // Stat cards
-  html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;">
-    <div class="stat-card"><div class="stat-lbl">Contacts</div><div class="stat-val">${contacts.length}</div></div>
-    <div class="stat-card"><div class="stat-lbl">They Owe Me</div><div class="stat-val" style="color:var(--green)">${fmtMoney(toy)}</div></div>
-    <div class="stat-card"><div class="stat-lbl">I Owe Them</div><div class="stat-val" style="color:var(--red)">${fmtMoney(yot)}</div></div>
-    <div class="stat-card"><div class="stat-lbl">Net Balance</div><div class="stat-val" style="color:${netColor}">${fmtMoney(net)}</div></div>
-    ${unread > 0 ? `<div class="stat-card" style="cursor:pointer;" onclick="navTo('notifications')"><div class="stat-lbl">Notifications</div><div class="stat-val" style="color:var(--accent);">${unread}</div></div>` : ''}
+  html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;">
+    <div class="stat-card" style="cursor:pointer;" onclick="navTo('contacts')"><div class="stat-lbl">Contacts</div><div class="stat-val">${contacts.length}</div></div>
+    <div class="stat-card" style="cursor:pointer;" onclick="navTo('entries')"><div class="stat-lbl">Entries</div><div class="stat-val">${recent.length}+</div></div>
+    ${unread > 0 ? `<div class="stat-card" style="cursor:pointer;border-color:var(--accent);" onclick="navTo('notifications')"><div class="stat-lbl">Unread</div><div class="stat-val" style="color:var(--accent);">${unread}</div></div>` : ''}
   </div>`;
 
   // Quick actions
