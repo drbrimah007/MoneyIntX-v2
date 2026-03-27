@@ -250,13 +250,8 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
-/* ── Scrolling Ticker ─────────────────────────────────────────── */
-.ticker-wrap { overflow: hidden; background: linear-gradient(90deg, #12102a, #0f1117 50%, #12102a); border-top: 1px solid rgba(108,99,255,.2); border-bottom: 1px solid rgba(108,99,255,.2); padding: 8px 0; white-space: nowrap; }
-.ticker-track { display: inline-block; animation: ticker 38s linear infinite; }
-.ticker-track:hover { animation-play-state: paused; }
-.ticker-item { display: inline-block; padding: 0 48px; font-size: 13px; color: #a78bfa; font-weight: 500; }
-.ticker-item::before { content: '💡 '; }
-@keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+/* ── Dashboard Tip Card ───────────────────────────────────────── */
+.dash-tip { background:linear-gradient(90deg,rgba(108,99,255,.12),rgba(108,99,255,.06)); border:1px solid rgba(108,99,255,.25); border-left:3px solid var(--accent); border-radius:10px; padding:9px 14px; font-size:13px; color:#c4b5fd; margin-bottom:14px; display:flex; align-items:center; gap:10px; }
 
 /* ── Contact avatar colors ────────────────────────────────────── */
 .contact-avatar { width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; color:#fff; flex-shrink:0; text-shadow:0 1px 2px rgba(0,0,0,.4); }
@@ -400,33 +395,6 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
   </div>
   </div>
 
-  <!-- Scrolling Tips Ticker -->
-  <div class="ticker-wrap" id="landing-ticker">
-    <div class="ticker-track" id="landing-ticker-track">
-      <span class="ticker-item">Record every transaction, no matter how small — it adds up.</span>
-      <span class="ticker-item">Always confirm settlements in writing — Money IntX keeps it clear.</span>
-      <span class="ticker-item">Use templates to create invoices in seconds.</span>
-      <span class="ticker-item">Assign a Trusted Contact to protect your records for your family.</span>
-      <span class="ticker-item">Separate currencies keep your international dealings clean.</span>
-      <span class="ticker-item">Savings circles (ajo/susu) work best with clear records — use Groups.</span>
-      <span class="ticker-item">Track ROI on investments by adding all partners and transactions.</span>
-      <span class="ticker-item">Send payment reminders directly from the app — stay professional.</span>
-      <span class="ticker-item">A debt unrecorded is a debt forgotten — always write it down.</span>
-      <span class="ticker-item">Recurring entries automate regular bills and income records.</span>
-      <!-- Duplicate for seamless loop -->
-      <span class="ticker-item">Record every transaction, no matter how small — it adds up.</span>
-      <span class="ticker-item">Always confirm settlements in writing — Money IntX keeps it clear.</span>
-      <span class="ticker-item">Use templates to create invoices in seconds.</span>
-      <span class="ticker-item">Assign a Trusted Contact to protect your records for your family.</span>
-      <span class="ticker-item">Separate currencies keep your international dealings clean.</span>
-      <span class="ticker-item">Savings circles (ajo/susu) work best with clear records — use Groups.</span>
-      <span class="ticker-item">Track ROI on investments by adding all partners and transactions.</span>
-      <span class="ticker-item">Send payment reminders directly from the app — stay professional.</span>
-      <span class="ticker-item">A debt unrecorded is a debt forgotten — always write it down.</span>
-      <span class="ticker-item">Recurring entries automate regular bills and income records.</span>
-    </div>
-  </div>
-
   <!-- Trust bar -->
   <div style="background:#0f1117;border-top:1px solid #1e2235;padding:24px 20px;text-align:center;">
     <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:20px;font-size:12px;color:#6b7280;margin-bottom:12px;">
@@ -476,33 +444,6 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
     <button class="nav-btn" data-page="trash" id="trash-link" onclick="app.navigate('trash')" style="display:none;">Trash</button>
     <button class="nav-btn" data-page="admin" id="admin-link" onclick="app.navigate('admin')" style="display:none;">Admin</button>
     <button class="nav-btn" data-page="settings" onclick="app.navigate('settings')">⚙</button>
-  </div>
-
-  <!-- App Tips Ticker -->
-  <div class="ticker-wrap no-print" id="app-ticker">
-    <div class="ticker-track">
-      <span class="ticker-item">Add contacts first — entries are always linked to a contact.</span>
-      <span class="ticker-item">Use 'They Owe Me' for loans given, 'Invoice' for services rendered.</span>
-      <span class="ticker-item">The net balance on your dashboard updates in real-time.</span>
-      <span class="ticker-item">Group balances by currency — each currency shows its own ledger.</span>
-      <span class="ticker-item">Templates save you time — build once, use on every invoice.</span>
-      <span class="ticker-item">Settle partially — record part-payments as they come in.</span>
-      <span class="ticker-item">Share a record with a contact — they can accept it into their own account.</span>
-      <span class="ticker-item">Asset Lockers keep your important financial details safe and organised.</span>
-      <span class="ticker-item">Trusted Access lets a designated person view your records if needed.</span>
-      <span class="ticker-item">Export to CSV for your accountant or tax records anytime.</span>
-      <!-- Duplicate for seamless loop -->
-      <span class="ticker-item">Add contacts first — entries are always linked to a contact.</span>
-      <span class="ticker-item">Use 'They Owe Me' for loans given, 'Invoice' for services rendered.</span>
-      <span class="ticker-item">The net balance on your dashboard updates in real-time.</span>
-      <span class="ticker-item">Group balances by currency — each currency shows its own ledger.</span>
-      <span class="ticker-item">Templates save you time — build once, use on every invoice.</span>
-      <span class="ticker-item">Settle partially — record part-payments as they come in.</span>
-      <span class="ticker-item">Share a record with a contact — they can accept it into their own account.</span>
-      <span class="ticker-item">Asset Lockers keep your important financial details safe and organised.</span>
-      <span class="ticker-item">Trusted Access lets a designated person view your records if needed.</span>
-      <span class="ticker-item">Export to CSV for your accountant or tax records anytime.</span>
-    </div>
   </div>
 
   <!-- Main Content -->
@@ -647,20 +588,23 @@ window.setDefaultCurrency = async function(cur) {
 };
 
 // ── Mini currency picker (replaces native <select> in hero) ────────
+// Dropdown uses position:fixed so it always clears overflow:hidden parent cards
 window.toggleCurPicker = function(el) {
-  const picker = document.getElementById('hero-cur-picker');
+  let picker = document.getElementById('hero-cur-picker');
   if (!picker) return;
   const isOpen = picker.style.display !== 'none';
-  picker.style.display = isOpen ? 'none' : 'block';
-  if (!isOpen) {
-    // close on outside click
-    setTimeout(() => {
-      document.addEventListener('click', function _close(e) {
-        if (!picker.contains(e.target) && e.target !== el) picker.style.display = 'none';
-        document.removeEventListener('click', _close);
-      });
-    }, 0);
-  }
+  if (isOpen) { picker.style.display = 'none'; return; }
+  // Position below the button using fixed coords
+  const rect = el.getBoundingClientRect();
+  picker.style.top  = (rect.bottom + 6) + 'px';
+  picker.style.left = rect.left + 'px';
+  picker.style.display = 'block';
+  setTimeout(() => {
+    document.addEventListener('click', function _close(e) {
+      if (!picker.contains(e.target) && e.target !== el) picker.style.display = 'none';
+      document.removeEventListener('click', _close);
+    });
+  }, 0);
 };
 window.pickCurrency = async function(cur) {
   const picker = document.getElementById('hero-cur-picker');
@@ -903,6 +847,9 @@ function navTo(page) {
 
 // ── Dashboard ─────────────────────────────────────────────────────
 async function renderDash(el) {
+  // Allow being called without el (e.g. from setDefaultCurrency)
+  if (!el) el = document.getElementById('content');
+  if (!el || window._currentPage !== 'dash') return;
   el.innerHTML = '<div class="page-header"><h2>Dashboard</h2></div><p style="color:var(--muted);padding:20px;">Loading…</p>';
   // Run critical queries first (top 4), then non-critical (ledger + currency) in parallel
   // This paints the hero card faster even if ledger is slow
@@ -929,6 +876,23 @@ async function renderDash(el) {
 
   const userName = currentProfile?.display_name?.split(' ')[0] || 'there';
 
+  // Inject / update the body-level floating currency picker (lives outside hero card
+  // so it's never clipped by overflow:hidden — positioned via fixed coords in toggleCurPicker)
+  const ALL_CURRENCIES = ['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','AED','SAR','BRL','EGP','MAD','TZS','UGX','ETB','XOF','QAR','KWD','CNY','MXN'];
+  let _picker = document.getElementById('hero-cur-picker');
+  if (!_picker) {
+    _picker = document.createElement('div');
+    _picker.id = 'hero-cur-picker';
+    _picker.style.cssText = 'display:none;position:fixed;z-index:9999;background:#1e2035;border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:6px;min-width:110px;box-shadow:0 8px 24px rgba(0,0,0,.5);max-height:240px;overflow-y:auto;';
+    document.body.appendChild(_picker);
+  }
+  _picker.innerHTML = ALL_CURRENCIES.map(c =>
+    `<div onclick="pickCurrency('${c}')" style="padding:5px 10px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:${defaultCur===c?'800':'500'};color:${defaultCur===c?'#a5b4fc':'#e2e8f0'};background:${defaultCur===c?'rgba(99,102,241,.25)':'transparent'};"
+      onmouseover="this.style.background='rgba(99,102,241,.15)'" onmouseout="this.style.background='${defaultCur===c?'rgba(99,102,241,.25)':'transparent'}'">
+      ${c}
+    </div>`
+  ).join('');
+
   let html = `<div class="page-header">
     <div><h2>Dashboard</h2><p style="font-size:13px;color:var(--muted);margin-top:2px;">Welcome back, ${esc(userName)} 👋</p></div>
     <div style="display:flex;gap:8px;">
@@ -950,9 +914,10 @@ async function renderDash(el) {
   // Distinct hues for currency sub-boxes (not red/green — purely visual identity)
   const CUR_HUES = { USD:220, EUR:260, GBP:280, NGN:30, CAD:195, AUD:170, JPY:340, KES:135, ZAR:0, GHS:45, INR:15, AED:200, SAR:90, BRL:145, EGP:55, MAD:310 };
 
-  // Other-currency stretch panel — stacked vertically to the RIGHT of main balance
+  // Other-currency compact pills — stacked vertically to the RIGHT of main balance
+  // Fixed width, truncated amounts to prevent overflow
   const otherCurPanel = otherRows.length > 0 ? `
-    <div style="display:flex;flex-direction:column;gap:5px;min-width:120px;max-width:150px;flex-shrink:0;justify-content:center;">
+    <div style="display:flex;flex-direction:column;gap:5px;width:118px;min-width:118px;max-width:118px;flex-shrink:0;justify-content:center;">
       ${otherRows.map(row => {
         const cur = row.currency;
         const owed = row.owed_to_me || 0;
@@ -960,13 +925,20 @@ async function renderDash(el) {
         const netCur = owed - owing;
         const hue = CUR_HUES[cur] ?? ((Object.keys(CUR_HUES).indexOf(cur) * 37 + 180) % 360);
         const icon = CURRENCY_ICONS[cur] || '💰';
+        // Compact amount — use abbreviated format for large numbers
+        function shortAmt(cents, c) {
+          const v = Math.abs(cents) / 100;
+          if (v >= 1e6) return c + ' ' + (v/1e6).toFixed(1) + 'M';
+          if (v >= 1e3) return c + ' ' + (v/1e3).toFixed(1) + 'K';
+          return _fmtAmt(v, c);
+        }
+        const netSign = netCur >= 0 ? '+' : '-';
         return `<div onclick="navTo('entries')" title="${cur}: Owed ${_fmtAmt(owed/100,cur)} · Due ${_fmtAmt(owing/100,cur)}"
-          style="background:rgba(0,0,0,.28);border:1px solid hsla(${hue},70%,60%,.35);border-radius:9px;padding:7px 10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:6px;">
-          <div>
-            <div style="font-size:10px;font-weight:700;opacity:.8;">${icon} ${esc(cur)}</div>
-            <div style="font-size:9px;opacity:.55;margin-top:1px;">${_fmtAmt(owed/100,cur)} · ${_fmtAmt(owing/100,cur)}</div>
+          style="background:rgba(0,0,0,.28);border:1px solid hsla(${hue},70%,60%,.35);border-radius:9px;padding:6px 8px;cursor:pointer;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;overflow:hidden;">
+            <div style="font-size:10px;font-weight:700;opacity:.85;white-space:nowrap;">${icon} ${esc(cur)}</div>
+            <div style="font-size:12px;font-weight:900;color:hsl(${hue},85%,72%);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:62px;">${netSign}${shortAmt(Math.abs(netCur),cur)}</div>
           </div>
-          <div style="font-size:14px;font-weight:900;color:hsl(${hue},85%,72%);white-space:nowrap;">${netCur >= 0 ? '+' : ''}${_fmtAmt(Math.abs(netCur)/100, cur)}</div>
         </div>`;
       }).join('')}
     </div>` : '';
@@ -984,27 +956,45 @@ async function renderDash(el) {
           <div><span style="opacity:.7;">Owed to Me</span><div style="font-weight:800;font-size:14px;">${fmtMoney(toy, defaultCur)}</div></div>
           <div><span style="opacity:.7;">I Owe</span><div style="font-weight:800;font-size:14px;">${fmtMoney(yot, defaultCur)}</div></div>
         </div>
-        <!-- Compact currency tab at bottom-right of hero -->
-        <div style="position:relative;display:inline-block;margin-top:10px;">
+        <!-- Compact currency pill — dropdown rendered in body to avoid overflow:hidden clipping -->
+        <div style="display:inline-block;margin-top:10px;">
           <button onclick="toggleCurPicker(this)" title="Change default currency"
             style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:5px;letter-spacing:.04em;">
             ${defaultCur} <span style="font-size:9px;opacity:.7;">▼</span>
           </button>
-          <!-- Custom dropdown — dark bg so options are always readable -->
-          <div id="hero-cur-picker" style="display:none;position:absolute;left:0;top:calc(100% + 4px);z-index:999;background:#1e2035;border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:6px;min-width:110px;box-shadow:0 8px 24px rgba(0,0,0,.5);max-height:220px;overflow-y:auto;">
-            ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','AED','SAR','BRL','EGP','MAD','TZS','UGX','ETB','XOF','MAD','QAR','KWD'].filter((v,i,a)=>a.indexOf(v)===i).map(c =>
-              `<div onclick="pickCurrency('${c}')" style="padding:5px 10px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:${defaultCur===c?'800':'500'};color:${defaultCur===c?'#a5b4fc':'#e2e8f0'};background:${defaultCur===c?'rgba(99,102,241,.25)':'transparent'};transition:background .1s;"
-                onmouseover="this.style.background='rgba(99,102,241,.15)'" onmouseout="this.style.background='${defaultCur===c?'rgba(99,102,241,.25)':'transparent'}'">
-                ${c}
-              </div>`
-            ).join('')}
-          </div>
         </div>
       </div>
       <!-- Other currencies stretch panel (right side) -->
       ${otherCurPanel}
     </div>
   </div>`;
+
+  // ── Single rotating tip (replaces scrolling ticker) ──────────────
+  // Pick one message per page load — loaded from app_settings or hardcoded defaults
+  const DEFAULT_TIPS = [
+    'Add contacts first — entries are always linked to a person.',
+    'Use "They Owe Me" for loans given, "Invoice" for services rendered.',
+    'Templates save you time — build once, use on every invoice.',
+    'Settle partially — record part-payments as they come in.',
+    'Asset Lockers keep your important financial details safe and organised.',
+    'Trusted Access lets a designated person view your records if needed.',
+    'Export to CSV for your accountant or tax records anytime.',
+    'Separate currencies keep your international dealings clean.',
+    'A debt unrecorded is a debt forgotten — always write it down.',
+    'Assign a Trusted Contact to protect your records for your family.',
+    'Savings circles (ajo/susu) work best with clear records — use Groups.',
+    'Send payment reminders directly from the app — stay professional.',
+    'Track ROI on investments by adding all partners and transactions.',
+    'Recurring entries automate regular bills and income records.',
+  ];
+  // Load from app_settings if available (admin-managed list)
+  let tipList = DEFAULT_TIPS;
+  try {
+    const { data: tipRow } = await supabase.from('app_settings').select('value').eq('key','banner_tips').maybeSingle();
+    if (tipRow?.value && Array.isArray(tipRow.value) && tipRow.value.length > 0) tipList = tipRow.value;
+  } catch(_) {}
+  const todayTipIdx = Math.floor(Date.now() / 86400000) % tipList.length; // changes daily
+  html += `<div class="dash-tip no-print"><span style="font-size:16px;">💡</span><span>${esc(tipList[todayTipIdx])}</span></div>`;
 
   // Stat cards row
   const pendingCount = recent.filter(e => !['settled','voided','cancelled','fulfilled'].includes(e.status)).length;
@@ -4664,9 +4654,11 @@ window.confirmDeleteRecurring = async function(id) {
 async function renderSettings(el) {
   const p = currentProfile || {};
   const isAdmin = p.role === 'platform_admin';
+  const np = p.notif_prefs || {};
+  const CURLIST = ['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','BHD','OMR','EGP','MAD','TZS','UGX','ETB','XOF'];
   let html = `<div class="page-header"><h2>Settings</h2></div>`;
 
-  // Profile
+  // ── Profile ────────────────────────────────────────────────────
   html += `<div class="card">
     <h3 style="font-size:16px;font-weight:700;margin-bottom:16px;">Profile</h3>
     <div class="form-row">
@@ -4675,65 +4667,132 @@ async function renderSettings(el) {
     </div>
     <div class="form-row">
       <div class="form-group"><label>Phone</label><input type="text" id="s-phone" value="${esc(p.phone || '')}"></div>
-      <div class="form-group"><label>City</label><input type="text" id="s-city" value="${esc(p.city || '')}"></div>
+      <div class="form-group"><label>City / Location</label><input type="text" id="s-city" value="${esc(p.city || '')}"></div>
     </div>
-    <div class="form-group"><label>Bio</label><textarea id="s-bio" rows="2">${esc(p.bio || '')}</textarea></div>
+    <div class="form-group"><label>Bio / Notes</label><textarea id="s-bio" rows="2">${esc(p.bio || '')}</textarea></div>
     <div class="form-group"><label>Default Currency</label><select id="s-currency">
-      ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','BHD','OMR','EGP','MAD','TZS','UGX','ETB','XOF'].map(c =>
-        `<option value="${c}" ${p.default_currency === c ? 'selected' : ''}>${c}</option>`
-      ).join('')}
+      ${CURLIST.map(c => `<option value="${c}" ${p.default_currency === c ? 'selected' : ''}>${c}</option>`).join('')}
     </select></div>
     <button class="btn btn-primary btn-sm" onclick="saveSettings()">Save Profile</button>
   </div>`;
 
-  // Branding & Company (admin)
-  if (isAdmin) {
-    html += `<div class="card" style="margin-top:12px;">
-      <h3 style="font-size:16px;font-weight:700;margin-bottom:16px;">Branding & Company</h3>
-      <div class="form-row">
-        <div class="form-group"><label>App / Site Name</label><input type="text" id="s-appname" value="${esc(p.app_name || 'Money IntX')}"></div>
-        <div class="form-group"><label>Tagline</label><input type="text" id="s-tagline" value="${esc(p.tagline || '')}"></div>
-      </div>
-      <div class="form-group"><label>Site URL</label><input type="text" id="s-siteurl" value="${esc(p.site_url || '')}" placeholder="https://moneyinteractions.com"></div>
-      <div class="form-group"><label>Logo URL</label><input type="text" id="s-logourl" value="${esc(p.logo_url || '')}" placeholder="https://...logo.png"></div>
-      ${p.logo_url ? `<div style="margin-bottom:12px;"><img src="${esc(p.logo_url)}" style="max-height:48px;border-radius:8px;"></div>` : ''}
-      <hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">
-      <div class="form-row">
-        <div class="form-group"><label>Company Name</label><input type="text" id="s-company" value="${esc(p.company_name || '')}"></div>
-        <div class="form-group"><label>Company Email</label><input type="email" id="s-comemail" value="${esc(p.company_email || '')}"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>Company Phone</label><input type="text" id="s-comphone" value="${esc(p.company_phone || '')}"></div>
-        <div class="form-group"><label>Company Address</label><input type="text" id="s-comaddr" value="${esc(p.company_address || '')}"></div>
-      </div>
-      <button class="btn btn-primary btn-sm" onclick="saveBranding()">Save Branding</button>
-    </div>`;
-  }
-  // Theme picker
+  // ── Invoice / Branding Info — available to ALL users ──────────
+  html += `<div class="card" style="margin-top:12px;">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:4px;">Invoice & Company Info</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Shown on your invoices and printed documents.</p>
+    <div class="form-group">
+      <label>Logo URL <span style="font-size:11px;color:var(--muted);">— paste a link to your logo image</span></label>
+      <input type="text" id="s-logourl" value="${esc(p.logo_url || '')}" placeholder="https://...logo.png">
+      ${p.logo_url ? `<div style="margin-top:8px;"><img src="${esc(p.logo_url)}" style="max-height:52px;border-radius:8px;border:1px solid var(--border);" onerror="this.style.display='none'"></div>` : ''}
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Company / Business Name</label><input type="text" id="s-company" value="${esc(p.company_name || '')}"></div>
+      <div class="form-group"><label>Company Email</label><input type="email" id="s-comemail" value="${esc(p.company_email || '')}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Company Phone</label><input type="text" id="s-comphone" value="${esc(p.company_phone || '')}"></div>
+      <div class="form-group"><label>Company Address</label><input type="text" id="s-comaddr" value="${esc(p.company_address || '')}"></div>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="saveInvoiceInfo()">Save Invoice Info</button>
+  </div>`;
+
+  // ── Notification Preferences ───────────────────────────────────
+  html += `<div class="card" style="margin-top:12px;">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:14px;">Notification Preferences</h3>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+        <div><div style="font-size:14px;font-weight:600;">In-App Notifications</div><div style="font-size:12px;color:var(--muted);">Alerts inside the app</div></div>
+        <input type="checkbox" id="np-inapp" ${np.inapp !== false ? 'checked' : ''} style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;">
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+        <div><div style="font-size:14px;font-weight:600;">Email Notifications</div><div style="font-size:12px;color:var(--muted);">Sent to your registered email</div></div>
+        <input type="checkbox" id="np-email" ${np.email !== false ? 'checked' : ''} style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;">
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+        <div><div style="font-size:14px;font-weight:600;">SMS Notifications</div><div style="font-size:12px;color:var(--muted);">Text alerts (requires valid phone)</div></div>
+        <input type="checkbox" id="np-sms" ${np.sms ? 'checked' : ''} style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;">
+      </label>
+    </div>
+    <button class="btn btn-primary btn-sm" style="margin-top:14px;" onclick="saveNotifPrefs()">Save Preferences</button>
+  </div>`;
+
+  // ── Invite Friends ─────────────────────────────────────────────
+  const inviteLink = `${window.location.origin}${window.location.pathname}?ref=${currentUser?.id || ''}`;
+  html += `<div class="card" style="margin-top:12px;">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:8px;">Invite Friends</h3>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Share your personal invite link. Friends who sign up with it will be linked to your account.</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <input type="text" value="${esc(inviteLink)}" readonly style="flex:1;min-width:0;font-size:12px;font-family:monospace;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--muted);">
+      <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText('${esc(inviteLink)}').then(()=>toast('Invite link copied!','success'))">Copy Link</button>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <input type="email" id="s-invite-email" placeholder="friend@email.com" style="flex:1;min-width:0;">
+      <button class="btn btn-primary btn-sm" onclick="sendEmailInvite()">📧 Send Invite</button>
+    </div>
+  </div>`;
+
+  // ── Theme picker ───────────────────────────────────────────────
   const currentTheme = localStorage.getItem('mxi_theme') || 'purple';
   const themes = [
     { id: 'purple', name: 'Purple', color: '#6c63ff' },
-    { id: 'teal', name: 'Teal', color: '#0d9488' },
-    { id: 'ocean', name: 'Ocean', color: '#0284c7' },
-    { id: 'rose', name: 'Rose', color: '#e11d48' },
-    { id: 'dark', name: 'Dark', color: '#334155' }
+    { id: 'teal',   name: 'Teal',   color: '#0d9488' },
+    { id: 'ocean',  name: 'Ocean',  color: '#0284c7' },
+    { id: 'rose',   name: 'Rose',   color: '#e11d48' },
+    { id: 'dark',   name: 'Dark',   color: '#334155' }
   ];
   html += `<div class="card" style="margin-top:12px;">
     <h3 style="font-size:16px;font-weight:700;margin-bottom:12px;">Theme</h3>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       ${themes.map(t => `
-        <button onclick="setTheme('${t.id}')" style="
+        <button onclick="setTheme('${t.id}')" title="${t.name}" style="
           width:56px;height:56px;border-radius:14px;border:3px solid ${currentTheme === t.id ? t.color : 'var(--border)'};
           background:${t.id === 'dark' ? '#1e293b' : '#fff'};cursor:pointer;display:flex;align-items:center;justify-content:center;
-          transition:all 0.15s;box-shadow:${currentTheme === t.id ? '0 0 0 2px ' + t.color + '40' : 'none'};
-        ">
+          transition:all .15s;box-shadow:${currentTheme === t.id ? '0 0 0 2px ' + t.color + '40' : 'none'};">
           <div style="width:28px;height:28px;border-radius:50%;background:${t.color};"></div>
-        </button>
-      `).join('')}
+        </button>`).join('')}
     </div>
     <p style="font-size:12px;color:var(--muted);margin-top:8px;">Current: ${themes.find(t => t.id === currentTheme)?.name || 'Purple'}</p>
   </div>`;
 
+  // ── Admin: Branding + Dashboard Tips ──────────────────────────
+  if (isAdmin) {
+    // Load current tips
+    let currentTips = [];
+    try {
+      const { data: tipRow } = await supabase.from('app_settings').select('value').eq('key','banner_tips').maybeSingle();
+      if (tipRow?.value && Array.isArray(tipRow.value)) currentTips = tipRow.value;
+    } catch(_) {}
+
+    html += `<div class="card" style="margin-top:12px;border-color:rgba(251,191,36,.3);">
+      <h3 style="font-size:16px;font-weight:700;margin-bottom:4px;">🛠 Admin: Platform Branding</h3>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">These settings apply platform-wide.</p>
+      <div class="form-row">
+        <div class="form-group"><label>App / Site Name</label><input type="text" id="s-appname" value="${esc(p.app_name || 'Money IntX')}"></div>
+        <div class="form-group"><label>Tagline</label><input type="text" id="s-tagline" value="${esc(p.tagline || '')}"></div>
+      </div>
+      <div class="form-group"><label>Site URL</label><input type="text" id="s-siteurl" value="${esc(p.site_url || '')}" placeholder="https://moneyinteractions.com"></div>
+      <button class="btn btn-primary btn-sm" onclick="saveBranding()">Save Branding</button>
+    </div>`;
+
+    html += `<div class="card" style="margin-top:12px;border-color:rgba(251,191,36,.3);">
+      <h3 style="font-size:16px;font-weight:700;margin-bottom:4px;">🛠 Admin: Dashboard Tips</h3>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">One tip is shown per day on the dashboard. Edit the list here.</p>
+      <div id="admin-tips-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
+        ${currentTips.map((tip,i) => `
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" value="${esc(tip)}" id="admin-tip-${i}" style="flex:1;font-size:13px;">
+            <button class="btn btn-danger btn-sm" style="padding:4px 10px;flex-shrink:0;" onclick="removeAdminTip(${i})">✕</button>
+          </div>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <input type="text" id="admin-tip-new" placeholder="Add new tip…" style="flex:1;font-size:13px;">
+        <button class="btn btn-secondary btn-sm" onclick="addAdminTip()">+ Add</button>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="saveAdminTips()">💾 Save Tip List</button>
+    </div>`;
+  }
+
+  // ── Account ────────────────────────────────────────────────────
   html += `<div class="card" style="margin-top:12px;">
     <h3 style="font-size:16px;font-weight:700;margin-bottom:12px;">Account</h3>
     <button class="btn btn-danger btn-sm" onclick="app.logOut()">Sign Out</button>
@@ -4744,11 +4803,11 @@ async function renderSettings(el) {
 window.saveSettings = async function() {
   const { error } = await supabase.from('users').update({
     display_name: document.getElementById('s-name').value.trim(),
-    phone: document.getElementById('s-phone').value.trim(),
-    city: document.getElementById('s-city').value.trim(),
-    bio: document.getElementById('s-bio').value.trim(),
+    phone:        document.getElementById('s-phone').value.trim(),
+    city:         document.getElementById('s-city').value.trim(),
+    bio:          document.getElementById('s-bio').value.trim(),
     default_currency: document.getElementById('s-currency').value,
-    updated_at: new Date().toISOString()
+    updated_at:   new Date().toISOString()
   }).eq('id', currentUser.id);
   if (error) return toast(error.message, 'error');
   currentProfile = await getProfile(currentUser.id);
@@ -4756,21 +4815,82 @@ window.saveSettings = async function() {
   toast('Profile saved.', 'success');
 };
 
+window.saveInvoiceInfo = async function() {
+  const { error } = await supabase.from('users').update({
+    logo_url:        document.getElementById('s-logourl').value.trim(),
+    company_name:    document.getElementById('s-company').value.trim(),
+    company_email:   document.getElementById('s-comemail').value.trim(),
+    company_phone:   document.getElementById('s-comphone').value.trim(),
+    company_address: document.getElementById('s-comaddr').value.trim(),
+    updated_at:      new Date().toISOString()
+  }).eq('id', currentUser.id);
+  if (error) return toast(error.message, 'error');
+  currentProfile = await getProfile(currentUser.id);
+  toast('Invoice info saved.', 'success');
+};
+
+window.saveNotifPrefs = async function() {
+  const prefs = {
+    inapp: document.getElementById('np-inapp').checked,
+    email: document.getElementById('np-email').checked,
+    sms:   document.getElementById('np-sms').checked,
+  };
+  const { error } = await supabase.from('users').update({
+    notif_prefs: prefs, updated_at: new Date().toISOString()
+  }).eq('id', currentUser.id);
+  if (error) return toast(error.message, 'error');
+  if (currentProfile) currentProfile.notif_prefs = prefs;
+  toast('Notification preferences saved.', 'success');
+};
+
+window.sendEmailInvite = function() {
+  const email = document.getElementById('s-invite-email')?.value.trim();
+  if (!email) return toast('Enter an email address first.', 'error');
+  const inviteLink = `${window.location.origin}${window.location.pathname}?ref=${currentUser?.id || ''}`;
+  const name = currentProfile?.display_name || 'A friend';
+  const subject = encodeURIComponent(`${name} invited you to Money IntX`);
+  const body = encodeURIComponent(`Hi,\n\n${name} has invited you to join Money IntX — a smart financial record-keeping app.\n\nClick here to sign up:\n${inviteLink}\n\nMoney IntX lets you track who owes you, send invoices, manage currencies and more.\n\n— Money IntX`);
+  window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
+};
+
 window.saveBranding = async function() {
   const { error } = await supabase.from('users').update({
-    app_name: document.getElementById('s-appname').value.trim(),
-    tagline: document.getElementById('s-tagline').value.trim(),
-    site_url: document.getElementById('s-siteurl').value.trim(),
-    logo_url: document.getElementById('s-logourl').value.trim(),
-    company_name: document.getElementById('s-company').value.trim(),
-    company_email: document.getElementById('s-comemail').value.trim(),
-    company_phone: document.getElementById('s-comphone').value.trim(),
-    company_address: document.getElementById('s-comaddr').value.trim(),
+    app_name:  document.getElementById('s-appname')?.value.trim(),
+    tagline:   document.getElementById('s-tagline')?.value.trim(),
+    site_url:  document.getElementById('s-siteurl')?.value.trim(),
     updated_at: new Date().toISOString()
   }).eq('id', currentUser.id);
   if (error) return toast(error.message, 'error');
   currentProfile = await getProfile(currentUser.id);
   toast('Branding saved.', 'success');
+};
+
+// ── Admin tips CRUD ────────────────────────────────────────────────
+window.addAdminTip = function() {
+  const inp = document.getElementById('admin-tip-new');
+  const val = inp?.value.trim();
+  if (!val) return;
+  const list = document.getElementById('admin-tips-list');
+  const idx = list.children.length;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:8px;align-items:center;';
+  row.innerHTML = `<input type="text" value="${esc(val)}" id="admin-tip-${idx}" style="flex:1;font-size:13px;">
+    <button class="btn btn-danger btn-sm" style="padding:4px 10px;flex-shrink:0;" onclick="this.closest('div').remove()">✕</button>`;
+  list.appendChild(row);
+  inp.value = '';
+};
+window.removeAdminTip = function(idx) {
+  document.getElementById(`admin-tip-${idx}`)?.closest('div')?.remove();
+};
+window.saveAdminTips = async function() {
+  const list = document.getElementById('admin-tips-list');
+  const tips = Array.from(list.querySelectorAll('input[type=text]'))
+    .map(i => i.value.trim()).filter(Boolean);
+  const { error } = await supabase.from('app_settings').upsert({
+    key: 'banner_tips', value: tips, updated_at: new Date().toISOString()
+  }, { onConflict: 'key' });
+  if (error) return toast(error.message, 'error');
+  toast(`${tips.length} tips saved.`, 'success');
 };
 
 // ── Action menu toggle (global) ───────────────────────────────────
