@@ -29,8 +29,8 @@ export async function createPanel(userId, { title, currency, session_type }) {
     .insert({ user_id: userId, title, currency, session_type, fields: [] })
     .select()
     .single();
-  if (error) console.error('[createPanel]', error.message);
-  return data;
+  if (error) console.error('[createPanel]', error.code, error.message);
+  return { data, error };
 }
 
 export async function updatePanel(panelId, updates) {

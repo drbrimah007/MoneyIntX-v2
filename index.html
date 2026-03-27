@@ -565,7 +565,7 @@ let notifChannel = null;
 
 /// ── Contact color: deterministic per ID, stored in localStorage ───
 // Cache key includes version — bump to invalidate stale colors
-const _CC_KEY = 'mxi_cc_v4';
+const _CC_KEY = 'mxi_cc_v5';
 function contactColor(id) {
   try {
     const stored = JSON.parse(localStorage.getItem(_CC_KEY) || '{}');
@@ -575,9 +575,9 @@ function contactColor(id) {
     let h = 0;
     for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
     const hue = VIVID_HUES[h % VIVID_HUES.length];
-    // Saturation 70–80%, Lightness 68–76% — bright enough to read on dark backgrounds
-    const sat = 70 + (h % 10);
-    const lit = 68 + ((h >> 4) % 8);
+    // Saturation 65–75%, Lightness 55–63% — vivid on dark bg without looking washed out
+    const sat = 65 + (h % 10);
+    const lit = 55 + ((h >> 4) % 8);
     const color = `hsl(${hue}, ${sat}%, ${lit}%)`;
     stored[id] = color;
     localStorage.setItem(_CC_KEY, JSON.stringify(stored));

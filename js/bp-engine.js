@@ -171,7 +171,8 @@ export async function renderBusinessPage(el) {
 
   // ── Check if table exists ──────────────────────────────────────
   const { error: chkErr } = await supabase.from('business_panels').select('id').limit(1);
-  if (chkErr && (chkErr.message?.includes('does not exist') || chkErr.code === '42P01' || chkErr.code === 'PGRST200')) {
+  const _tableOk = !chkErr || (!chkErr.message?.includes('does not exist') && !chkErr.message?.includes('Could not find') && chkErr.code !== '42P01' && chkErr.code !== 'PGRST200' && chkErr.code !== 'PGRST116' && chkErr.code !== '404');
+  if (!_tableOk) {
     el.innerHTML = `<div class="page-header"><h2 style="margin:0;">Business Panels</h2></div>
     <div class="card" style="border:1px solid var(--amber);background:rgba(251,191,36,.07);">
       <div style="font-size:20px;margin-bottom:8px;">⚙️ One-time setup required</div>
@@ -266,8 +267,13 @@ async function _doCreate() {
   const session_type = document.getElementById('bp-sestype')?.value || 'monthly';
   if (!title) { toast('Panel title required.', 'error'); return; }
   document.getElementById('bpCreateBg')?.remove();
-  const panel = await createPanel(_userId, { title, currency, session_type });
-  if (!panel) { toast('Failed to create panel.', 'error'); return; }
+  const { data: panel, error } = await createPanel(_userId, { title, currency, session_type });
+  if (error || !panel) {
+    const msg = error?.message || 'Unknown error';
+    toast(`Failed to create panel: ${msg}`, 'error');
+    console.error('[_doCreate] userId:', _userId, 'error:', error);
+    return;
+  }
   toast('Panel created');
   openPanel(panel.id);
 }
