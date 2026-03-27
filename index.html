@@ -2398,13 +2398,14 @@ window._tplFields = [];
 
 const FIELD_TYPES = {
   text: 'Text', number: 'Number', date: 'Date', select: 'Dropdown',
-  textarea: 'Long Text', currency: 'Currency', computed: 'Computed',
+  textarea: 'Long Text', currency: 'Currency',
   paired: 'Item + Amount (Paired)'
 };
 const CALC_TYPES = {
   '': 'None', multiply: 'Multiply by factor', add: 'Add to field',
-  subtract: 'Subtract from field', aggregate: 'Sum all numeric fields',
-  select_aggregate: 'Sum selected fields'
+  subtract: 'Subtract from field',
+  aggregate: 'Run Aggregate (all, no excluded)',
+  select_aggregate: 'Run Selection Aggregate (choose fields)'
 };
 const LEDGER_EFFECTS = { '': 'None', toy: 'They Owe (TOY)', toy_credit: 'TOY Credit', yot: 'I Owe (YOT)', yot_credit: 'YOT Credit' };
 const CURRENCIES = ['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'];
