@@ -588,17 +588,34 @@ window.setDefaultCurrency = async function(cur) {
 };
 
 // ── Mini currency picker (replaces native <select> in hero) ────────
-// Dropdown uses position:fixed so it always clears overflow:hidden parent cards
+// Dropdown uses position:fixed — never clipped by overflow:hidden parent cards.
+// Smart positioning: opens downward by default, flips upward if near bottom of viewport.
 window.toggleCurPicker = function(el) {
   let picker = document.getElementById('hero-cur-picker');
   if (!picker) return;
   const isOpen = picker.style.display !== 'none';
   if (isOpen) { picker.style.display = 'none'; return; }
-  // Position below the button using fixed coords
   const rect = el.getBoundingClientRect();
-  picker.style.top  = (rect.bottom + 6) + 'px';
-  picker.style.left = rect.left + 'px';
+  const viewH = window.innerHeight;
+  const dropH = Math.min(240, picker.scrollHeight || 240); // estimated height
+  const spaceBelow = viewH - rect.bottom - 8;
+  const spaceAbove = rect.top - 8;
+  if (spaceBelow >= dropH || spaceBelow >= spaceAbove) {
+    // Open downward — clamp so it never goes below viewport
+    picker.style.top    = (rect.bottom + 6) + 'px';
+    picker.style.bottom = 'auto';
+    picker.style.maxHeight = Math.max(120, spaceBelow - 6) + 'px';
+  } else {
+    // Flip upward — open from button top upwards
+    picker.style.bottom = (viewH - rect.top + 6) + 'px';
+    picker.style.top    = 'auto';
+    picker.style.maxHeight = Math.max(120, spaceAbove - 6) + 'px';
+  }
+  picker.style.left    = Math.max(4, Math.min(rect.left, window.innerWidth - 120)) + 'px';
   picker.style.display = 'block';
+  // Scroll selected item into view
+  const active = picker.querySelector('[data-cur-active]');
+  if (active) active.scrollIntoView({ block: 'nearest' });
   setTimeout(() => {
     document.addEventListener('click', function _close(e) {
       if (!picker.contains(e.target) && e.target !== el) picker.style.display = 'none';
@@ -869,9 +886,10 @@ async function renderDash(el) {
   // currencyRows data is in cents (matching fmtMoney's expectation).
   const defaultCur = currentProfile?.default_currency || 'USD';
   const primaryRow = (currencyRows || []).find(r => r.currency === defaultCur);
-  // Fall back to dashboard_totals only when there's no per-currency data yet
-  const toy = primaryRow ? (primaryRow.owed_to_me || 0) : (totals.total_they_owe_me || 0);
-  const yot = primaryRow ? (primaryRow.i_owe || 0)      : (totals.total_i_owe_them || 0);
+  // STRICT currency isolation: if no transactions in this currency, show zeros.
+  // NEVER fall back to cross-currency totals — each currency is completely separate.
+  const toy = primaryRow ? (primaryRow.owed_to_me || 0) : 0;
+  const yot = primaryRow ? (primaryRow.i_owe || 0)      : 0;
   const net = toy - yot;
 
   const userName = currentProfile?.display_name?.split(' ')[0] || 'there';
@@ -887,9 +905,9 @@ async function renderDash(el) {
     document.body.appendChild(_picker);
   }
   _picker.innerHTML = ALL_CURRENCIES.map(c =>
-    `<div onclick="pickCurrency('${c}')" style="padding:5px 10px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:${defaultCur===c?'800':'500'};color:${defaultCur===c?'#a5b4fc':'#e2e8f0'};background:${defaultCur===c?'rgba(99,102,241,.25)':'transparent'};"
-      onmouseover="this.style.background='rgba(99,102,241,.15)'" onmouseout="this.style.background='${defaultCur===c?'rgba(99,102,241,.25)':'transparent'}'">
-      ${c}
+    `<div onclick="pickCurrency('${c}')" ${defaultCur===c?'data-cur-active':''} style="padding:6px 10px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:${defaultCur===c?'800':'500'};color:${defaultCur===c?'#a5b4fc':'#e2e8f0'};background:${defaultCur===c?'rgba(99,102,241,.25)':'transparent'};display:flex;align-items:center;gap:6px;"
+      onmouseover="this.style.background='rgba(99,102,241,.18)'" onmouseout="this.style.background='${defaultCur===c?'rgba(99,102,241,.25)':'transparent'}'">
+      ${defaultCur===c?'<span style="font-size:9px;color:#a5b4fc;">✓</span>':'<span style="font-size:9px;opacity:0;">·</span>'} ${c}
     </div>`
   ).join('');
 
@@ -914,10 +932,10 @@ async function renderDash(el) {
   // Distinct hues for currency sub-boxes (not red/green — purely visual identity)
   const CUR_HUES = { USD:220, EUR:260, GBP:280, NGN:30, CAD:195, AUD:170, JPY:340, KES:135, ZAR:0, GHS:45, INR:15, AED:200, SAR:90, BRL:145, EGP:55, MAD:310 };
 
-  // Other-currency compact pills — stacked vertically to the RIGHT of main balance
-  // Fixed width, truncated amounts to prevent overflow
+  // Other-currency expanded cards — RIGHT of main balance.
+  // No truncation: full amounts, owed + owe rows, auto-width.
   const otherCurPanel = otherRows.length > 0 ? `
-    <div style="display:flex;flex-direction:column;gap:5px;width:118px;min-width:118px;max-width:118px;flex-shrink:0;justify-content:center;">
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:130px;flex-shrink:0;justify-content:center;">
       ${otherRows.map(row => {
         const cur = row.currency;
         const owed = row.owed_to_me || 0;
@@ -925,19 +943,20 @@ async function renderDash(el) {
         const netCur = owed - owing;
         const hue = CUR_HUES[cur] ?? ((Object.keys(CUR_HUES).indexOf(cur) * 37 + 180) % 360);
         const icon = CURRENCY_ICONS[cur] || '💰';
-        // Compact amount — use abbreviated format for large numbers
-        function shortAmt(cents, c) {
-          const v = Math.abs(cents) / 100;
-          if (v >= 1e6) return c + ' ' + (v/1e6).toFixed(1) + 'M';
-          if (v >= 1e3) return c + ' ' + (v/1e3).toFixed(1) + 'K';
-          return _fmtAmt(v, c);
-        }
-        const netSign = netCur >= 0 ? '+' : '-';
-        return `<div onclick="navTo('entries')" title="${cur}: Owed ${_fmtAmt(owed/100,cur)} · Due ${_fmtAmt(owing/100,cur)}"
-          style="background:rgba(0,0,0,.28);border:1px solid hsla(${hue},70%,60%,.35);border-radius:9px;padding:6px 8px;cursor:pointer;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;overflow:hidden;">
-            <div style="font-size:10px;font-weight:700;opacity:.85;white-space:nowrap;">${icon} ${esc(cur)}</div>
-            <div style="font-size:12px;font-weight:900;color:hsl(${hue},85%,72%);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:62px;">${netSign}${shortAmt(Math.abs(netCur),cur)}</div>
+        const netColor = netCur >= 0 ? 'hsl(142,70%,68%)' : 'hsl(0,80%,68%)';
+        return `<div onclick="navTo('entries')"
+          style="background:rgba(0,0,0,.30);border:1px solid hsla(${hue},65%,55%,.4);border-radius:10px;padding:8px 11px;cursor:pointer;white-space:nowrap;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;">
+            <span style="font-size:11px;font-weight:800;opacity:.9;">${icon} ${esc(cur)}</span>
+            <span style="font-size:13px;font-weight:900;color:${netColor};">${netCur >= 0 ? '+' : ''}${_fmtAmt(netCur/100, cur)}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <div style="display:flex;justify-content:space-between;gap:10px;font-size:10px;opacity:.75;">
+              <span>Owed to me</span><span style="font-weight:700;">${_fmtAmt(owed/100, cur)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:10px;font-size:10px;opacity:.75;">
+              <span>I owe</span><span style="font-weight:700;">${_fmtAmt(owing/100, cur)}</span>
+            </div>
           </div>
         </div>`;
       }).join('')}
