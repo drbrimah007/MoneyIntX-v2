@@ -894,9 +894,14 @@ async function renderDash(el) {
     getLedgerSummary(currentUser.id),
     getCurrencyLedger(currentUser.id)
   ]);
-  const toy = totals.total_they_owe_me || 0;
-  const yot = totals.total_i_owe_them || 0;
-  const net = totals.total_net || 0;
+  // Use per-currency ledger row for the primary currency hero — never mix currencies.
+  // currencyRows data is in cents (matching fmtMoney's expectation).
+  const defaultCur = currentProfile?.default_currency || 'USD';
+  const primaryRow = (currencyRows || []).find(r => r.currency === defaultCur);
+  // Fall back to dashboard_totals only when there's no per-currency data yet
+  const toy = primaryRow ? (primaryRow.owed_to_me || 0) : (totals.total_they_owe_me || 0);
+  const yot = primaryRow ? (primaryRow.i_owe || 0)      : (totals.total_i_owe_them || 0);
+  const net = toy - yot;
 
   const userName = currentProfile?.display_name?.split(' ')[0] || 'there';
 
@@ -909,9 +914,7 @@ async function renderDash(el) {
   </div>`;
 
   // ── Primary currency hero card ─────────────────────────────────
-  // Shows default currency net. Other currencies appear as sub-boxes inside the card.
-  const defaultCur = currentProfile?.default_currency || 'USD';
-  const primaryRow = (currencyRows || []).find(r => r.currency === defaultCur);
+  // defaultCur and primaryRow already set above from currencyRows
   const otherRows = (currencyRows || []).filter(r => r.currency !== defaultCur);
 
   const netAbs = Math.abs(net);
@@ -952,10 +955,10 @@ async function renderDash(el) {
       <!-- Primary currency block -->
       <div style="flex:1;min-width:0;">
         <div style="font-size:11px;opacity:0.75;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px;">${netLabel} · ${defaultCur}</div>
-        <div style="font-size:36px;font-weight:900;letter-spacing:-.02em;line-height:1;">${fmtMoney(netAbs)}</div>
+        <div style="font-size:36px;font-weight:900;letter-spacing:-.02em;line-height:1;">${fmtMoney(netAbs, defaultCur)}</div>
         <div style="display:flex;gap:18px;font-size:12px;opacity:0.85;margin-top:10px;">
-          <div><span style="opacity:.7;">Owed to Me</span><div style="font-weight:800;font-size:14px;">${fmtMoney(toy)}</div></div>
-          <div><span style="opacity:.7;">I Owe</span><div style="font-weight:800;font-size:14px;">${fmtMoney(yot)}</div></div>
+          <div><span style="opacity:.7;">Owed to Me</span><div style="font-weight:800;font-size:14px;">${fmtMoney(toy, defaultCur)}</div></div>
+          <div><span style="opacity:.7;">I Owe</span><div style="font-weight:800;font-size:14px;">${fmtMoney(yot, defaultCur)}</div></div>
         </div>
         <div style="margin-top:10px;">
           <span style="font-size:10px;opacity:.55;display:block;margin-bottom:2px;">Default currency</span>
