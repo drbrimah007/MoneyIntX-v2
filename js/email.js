@@ -3,12 +3,23 @@
 import { supabase } from './supabase.js';
 
 const TX_LABELS = {
-  they_owe_you: 'They Owe You',
-  you_owe_them: 'You Owe Them',
+  // v2 categories
+  owed_to_me:       'Owed to Me',
+  i_owe:            'I Owe',
+  invoice_sent:     'Invoice Sent',
+  invoice_received: 'Invoice Received',
+  bill_sent:        'Bill Sent',
+  bill_received:    'Bill Received',
+  advance_paid:     'Advance Sent',
+  advance_received: 'Advance Received',
+  payment_recorded: 'Payment Recorded',
+  // legacy
+  they_owe_you:  'They Owe You',
+  you_owe_them:  'You Owe Them',
   they_paid_you: 'They Settled Up',
   you_paid_them: 'You Settled Up',
-  invoice: 'Invoice',
-  bill: 'Bill'
+  invoice:       'Invoice',
+  bill:          'Bill'
 };
 
 // ── Brand constants ────────────────────────────────────────────────────────────
