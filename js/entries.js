@@ -15,27 +15,52 @@ export function fmtMoney(cents, currency = 'USD') {
   }
 }
 
+// ── In-memory cache (60-second TTL) ──────────────────────────────
+const _cache = {};
+function _cacheGet(key) {
+  const v = _cache[key];
+  if (!v) return null;
+  if (Date.now() - v.ts > 60000) { delete _cache[key]; return null; }
+  return v.data;
+}
+function _cacheSet(key, data) { _cache[key] = { ts: Date.now(), data }; }
+export function invalidateEntryCache(userId) { delete _cache['entries_' + userId]; }
+
 // ── List entries ──────────────────────────────────────────────────
-export async function listEntries(userId, { status, txType, contactId, limit = 50, offset = 0, orderBy = 'created_at', ascending = false } = {}) {
+export async function listEntries(userId, { status, txType, contactId, limit, offset = 0, orderBy = 'created_at', ascending = false } = {}) {
+  // For full list (no filters, no explicit limit), use cache
+  const useCache = !status && !txType && !contactId && !limit && !offset;
+  const cacheKey = 'entries_' + userId;
+  if (useCache) {
+    const cached = _cacheGet(cacheKey);
+    if (cached) return cached;
+  }
+
   let query = supabase
     .from('entries')
     .select('*, contact:contacts(id, name, email)')
     .eq('user_id', userId)
     .is('archived_at', null)
-    .order(orderBy, { ascending })
-    .range(offset, offset + limit - 1);
+    .order(orderBy, { ascending });
 
   if (status) query = query.eq('status', status);
   if (txType) query = query.eq('tx_type', txType);
   if (contactId) query = query.eq('contact_id', contactId);
+  // Only apply range if explicitly requested
+  if (typeof limit === 'number') query = query.range(offset, offset + limit - 1);
 
-  const { data, error, count } = await query;
+  const { data, error } = await query;
   if (error) console.error('[listEntries]', error.message);
-  return data || [];
+  const result = data || [];
+  if (useCache) _cacheSet(cacheKey, result);
+  return result;
 }
 
-// ── Recent entries (dashboard) ────────────────────────────────────
-export async function recentEntries(userId, limit = 10) {
+// ── Recent entries (dashboard) — uses cache when available ────────
+export async function recentEntries(userId, limit = 15) {
+  // Reuse full entry cache if available (avoid duplicate query)
+  const all = _cacheGet('entries_' + userId);
+  if (all) return all.slice(0, limit);
   const { data, error } = await supabase
     .from('entries')
     .select('*, contact:contacts(id, name, email)')

@@ -29,9 +29,11 @@ export async function getTemplate(id) {
   return data;
 }
 
-export async function createTemplate(userId, { name, description = '', txType = null, fields = [], invoicePrefix = 'INV-' }) {
+export async function createTemplate(userId, { name, description = '', txType = null, fields = [], invoicePrefix = 'INV-', invoiceNextNum = 1, currency = 'USD', isPublic = false }) {
   const { data, error } = await supabase.from('templates').insert({
-    user_id: userId, name, description, tx_type: txType, fields, invoice_prefix: invoicePrefix
+    user_id: userId, name, description, tx_type: txType, fields,
+    invoice_prefix: invoicePrefix, invoice_next_num: invoiceNextNum,
+    currency, is_public: isPublic
   }).select().single();
   if (error) console.error('[createTemplate]', error.message);
   return data;
