@@ -93,10 +93,14 @@ async function callSendEmail({ to, subject, html }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ to, subject, html })
     });
-    return await res.json();
+    const data = await res.json();
+    if (!data.ok) {
+      console.error('[callSendEmail] Failed:', data.error || 'Unknown error');
+    }
+    return data;
   } catch (err) {
-    console.error('callSendEmail error:', err);
-    return { ok: false, error: err.message };
+    console.error('[callSendEmail] Network/parse error:', err);
+    return { ok: false, error: 'Network error: ' + err.message };
   }
 }
 
