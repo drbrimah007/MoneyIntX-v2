@@ -181,9 +181,9 @@ th { text-align: left; color: var(--muted); font-size: 12px; font-weight: 600; p
 td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; word-break: break-word; }
 tr:last-child td { border-bottom: none; }
 tr.row-selected td { background: rgba(108,99,255,.1) !important; }
-@media(max-width:640px) { .hide-mobile { display: none; } }
+.show-mobile { display: none; }
 .mobile-label { display: none; }
-@media(max-width:640px) { .mobile-label { display: block; } }
+@media(max-width:640px) { .hide-mobile { display: none; } .show-mobile { display: block !important; } .mobile-label { display: block; } }
 /* Hero other-currency panel: stack below main balance on small screens */
 @media(max-width:520px) {
   .hero-flex { flex-direction: column !important; }
@@ -1157,13 +1157,15 @@ async function renderDash(el) {
     recent.forEach(e => {
       const cName = e.contact?.name || '—';
       const cId = e.contact?.id || '';
-      const txLabel = TX_LABELS[e.tx_type] || e.tx_type;
-      const txColor = TX_COLORS[e.tx_type] || 'var(--text)';
+      const _txKey = e.category || e.tx_type;
+      const txLabel = TX_LABELS[_txKey] || _txKey;
+      const txColor = TX_COLORS[_txKey] || 'var(--text)';
       const remaining = e.amount - e.settled_amount;
       const settled = e.settled_amount > 0;
+      const typeMobileDash = `<div class="show-mobile" style="font-size:11px;font-weight:700;color:${txColor};margin-bottom:2px;">${esc(txLabel)}</div>`;
       const amtHtml = settled
-        ? `${fmtMoney(e.amount, e.currency)}<div style="font-size:11px;color:var(--muted);">Pd ${fmtMoney(e.settled_amount, e.currency)}</div><div style="font-size:11px;font-weight:700;color:${remaining<=0?'var(--green)':'var(--amber)'};">Bal ${fmtMoney(remaining,e.currency)}</div>`
-        : fmtMoney(e.amount, e.currency);
+        ? `${typeMobileDash}${fmtMoney(e.amount, e.currency)}<div style="font-size:11px;color:var(--muted);">Pd ${fmtMoney(e.settled_amount, e.currency)}</div><div style="font-size:11px;font-weight:700;color:${remaining<=0?'var(--green)':'var(--amber)'};">Bal ${fmtMoney(remaining,e.currency)}</div>`
+        : `${typeMobileDash}${fmtMoney(e.amount, e.currency)}`;
       const col = cId ? contactColor(cId) : 'var(--bg3)';
       const reminderHtml = e.reminder_count > 0 ? `<span class="badge badge-red" style="margin-left:4px;">🚩${e.reminder_count}</span>` : '';
       html += `<tr>
@@ -1287,13 +1289,15 @@ function _cpEntriesTable(entries, page) {
   const totalPages = Math.ceil(total / CP_PS);
 
   let rows = pageItems.map(e => {
-    const txLabel = TX_LABELS[e.tx_type] || e.tx_type;
-    const txColor = TX_COLORS[e.tx_type] || 'var(--text)';
+    const _txKey = e.category || e.tx_type;
+    const txLabel = TX_LABELS[_txKey] || _txKey;
+    const txColor = TX_COLORS[_txKey] || 'var(--text)';
     const settled = e.settled_amount > 0;
     const remaining = e.amount - (e.settled_amount || 0);
+    const typeMobileCp = `<div class="show-mobile" style="font-size:11px;font-weight:700;color:${txColor};margin-bottom:2px;">${esc(txLabel)}</div>`;
     const amtHtml = settled
-      ? `${fmtMoney(e.amount, e.currency)}<div style="font-size:11px;color:var(--muted);">Pd ${fmtMoney(e.settled_amount, e.currency)}</div><div style="font-size:11px;font-weight:700;color:${remaining<=0?'var(--green)':'var(--amber)'};">Bal ${fmtMoney(remaining, e.currency)}</div>`
-      : fmtMoney(e.amount, e.currency);
+      ? `${typeMobileCp}${fmtMoney(e.amount, e.currency)}<div style="font-size:11px;color:var(--muted);">Pd ${fmtMoney(e.settled_amount, e.currency)}</div><div style="font-size:11px;font-weight:700;color:${remaining<=0?'var(--green)':'var(--amber)'};">Bal ${fmtMoney(remaining, e.currency)}</div>`
+      : `${typeMobileCp}${fmtMoney(e.amount, e.currency)}`;
     const reminderHtml = e.reminder_count > 0 ? `<span class="badge badge-red" style="margin-left:4px;cursor:pointer;" onclick="openEntryDetail('${e.id}')">🚩${e.reminder_count}</span>` : '';
     const noLedgerHtml = e.no_ledger ? `<span class="badge badge-gray" style="margin-left:4px;" title="Not in ledger">⊘</span>` : '';
     return `<tr>
@@ -1647,13 +1651,15 @@ async function renderEntries(el, page, forceRefresh) {
     pageEntries.forEach(e => {
       const cName = e.contact?.name || '—';
       const cId = e.contact?.id || '';
-      const txLabel = TX_LABELS[e.tx_type] || e.tx_type;
-      const txColor = TX_COLORS[e.tx_type] || 'var(--text)';
+      const _txKey = e.category || e.tx_type;
+      const txLabel = TX_LABELS[_txKey] || _txKey;
+      const txColor = TX_COLORS[_txKey] || 'var(--text)';
       const settled = e.settled_amount > 0;
       const remaining = e.amount - e.settled_amount;
+      const typeMobileEnt = `<div class="show-mobile" style="font-size:11px;font-weight:700;color:${txColor};margin-bottom:2px;">${esc(txLabel)}</div>`;
       const amtHtml = settled
-        ? `${fmtMoney(e.amount, e.currency)}<div style="font-size:11px;color:var(--muted);">Pd ${fmtMoney(e.settled_amount, e.currency)}</div><div style="font-size:11px;font-weight:700;color:${remaining <= 0 ? 'var(--green)' : 'var(--amber)'};">Bal ${fmtMoney(remaining, e.currency)}</div>`
-        : fmtMoney(e.amount, e.currency);
+        ? `${typeMobileEnt}${fmtMoney(e.amount, e.currency)}<div style="font-size:11px;color:var(--muted);">Pd ${fmtMoney(e.settled_amount, e.currency)}</div><div style="font-size:11px;font-weight:700;color:${remaining <= 0 ? 'var(--green)' : 'var(--amber)'};">Bal ${fmtMoney(remaining, e.currency)}</div>`
+        : `${typeMobileEnt}${fmtMoney(e.amount, e.currency)}`;
       const isTerminal = ['settled','voided','cancelled','fulfilled'].includes(e.status);
       const _ecat = e.category || e.tx_type;
       const canSettle = ['owed_to_me','bill_sent','invoice_sent','i_owe','bill_received','invoice_received',

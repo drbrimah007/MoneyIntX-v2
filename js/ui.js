@@ -172,23 +172,26 @@ export const TX_CREATE_LABELS = {
 };
 
 export const TX_COLORS = {
-  // New categories
-  owed_to_me:       '#16a34a',
-  bill_sent:        '#6c63ff',
-  invoice_sent:     '#6c63ff',
-  i_owe:            '#dc2626',
-  bill_received:    '#dc2626',
-  invoice_received: '#dc2626',
-  advance_paid:     '#f59e0b',
-  advance_received: '#0ea5e9',
-  payment_recorded: '#64748b',
-  // Legacy aliases
-  they_owe_you:  '#16a34a',
-  you_owe_them:  '#dc2626',
-  they_paid_you: '#64748b',
-  you_paid_them: '#64748b',
-  invoice:       '#6c63ff',
-  bill:          '#6c63ff'
+  // Green = receivable / owed to me  (V1 dark theme --green: #4ade80)
+  owed_to_me:       '#4ade80',
+  invoice_sent:     '#4ade80',
+  bill_sent:        '#4ade80',
+  they_owe_you:     '#4ade80',
+  they_paid_you:    '#4ade80',
+  // Red = payable / I owe  (V1 dark theme --red: #f87171)
+  i_owe:            '#f87171',
+  invoice_received: '#f87171',
+  bill_received:    '#f87171',
+  you_owe_them:     '#f87171',
+  you_paid_them:    '#f87171',
+  // Purple = neutral invoice/bill  (V1 --accent #6c63ff, lightened for readability)
+  invoice:          '#818cf8',
+  bill:             '#818cf8',
+  // Teal = payment recorded (neutral settlement)
+  payment_recorded: '#2dd4bf',
+  // Amber / sky for advances
+  advance_paid:     '#fb923c',
+  advance_received: '#60a5fa'
 };
 
 // Direction sign per category (canonical source of truth for new entries)
