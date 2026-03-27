@@ -3,9 +3,10 @@ import { supabase } from './supabase.js';
 import { fmtMoney } from './entries.js';
 
 // ── Helper: render template_data fields as invoice line items ──────
+// Returns { rows: string, hasFinalTotal: boolean }
 function renderTemplateRows(entry, currency) {
   const tdata = entry.template_data;
-  if (!tdata || typeof tdata !== 'object') return '';
+  if (!tdata || typeof tdata !== 'object') return { rows: '', hasFinalTotal: false };
   const fields = entry.template_fields || []; // ordered field definitions
   let rows = '';
   let hasFinalTotal = false;
@@ -89,7 +90,7 @@ function renderTemplateRows(entry, currency) {
     }
   });
 
-  return rows;
+  return { rows, hasFinalTotal };
 }
 
 function escHtml(s) {
@@ -112,10 +113,17 @@ export function generateInvoiceHTML(entry, contact, profile, settlements = []) {
   // Build line items: template fields if available, else single note row
   const tdata = entry.template_data;
   const hasTemplateData = tdata && typeof tdata === 'object' && Object.keys(tdata).length > 0;
-  const templateRows = hasTemplateData ? renderTemplateRows(entry, currency) : '';
+  const { rows: templateRows, hasFinalTotal } = hasTemplateData
+    ? renderTemplateRows(entry, currency)
+    : { rows: '', hasFinalTotal: false };
 
-  // If template has fields, don't show the plain "note" as a separate row to avoid duplication
+  // If template has fields, don't show the plain "note" row (avoid duplication)
   const showNoteRow = !hasTemplateData;
+
+  // When the template itself contains a Final Total field (rendered inside templateRows),
+  // suppress the bottom totals block — the template IS the total.
+  // Only keep the "Balance Due" row if there are partial settlements.
+  const suppressTotalsBlock = hasTemplateData && hasFinalTotal && settled === 0;
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escHtml(entry.invoice_number || 'Record')} — ${escHtml(company)}</title><style>
     * { box-sizing: border-box; }
@@ -200,11 +208,12 @@ export function generateInvoiceHTML(entry, contact, profile, settlements = []) {
         ${templateRows}
       </tbody>
     </table>
+    ${suppressTotalsBlock ? '' : `
     <div class="inv-totals">
       ${hasTemplateData ? '' : `<div class="row"><span>Subtotal</span><span>${fmtMoney(amt, currency)}</span></div>`}
-      ${settled > 0 ? `<div class="row" style="color:#16a34a;"><span>Settled</span><span>−${fmtMoney(settled, currency)}</span></div>` : ''}
+      ${settled > 0 ? `<div class="row" style="color:#16a34a;"><span>Amount Settled</span><span>−${fmtMoney(settled, currency)}</span></div>` : ''}
       <div class="row total"><span>${settled > 0 ? 'Balance Due' : 'Total'}</span><span>${fmtMoney(remaining, currency)}</span></div>
-    </div>
+    </div>`}
 
     ${entry.note && hasTemplateData ? `<div class="inv-note">📝 ${escHtml(entry.note)}</div>` : ''}
 
@@ -236,8 +245,28 @@ export function generateInvoiceHTML(entry, contact, profile, settlements = []) {
 }
 
 export function openInvoiceWindow(html) {
-  const win = window.open('', '_blank');
-  if (!win) { alert('Popup blocked. Please allow popups for this site.'); return; }
-  win.document.write(html);
-  win.document.close();
+  // Use a Blob URL — opens as a real navigable page in a new tab,
+  // not a popup, so it bypasses mobile popup blockers entirely.
+  try {
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const tab = window.open(url, '_blank');
+    if (tab) {
+      // Revoke the blob URL after the tab has had time to load it
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return;
+    }
+    // If window.open returned null (aggressive blocker), try an anchor click
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (e) {
+    console.error('[openInvoiceWindow]', e);
+    alert('Could not open the invoice. Please check your browser settings.');
+  }
 }
