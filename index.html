@@ -923,20 +923,23 @@ async function renderDash(el) {
   // Distinct hues for currency sub-boxes (not red/green — purely visual identity)
   const CUR_HUES = { USD:220, EUR:260, GBP:280, NGN:30, CAD:195, AUD:170, JPY:340, KES:135, ZAR:0, GHS:45, INR:15, AED:200, SAR:90, BRL:145, EGP:55, MAD:310 };
 
-  // Other-currency sub-boxes (shown inside hero card if any)
-  const otherCurHtml = otherRows.length > 0 ? `
-    <div style="margin-top:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;">
+  // Other-currency stretch panel — stacked vertically to the RIGHT of main balance
+  const otherCurPanel = otherRows.length > 0 ? `
+    <div style="display:flex;flex-direction:column;gap:5px;min-width:120px;max-width:150px;flex-shrink:0;justify-content:center;">
       ${otherRows.map(row => {
         const cur = row.currency;
         const owed = row.owed_to_me || 0;
         const owing = row.i_owe || 0;
         const netCur = owed - owing;
-        const hue = CUR_HUES[cur] ?? (Object.keys(CUR_HUES).indexOf(cur) * 37 + 180) % 360;
+        const hue = CUR_HUES[cur] ?? ((Object.keys(CUR_HUES).indexOf(cur) * 37 + 180) % 360);
         const icon = CURRENCY_ICONS[cur] || '💰';
-        return `<div style="background:rgba(0,0,0,.25);border:1px solid hsla(${hue},70%,60%,.4);border-radius:10px;padding:9px 10px;cursor:pointer;" onclick="navTo('entries')" title="${cur}: Owed ${_fmtAmt(owed/100,cur)} · Due ${_fmtAmt(owing/100,cur)}">
-          <div style="font-size:10px;font-weight:700;opacity:.8;margin-bottom:2px;">${icon} ${esc(cur)}</div>
-          <div style="font-size:15px;font-weight:900;color:hsl(${hue},80%,72%);">${netCur >= 0 ? '+' : ''}${_fmtAmt(Math.abs(netCur)/100, cur)}</div>
-          <div style="font-size:9px;opacity:.6;margin-top:1px;">${_fmtAmt(owed/100,cur)} · ${_fmtAmt(owing/100,cur)}</div>
+        return `<div onclick="navTo('entries')" title="${cur}: Owed ${_fmtAmt(owed/100,cur)} · Due ${_fmtAmt(owing/100,cur)}"
+          style="background:rgba(0,0,0,.28);border:1px solid hsla(${hue},70%,60%,.35);border-radius:9px;padding:7px 10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:6px;">
+          <div>
+            <div style="font-size:10px;font-weight:700;opacity:.8;">${icon} ${esc(cur)}</div>
+            <div style="font-size:9px;opacity:.55;margin-top:1px;">${_fmtAmt(owed/100,cur)} · ${_fmtAmt(owing/100,cur)}</div>
+          </div>
+          <div style="font-size:14px;font-weight:900;color:hsl(${hue},85%,72%);white-space:nowrap;">${netCur >= 0 ? '+' : ''}${_fmtAmt(Math.abs(netCur)/100, cur)}</div>
         </div>`;
       }).join('')}
     </div>` : '';
@@ -944,25 +947,28 @@ async function renderDash(el) {
   html += `
   <div style="background:${heroGrad};border-radius:18px;padding:22px;color:#fff;margin-bottom:14px;position:relative;overflow:hidden;">
     <div style="position:absolute;right:-16px;top:-16px;font-size:110px;opacity:0.07;pointer-events:none;">${netIcon}</div>
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-      <div>
-        <div style="font-size:11px;opacity:0.75;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">${netLabel} · ${defaultCur}</div>
-        <div style="font-size:36px;font-weight:900;margin-top:2px;letter-spacing:-.02em;">${fmtMoney(netAbs)}</div>
-        <div style="display:flex;gap:20px;font-size:12px;opacity:0.85;margin-top:8px;">
-          <div><span style="opacity:.7;">Owed to Me</span><div style="font-weight:800;font-size:15px;">${fmtMoney(toy)}</div></div>
-          <div><span style="opacity:.7;">I Owe</span><div style="font-weight:800;font-size:15px;">${fmtMoney(yot)}</div></div>
+    <!-- Hero inner: primary currency LEFT, other currencies RIGHT -->
+    <div style="display:flex;align-items:stretch;gap:14px;">
+      <!-- Primary currency block -->
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:11px;opacity:0.75;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px;">${netLabel} · ${defaultCur}</div>
+        <div style="font-size:36px;font-weight:900;letter-spacing:-.02em;line-height:1;">${fmtMoney(netAbs)}</div>
+        <div style="display:flex;gap:18px;font-size:12px;opacity:0.85;margin-top:10px;">
+          <div><span style="opacity:.7;">Owed to Me</span><div style="font-weight:800;font-size:14px;">${fmtMoney(toy)}</div></div>
+          <div><span style="opacity:.7;">I Owe</span><div style="font-weight:800;font-size:14px;">${fmtMoney(yot)}</div></div>
+        </div>
+        <div style="margin-top:10px;">
+          <span style="font-size:10px;opacity:.55;display:block;margin-bottom:2px;">Default currency</span>
+          <select onchange="setDefaultCurrency(this.value)" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:7px;padding:4px 8px;font-size:12px;font-weight:700;cursor:pointer;">
+            ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','AED','SAR','BRL','EGP','MAD'].map(c =>
+              `<option value="${c}" ${defaultCur===c?'selected':''}>${c}</option>`
+            ).join('')}
+          </select>
         </div>
       </div>
-      <div style="text-align:right;">
-        <div style="font-size:10px;opacity:.65;margin-bottom:3px;">Default</div>
-        <select onchange="setDefaultCurrency(this.value)" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:7px;padding:4px 8px;font-size:12px;font-weight:700;cursor:pointer;">
-          ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','AED','SAR','BRL','EGP','MAD'].map(c =>
-            `<option value="${c}" ${defaultCur===c?'selected':''}>${c}</option>`
-          ).join('')}
-        </select>
-      </div>
+      <!-- Other currencies stretch panel (right side) -->
+      ${otherCurPanel}
     </div>
-    ${otherCurHtml}
   </div>`;
 
   // Stat cards row
@@ -1224,14 +1230,23 @@ function _cpEntriesTable(entries, page) {
 }
 
 window.openContactDetail = async function(id) {
-  // 2 queries instead of 3 — balance computed client-side from entries
-  // using the same logic as the ledger_summary view (start_toy/start_yot + entry sums)
-  const [contact, entries] = await Promise.all([
+  // Clear any stale data from a previous contact panel immediately
+  window._cpData = null;
+  window._cpPage = 1;
+
+  // Always fetch fresh from DB — never use the global entries cache for a specific contact
+  const [contactResp, entriesResp] = await Promise.all([
     supabase.from('contacts').select('*').eq('id', id).single(),
-    listEntries(currentUser.id, { contactId: id })
+    supabase.from('entries')
+      .select('*, contact:contacts(id, name, email), settlements(*)')
+      .eq('user_id', currentUser.id)
+      .eq('contact_id', id)
+      .is('archived_at', null)
+      .order('created_at', { ascending: false })
   ]);
-  if (!contact.data) return;
-  const c = contact.data;
+  if (!contactResp.data) return;
+  const c = contactResp.data;
+  const entries = entriesResp.data || [];
 
   // Mirror ledger_summary view logic:
   //   they_owe_me = start_toy + SUM(they_owe / invoice / bill entries) - SUM(they_paid_you entries)
@@ -1315,7 +1330,8 @@ window.openContactDetail = async function(id) {
 
 window.showCPTab = function(tab, contactId) {
   const d = window._cpData;
-  if (!d) return;
+  // Guard: only respond if data is loaded AND matches the contact whose panel is open
+  if (!d || (contactId && d.id !== contactId)) return;
   const el = document.getElementById('cp-tab-content');
   if (!el) return;
 
