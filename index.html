@@ -551,7 +551,8 @@ async function enterApp(user) {
   });
 
   updateNotifBadge();
-  navTo('dash');
+  const savedPage = localStorage.getItem('mxi_last_page') || 'dash';
+  navTo(savedPage);
   // Process scheduled reminders + recurring rules every 60s
   setInterval(() => { processDueReminders(user.id); processDueRecurring(user.id); }, 60000);
   processDueReminders(user.id);
@@ -586,6 +587,7 @@ async function updateNotifBadge() {
 // ── Navigation ────────────────────────────────────────────────────
 function navTo(page) {
   window._currentPage = page;
+  localStorage.setItem('mxi_last_page', page);
   // Update sidebar active state
   document.querySelectorAll('#nav .nav-btn').forEach(el => {
     el.classList.toggle('on', el.dataset.page === page);
