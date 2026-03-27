@@ -453,6 +453,7 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
     <button class="nav-btn" data-page="entries" onclick="app.navigate('entries')">Entries</button>
     <button class="nav-btn" data-page="groups" onclick="app.navigate('groups')">Groups</button>
     <button class="nav-btn" data-page="investments" onclick="app.navigate('investments')">Investments</button>
+    <button class="nav-btn" data-page="business" onclick="app.navigate('business')">Business</button>
     <button class="nav-btn" data-page="templates" onclick="app.navigate('templates')">Templates</button>
     <button class="nav-btn" data-page="recurring" onclick="app.navigate('recurring')">Recurring</button>
     <button class="nav-btn" data-page="notifications" onclick="app.navigate('notifications')">🔔 <span id="notif-badge" class="nav-badge" style="display:none;">0</span></button>
@@ -502,6 +503,9 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
       <button onclick="closeMobileMore();app.navigate('investments')" style="display:flex;align-items:center;gap:14px;padding:14px 24px;font-size:15px;font-weight:500;cursor:pointer;color:var(--text);background:none;border:none;width:100%;text-align:left;">
         <span style="font-size:20px;width:28px;text-align:center;">📈</span> Investments
       </button>
+      <button onclick="closeMobileMore();app.navigate('business')" style="display:flex;align-items:center;gap:14px;padding:14px 24px;font-size:15px;font-weight:500;cursor:pointer;color:var(--text);background:none;border:none;width:100%;text-align:left;">
+        <span style="font-size:20px;width:28px;text-align:center;">📊</span> Business
+      </button>
       <button onclick="closeMobileMore();app.navigate('templates')" style="display:flex;align-items:center;gap:14px;padding:14px 24px;font-size:15px;font-weight:500;cursor:pointer;color:var(--text);background:none;border:none;width:100%;text-align:left;">
         <span style="font-size:20px;width:28px;text-align:center;">📄</span> Templates
       </button>
@@ -550,6 +554,7 @@ import { exportEntriesToCSV, exportLedgerToCSV, exportContactsToCSV } from './js
 import { subscribeToEntries, subscribeToContacts, subscribeToNotifications as subNotifs, unsubscribeAll } from './js/realtime.js';
 import { generateInvoiceHTML, openInvoiceWindow } from './js/invoices.js';
 import { listTrustees, createTrustee, deleteTrustee, verifyTrustee, activateTrustee } from './js/nok.js';
+import { initBpEngine, exposeBpEngine, renderBusinessPage } from './js/bp-engine.js';
 import { listRecurring, createRecurring, deleteRecurring, toggleRecurring, processDueRecurring, FREQUENCIES } from './js/recurring.js';
 import { toast, esc, navigate, statusBadge, TX_LABELS, TX_COLORS, TX_CREATE_LABELS, DIRECTION_SIGN, fmtDate, fmtRelative, openModal, closeModal } from './js/ui.js';
 import { sendNotificationEmail, sendInvoiceEmail, sendOtpEmail, sendInviteEmail, logEmail } from './js/email.js';
@@ -826,6 +831,10 @@ async function enterApp(user) {
   initTplEngine(user.id, navTo, toast);
   exposeTplEngine();
 
+  // Init business panel engine
+  initBpEngine(user.id, navTo, toast);
+  exposeBpEngine();
+
   // Start realtime notifications
   notifChannel = subscribeToNotifications(user.id, (notif) => {
     updateNotifBadge();
@@ -920,6 +929,7 @@ function navTo(page) {
     case 'entries': _entriesAll = []; renderEntries(content); break; // always fresh on navigation
     case 'groups': renderGroups(content); break;
     case 'investments': renderInvestments(content); break;
+    case 'business': renderBusinessPage(content); break;
     case 'templates': renderTemplatesPage(content); break;
     case 'recurring': renderRecurringPage(content); break;
     case 'notifications': renderNotifications(content); break;
