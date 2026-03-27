@@ -232,8 +232,15 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
 </head>
 <body>
 
+<!-- Auth-loading overlay: shown immediately, hidden once session is known -->
+<div id="auth-loader" style="position:fixed;inset:0;background:#0f1117;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:16px;">
+  <div style="font-size:44px;">💰</div>
+  <div style="width:36px;height:36px;border:3px solid #6c63ff33;border-top-color:#6c63ff;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
 <!-- Landing / Auth -->
-<div id="landing" style="min-height:100vh;background:#0f1117;color:#e2e8f0;">
+<div id="landing" style="min-height:100vh;background:#0f1117;color:#e2e8f0;display:none;">
   <!-- Hero section -->
   <div style="background:linear-gradient(135deg, #1a1d27 0%, #0f1117 60%, #1c1830 100%);padding:60px 24px 40px;text-align:center;">
     <div style="font-size:48px;margin-bottom:12px;">💰</div>
@@ -521,6 +528,7 @@ async function enterApp(user) {
     }, { onConflict: 'id' }).select().single();
     currentProfile = data;
   }
+  document.getElementById('auth-loader').style.display = 'none';
   document.getElementById('landing').style.display = 'none';
   document.getElementById('shell').classList.add('active');
   document.getElementById('sidebar-user-name').textContent = currentProfile?.display_name || user.email;
@@ -3315,6 +3323,7 @@ async function checkAuth() {
     let _em = _hp.get('error_description') || _hp.get('error') || 'Authentication error.';
     if (_ec === 'otp_expired') _em = 'That email link has expired — please sign up or log in again.';
     history.replaceState(null, '', window.location.pathname + window.location.search);
+    document.getElementById('auth-loader').style.display = 'none';
     document.getElementById('landing').style.display = '';
     setTimeout(() => toast(_em, 'error'), 100);
     return;
@@ -3327,12 +3336,18 @@ async function checkAuth() {
     if (session?.user) {
       // Only call enterApp if onAuthStateChange hasn't already handled it
       if (!currentUser && !window._isRecovery) { enterApp(session.user); }
-      else if (window._isRecovery) { document.getElementById('landing').style.display = ''; }
+      else if (window._isRecovery) {
+        document.getElementById('auth-loader').style.display = 'none';
+        document.getElementById('landing').style.display = '';
+      }
+      // If currentUser already set by onAuthStateChange, enterApp hid the loader — nothing to do
     } else {
+      document.getElementById('auth-loader').style.display = 'none';
       document.getElementById('landing').style.display = '';
     }
   } catch(e) {
     console.error('[checkAuth] error:', e);
+    document.getElementById('auth-loader').style.display = 'none';
     document.getElementById('landing').style.display = '';
   }
 }
@@ -3343,6 +3358,7 @@ onAuthChange(async (event, session) => {
   // false-positives that fire SIGNED_OUT during session restoration on page load
   if (event === 'SIGNED_OUT' && currentUser) {
     currentUser = null; currentProfile = null;
+    document.getElementById('auth-loader').style.display = 'none';
     document.getElementById('shell').classList.remove('active');
     document.getElementById('landing').style.display = '';
   } else if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user && !currentUser && !window._isRecovery) {
@@ -3351,6 +3367,7 @@ onAuthChange(async (event, session) => {
     } catch(e) {
       console.error('[auth] enterApp failed', e);
       currentUser = null;
+      document.getElementById('auth-loader').style.display = 'none';
       document.getElementById('landing').style.display = '';
     }
   } else if (event === 'PASSWORD_RECOVERY') {
