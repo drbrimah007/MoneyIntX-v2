@@ -2409,7 +2409,7 @@ const CALC_TYPES = {
 const LEDGER_EFFECTS = { '': 'None', toy: 'They Owe (TOY)', toy_credit: 'TOY Credit', yot: 'I Owe (YOT)', yot_credit: 'YOT Credit' };
 const CURRENCIES = ['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'];
 const CURRENCY_SYMBOLS = { USD:'$', EUR:'€', GBP:'£', NGN:'₦', CAD:'C$', AUD:'A$', JPY:'¥', KES:'KSh', ZAR:'R', GHS:'₵', INR:'₹', CNY:'¥', BRL:'R$', MXN:'$', AED:'د.إ', SAR:'﷼', QAR:'﷼', KWD:'د.ك', EGP:'E£', MAD:'MAD', TZS:'TSh', UGX:'USh', ETB:'Br', XOF:'CFA' };
-function fmtMoney(val, currency) {
+function _tplFmt(val, currency) {
   const sym = CURRENCY_SYMBOLS[currency] || currency || '$';
   return sym + Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -2759,14 +2759,14 @@ window.useTemplateForEntry = async function(templateId) {
       // Fields with calculators render as computed display divs so they auto-update
       if (_hasCalcs) {
         const _isFinal = f.isFinalTotal;
-        return `<div class="form-group"><label>${esc(f.label)} <span style="font-size:10px;color:${_isFinal?'#22c55e':'#60a5fa'};font-weight:600;">${_isFinal?'✓ TOTAL':'⚡ auto'}</span></label><div id="tf-${f.id}" class="tpl-field" style="padding:12px 16px;background:${_isFinal?'#052e16':'#0d1f3c'};border:2px solid ${_isFinal?'#22c55e':'#2563eb'};border-radius:10px;font-weight:800;font-size:${_isFinal?'22':'16'}px;color:${_isFinal?'#4ade80':'#93c5fd'};" data-computed="0">${fmtMoney(0,window._activeTplCurrency)}</div></div>`;
+        return `<div class="form-group"><label>${esc(f.label)} <span style="font-size:10px;color:${_isFinal?'#22c55e':'#60a5fa'};font-weight:600;">${_isFinal?'✓ TOTAL':'⚡ auto'}</span></label><div id="tf-${f.id}" class="tpl-field" style="padding:12px 16px;background:${_isFinal?'#052e16':'#0d1f3c'};border:2px solid ${_isFinal?'#22c55e':'#2563eb'};border-radius:10px;font-weight:800;font-size:${_isFinal?'22':'16'}px;color:${_isFinal?'#4ade80':'#93c5fd'};" data-computed="0">${_tplFmt(0,window._activeTplCurrency)}</div></div>`;
       }
       return `<div class="form-group"><label>${esc(f.label)}${f.required?' *':''}</label><input type="number" id="tf-${f.id}" step="0.01" class="tpl-field" value="${esc(String(f.defaultValue||''))}" oninput="recalcTemplateFields()"></div>`;
     }
     if (f.type === 'date') return `<div class="form-group"><label>${esc(f.label)}</label><input type="date" id="tf-${f.id}" class="tpl-field" value="${new Date().toISOString().slice(0,10)}"></div>`;
     if (f.type === 'textarea') return `<div class="form-group"><label>${esc(f.label)}</label><textarea id="tf-${f.id}" rows="2" class="tpl-field"></textarea></div>`;
     if (f.type === 'select') return `<div class="form-group"><label>${esc(f.label)}</label><select id="tf-${f.id}" class="tpl-field" onchange="recalcTemplateFields()">${(f.options||[]).map(o => `<option>${esc(o)}</option>`).join('')}</select></div>`;
-    if (f.type === 'computed') return `<div class="form-group"><label>${esc(f.label)}</label><div id="tf-${f.id}" class="tpl-field" style="padding:10px 14px;background:var(--bg3);border-radius:10px;font-weight:700;font-size:16px;" data-computed="0">${fmtMoney(0,window._activeTplCurrency)}</div></div>`;
+    if (f.type === 'computed') return `<div class="form-group"><label>${esc(f.label)}</label><div id="tf-${f.id}" class="tpl-field" style="padding:10px 14px;background:var(--bg3);border-radius:10px;font-weight:700;font-size:16px;" data-computed="0">${_tplFmt(0,window._activeTplCurrency)}</div></div>`;
     if (f.type === 'paired') return `<div class="form-group"><label>${esc(f.label)} (${esc(f.textLabel||'Item')} + ${esc(f.numericLabel||'Amount')})</label>
       <div id="tf-${f.id}-rows" class="paired-rows"></div>
       <button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="addPairedRow('${f.id}')">+ Add Row</button>
@@ -2833,7 +2833,7 @@ window.recalcTemplateFields = function() {
     });
     document.querySelectorAll('.tpl-field[data-computed]').forEach(el => {
       el.dataset.computed = total;
-      el.textContent = fmtMoney(total, window._activeTplCurrency);
+      el.textContent = _tplFmt(total, window._activeTplCurrency);
     });
     const amtField = document.getElementById('tfe-amount');
     if (amtField && !amtField._userEdited) amtField.value = total > 0 ? total.toFixed(2) : '';
@@ -2933,10 +2933,10 @@ window.recalcTemplateFields = function() {
     if (f.isFinalTotal) {
       el.style.border = '2px solid var(--green)';
       el.style.fontSize = '20px';
-      el.textContent = fmtMoney(displayVal, window._activeTplCurrency);
+      el.textContent = _tplFmt(displayVal, window._activeTplCurrency);
       finalTotalVal = displayVal;
     } else {
-      el.textContent = fmtMoney(displayVal, window._activeTplCurrency);
+      el.textContent = _tplFmt(displayVal, window._activeTplCurrency);
     }
   });
 
