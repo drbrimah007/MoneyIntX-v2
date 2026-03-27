@@ -155,6 +155,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 input.tpl-field:focus:not([readonly]) { color: #22c55e !important; border-color: #22c55e; }
 textarea.tpl-field:not(:placeholder-shown) { color: #22c55e !important; }
 label { font-size: 13px; color: var(--muted); margin-bottom: 4px; display: block; }
+.form-input { background: var(--bg3); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 14px; width: 100%; outline: none; font-family: inherit; }
+.form-input:focus { border-color: var(--accent); }
 .fg { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
 .form-group { margin-bottom: 14px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -1894,67 +1896,6 @@ window.saveSettlement = async function(entryId) {
   });
   closeModal();
   toast('Settlement recorded.', 'success');
-  _invalidateEntries(); navTo('entries');
-};
-
-// ── Send Reminder Modal ───────────────────────────────────────────
-window.openSendReminderModal = async function(id) {
-  const entry = await getEntry(id);
-  if (!entry) return;
-  const cName = entry.contact?.name || 'Contact';
-  const remaining = entry.amount - entry.settled_amount;
-
-  openModal(`
-    <h3 style="margin-bottom:16px;">Send Reminder</h3>
-    <div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:14px;">
-      <div style="font-size:12px;color:var(--muted);">Record</div>
-      <div style="font-weight:700;">${esc(cName)} — ${fmtMoney(remaining, entry.currency)}</div>
-    </div>
-    <div class="form-group"><label>Message</label><textarea id="rem-msg" rows="3">For your attention.</textarea></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
-      <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="sendReminder('${id}')">Send Now</button>
-    </div>
-  `, { maxWidth: '420px' });
-};
-
-window.sendReminder = async function(entryId) {
-  const message = document.getElementById('rem-msg').value.trim();
-  if (!message) return toast('Message required.', 'error');
-  const entry = await getEntry(entryId);
-  const cName = entry?.contact?.name || 'Someone';
-  // Create notification for contact (if linked)
-  if (entry?.contact?.id) {
-    const contact = await supabase.from('contacts').select('linked_user_id').eq('id', entry.contact_id).single();
-    if (contact.data?.linked_user_id) {
-      await supabase.from('notifications').insert({
-        user_id: contact.data.linked_user_id,
-        type: 'reminder',
-        message: `Reminder from ${currentProfile?.display_name || 'Someone'}: ${message}`,
-        entry_id: entryId,
-        contact_name: currentProfile?.display_name || '',
-        amount: entry.amount,
-        currency: entry.currency
-      });
-    }
-  }
-  // Increment reminder count
-  await updateEntry(entryId, {
-    reminder_count: (entry?.reminder_count || 0) + 1,
-    last_reminder_at: new Date().toISOString()
-  });
-  // Self notification
-  await supabase.from('notifications').insert({
-    user_id: currentUser.id,
-    type: 'reminder',
-    message: `Reminder sent to ${cName}: ${message}`,
-    entry_id: entryId,
-    contact_name: cName,
-    amount: entry?.amount,
-    currency: entry?.currency
-  });
-  closeModal();
-  toast('Reminder sent.', 'success');
   _invalidateEntries(); navTo('entries');
 };
 

@@ -76,7 +76,7 @@ export async function recentEntries(userId, limit = 15) {
 export async function getEntry(id) {
   const { data, error } = await supabase
     .from('entries')
-    .select('*, contact:contacts(id, name, email), settlements(*)')
+    .select('*, contact:contacts(id, name, email, linked_user_id), settlements(*)')
     .eq('id', id)
     .single();
   if (error) console.error('[getEntry]', error.message);
