@@ -543,7 +543,7 @@ import { subscribeToEntries, subscribeToContacts, subscribeToNotifications as su
 import { generateInvoiceHTML, openInvoiceWindow } from './js/invoices.js';
 import { listTrustees, createTrustee, deleteTrustee, verifyTrustee, activateTrustee } from './js/nok.js';
 import { listRecurring, createRecurring, deleteRecurring, toggleRecurring, processDueRecurring, FREQUENCIES } from './js/recurring.js';
-import { toast, esc, navigate, statusBadge, TX_LABELS, TX_COLORS, fmtDate, fmtRelative, openModal, closeModal } from './js/ui.js';
+import { toast, esc, navigate, statusBadge, TX_LABELS, TX_COLORS, TX_CREATE_LABELS, DIRECTION_SIGN, fmtDate, fmtRelative, openModal, closeModal } from './js/ui.js';
 import { sendNotificationEmail, sendInvoiceEmail, sendOtpEmail, sendInviteEmail, logEmail } from './js/email.js';
 
 let currentUser = null;
@@ -1069,8 +1069,9 @@ async function renderDash(el) {
   html += `<div class="card card-sm" style="margin-bottom:14px;">
     <div class="section-title" style="margin-bottom:10px;">Quick Actions</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;">
-      <button class="btn sm" onclick="openNewEntryModal('they_owe_you')" style="background:linear-gradient(135deg,#16a34a,#15803d);">💚 They Owe Me</button>
-      <button class="btn sm" onclick="openNewEntryModal('you_owe_them')" style="background:linear-gradient(135deg,#dc2626,#b91c1c);">❤️ I Owe Them</button>
+      <button class="btn sm" onclick="openNewEntryModal('owe-me')" style="background:linear-gradient(135deg,#16a34a,#15803d);">💚 They Owe Me</button>
+      <button class="btn sm" onclick="openNewEntryModal('i-owe')" style="background:linear-gradient(135deg,#dc2626,#b91c1c);">❤️ I Owe Them</button>
+      <button class="btn sm" onclick="openNewEntryModal('advance')" style="background:linear-gradient(135deg,#d97706,#b45309);">⏳ Advance</button>
       <button class="btn sm" onclick="navTo('templates')" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);">📄 New Invoice</button>
       <button class="bs sm" onclick="openNewContactModal()">+ Contact</button>
       <button class="bs sm" onclick="navTo('groups')">👥 Groups</button>
@@ -1323,29 +1324,52 @@ window.openContactDetail = async function(id) {
   const c = contactResp.data;
   const entries = entriesResp.data || [];
 
-  // Mirror ledger_summary view logic:
-  //   they_owe_me = start_toy + SUM(they_owe / invoice / bill entries) - SUM(they_paid_you entries)
-  //   i_owe_them  = start_yot + SUM(you_owe_them entries) - SUM(you_paid_them entries)
+  // ── Balance calculation (v2: direction_sign with legacy fallback) ───────────
+  // direction_sign is +1 (they owe / receivable) or -1 (I owe / payable)
+  // Advances are isolated per spec section 4 rule 5
   const ACTIVE = e => !['voided','cancelled'].includes(e.status) && !e.no_ledger;
-  const toy = (c.start_toy || 0)
-    + entries.filter(e => ['they_owe_you','invoice','bill'].includes(e.tx_type) && ACTIVE(e))
-             .reduce((s, e) => s + e.amount, 0)
-    - entries.filter(e => e.tx_type === 'they_paid_you' && ACTIVE(e))
-             .reduce((s, e) => s + e.amount, 0);
-  const yot = (c.start_yot || 0)
-    + entries.filter(e => e.tx_type === 'you_owe_them' && ACTIVE(e))
-             .reduce((s, e) => s + e.amount, 0)
-    - entries.filter(e => e.tx_type === 'you_paid_them' && ACTIVE(e))
-             .reduce((s, e) => s + e.amount, 0);
-  const net = toy - yot;
+  const ADVANCE_CATS = ['advance_paid','advance_received'];
+  const LEGACY_TOY   = ['they_owe_you','invoice','bill'];
+  const LEGACY_YOT   = ['you_owe_them'];
+  const LEGACY_TPAY  = ['they_paid_you'];
+  const LEGACY_YPAY  = ['you_paid_them'];
+
+  // Net main balance (excludes advances)
+  let mainBalance = 0;
+  entries.filter(e => ACTIVE(e)).forEach(e => {
+    const cat = e.category || e.tx_type;
+    if (ADVANCE_CATS.includes(cat)) return; // advances isolated
+    if (e.direction_sign != null) {
+      mainBalance += e.amount * e.direction_sign;
+    } else {
+      // Legacy fallback
+      if (LEGACY_TOY.includes(cat))  mainBalance += e.amount;
+      if (LEGACY_TPAY.includes(cat)) mainBalance -= e.amount;
+      if (LEGACY_YOT.includes(cat))  mainBalance -= e.amount;
+      if (LEGACY_YPAY.includes(cat)) mainBalance += e.amount;
+    }
+  });
+  mainBalance += (c.start_toy || 0) - (c.start_yot || 0);
+
+  // Advance balance (isolated)
+  const advBalance = entries.filter(e => ACTIVE(e) && ADVANCE_CATS.includes(e.category || e.tx_type))
+    .reduce((s, e) => s + (e.direction_sign != null ? e.amount * e.direction_sign : 0), 0);
+
+  // Legacy-compat aliases
+  const toy = Math.max(0,  mainBalance);
+  const yot = Math.max(0, -mainBalance);
+  const net = mainBalance;
   const col = contactColor(id);
 
-  const toyEntries = entries.filter(e => ['they_owe_you','invoice','bill'].includes(e.tx_type) && !e.no_ledger);
-  const yotEntries = entries.filter(e => e.tx_type === 'you_owe_them' && !e.no_ledger);
-  const toyCredits = entries.filter(e => e.tx_type === 'they_paid_you' && !e.no_ledger);
-  const yotCredits = entries.filter(e => e.tx_type === 'you_paid_them' && !e.no_ledger);
+  // Entry group filters for display (use category when available, fall back to tx_type)
+  const _cat = e => e.category || e.tx_type;
+  const toyEntries  = entries.filter(e => [...LEGACY_TOY,  'owed_to_me','invoice_sent','bill_sent'].includes(_cat(e)) && !e.no_ledger);
+  const yotEntries  = entries.filter(e => [...LEGACY_YOT,  'i_owe','bill_received','invoice_received'].includes(_cat(e)) && !e.no_ledger);
+  const toyCredits  = entries.filter(e => [...LEGACY_TPAY, 'payment_recorded'].includes(_cat(e)) && e.direction_sign !== 1 && !e.no_ledger);
+  const yotCredits  = entries.filter(e => [...LEGACY_YPAY, 'payment_recorded'].includes(_cat(e)) && e.direction_sign !== -1 && !e.no_ledger);
+  const advEntries  = entries.filter(e => ADVANCE_CATS.includes(_cat(e)) && !e.no_ledger);
 
-  window._cpData = { id, c, entries, toy, yot, net, toyEntries, yotEntries, toyCredits, yotCredits };
+  window._cpData = { id, c, entries, toy, yot, net, mainBalance, advBalance, toyEntries, yotEntries, toyCredits, yotCredits, advEntries };
   window._cpPage = 1;
   window._cpRenderEntriesTab = function() {
     const el = document.getElementById('cp-entries-wrap');
@@ -1611,7 +1635,9 @@ async function renderEntries(el, page, forceRefresh) {
         ? `${fmtMoney(e.amount, e.currency)}<div style="font-size:11px;color:var(--muted);">Pd ${fmtMoney(e.settled_amount, e.currency)}</div><div style="font-size:11px;font-weight:700;color:${remaining <= 0 ? 'var(--green)' : 'var(--amber)'};">Bal ${fmtMoney(remaining, e.currency)}</div>`
         : fmtMoney(e.amount, e.currency);
       const isTerminal = ['settled','voided','cancelled','fulfilled'].includes(e.status);
-      const canSettle = ['they_owe_you','you_owe_them','invoice','bill'].includes(e.tx_type) && !isTerminal;
+      const _ecat = e.category || e.tx_type;
+      const canSettle = ['owed_to_me','bill_sent','invoice_sent','i_owe','bill_received','invoice_received',
+        'they_owe_you','you_owe_them','invoice','bill'].includes(_ecat) && !isTerminal;
       const reminderHtml = e.reminder_count > 0 ? `<span class="badge badge-red" style="margin-left:4px;cursor:pointer;" onclick="openEntryDetail('${e.id}')">🚩${e.reminder_count}</span>` : '';
       const noLedgerHtml = e.no_ledger ? `<span class="badge badge-gray" style="margin-left:4px;" title="Not in ledger">⊘</span>` : '';
       const col = cId ? contactColor(cId) : 'var(--bg3)';
@@ -1663,12 +1689,15 @@ window.openEntryDetail = async function(id) {
   const entry = await getEntry(id);
   if (!entry) return toast('Entry not found.', 'error');
   const cName = entry.contact?.name || '—';
-  const txLabel = TX_LABELS[entry.tx_type] || entry.tx_type;
-  const txColor = TX_COLORS[entry.tx_type] || 'var(--text)';
+  const _ecat    = entry.category || entry.tx_type;
+  const txLabel  = TX_LABELS[_ecat] || _ecat;
+  const txColor  = TX_COLORS[_ecat] || 'var(--text)';
   const settlements = entry.settlements || [];
-  const remaining = entry.amount - entry.settled_amount;
-  const isTerminal = ['settled','voided','cancelled','fulfilled'].includes(entry.status);
-  const canSettle = ['they_owe_you','you_owe_them','invoice','bill'].includes(entry.tx_type) && !isTerminal;
+  const paidAmt  = entry.paid_amount || entry.settled_amount || 0;
+  const remaining = entry.outstanding_amount != null ? entry.outstanding_amount : (entry.amount - paidAmt);
+  const isTerminal = ['paid','settled','voided','cancelled','fulfilled'].includes(entry.status);
+  const canMarkPaid = ['owed_to_me','bill_sent','invoice_sent','i_owe','bill_received','invoice_received',
+    'they_owe_you','you_owe_them','invoice','bill'].includes(_ecat) && !isTerminal;
 
   let settleHtml = '';
   if (settlements.length > 0) {
@@ -1734,9 +1763,9 @@ window.openEntryDetail = async function(id) {
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
       <button class="bs sm" onclick="openEditEntryModal('${entry.id}')">Edit</button>
       <button class="bs sm" onclick="closeModal();openShareModal('${entry.id}')">Share</button>
-      ${canSettle ? `<button class="btn sm" onclick="closeModal();openSettleModal('${entry.id}')">Settle</button>` : ''}
+      ${canMarkPaid ? `<button class="btn btn-primary sm" onclick="closeModal();openMarkPaidModal('${entry.id}')">✓ Mark as Paid</button>` : ''}
       ${!isTerminal ? `<button class="bs sm" onclick="closeModal();openSendReminderModal('${entry.id}')">Remind</button>` : ''}
-      ${['invoice','bill'].includes(entry.tx_type) && !isTerminal ? `<button class="bs sm" onclick="closeModal();openNotifyInvoiceModal('${entry.id}')" style="color:#60a5fa;">🔔 Notify</button>` : ''}
+      ${['invoice_sent','bill_sent','invoice','bill'].includes(_ecat) && !isTerminal ? `<button class="bs sm" onclick="closeModal();openNotifyInvoiceModal('${entry.id}')" style="color:#60a5fa;">🔔 Notify</button>` : ''}
       <button class="bs sm" onclick="printInvoice('${entry.id}')">Print</button>
       <button class="bs sm" onclick="duplicateEntry('${entry.id}');closeModal();">Duplicate</button>
       <button class="bs sm" onclick="toggleNoLedger('${entry.id}',${!entry.no_ledger});closeModal();">${entry.no_ledger ? 'Restore Ledger' : 'Rm Ledger'}</button>
@@ -2031,6 +2060,104 @@ window.saveSettlement = async function(entryId) {
   closeModal();
   toast('Settlement recorded.', 'success');
   _invalidateEntries(); navTo('entries');
+};
+
+// ── Mark as Paid Modal (spec section 6) ──────────────────────────
+// Trigger: "Mark as Paid" button on a record — not a dropdown creation type.
+// Creates a payment_recorded entry + updates paid_amount/outstanding_amount/status.
+window.openMarkPaidModal = async function(id) {
+  const entry = await getEntry(id);
+  if (!entry) return toast('Entry not found.', 'error');
+
+  const cat        = entry.category || entry.tx_type;
+  const paidSoFar  = entry.paid_amount || entry.settled_amount || 0;
+  const outstanding = entry.outstanding_amount != null
+    ? entry.outstanding_amount : (entry.amount - paidSoFar);
+  const outstandingDollars = (outstanding / 100).toFixed(2);
+  const currency   = entry.currency || 'USD';
+  const cName      = entry.contact?.name || '—';
+  const label      = TX_LABELS[cat] || cat;
+
+  openModal(`
+    <h3 style="margin-bottom:4px;">✓ Mark as Paid</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">${esc(cName)} — ${label}</p>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Payment Amount</label>
+        <input type="number" id="mp-amount" value="${outstandingDollars}" min="0.01" step="0.01"
+          placeholder="${outstandingDollars}" style="width:100%;">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Outstanding: ${fmtMoney(outstanding, currency)}</div>
+      </div>
+      <div class="form-group"><label>Currency</label>
+        <input type="text" value="${esc(currency)}" readonly style="width:100%;opacity:.7;">
+      </div>
+    </div>
+    <div class="form-group"><label>Payment Date</label>
+      <input type="date" id="mp-date" value="${new Date().toISOString().slice(0,10)}" style="width:100%;"></div>
+    <div class="form-group"><label>Note <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+      <textarea id="mp-note" rows="2" placeholder="e.g. Paid via bank transfer"></textarea></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="bs sm" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="mp-save-btn" onclick="saveMarkPaid('${id}','${currency}')">Record Payment</button>
+    </div>
+  `, { maxWidth: '420px' });
+};
+
+window.saveMarkPaid = async function(entryId, currency) {
+  const amountDollars = parseFloat(document.getElementById('mp-amount').value);
+  if (!amountDollars || amountDollars <= 0) return toast('Enter a valid amount.', 'error');
+  const amountCents = Math.round(amountDollars * 100);
+  const payDate     = document.getElementById('mp-date').value || new Date().toISOString().slice(0,10);
+  const note        = document.getElementById('mp-note').value.trim();
+  const btn         = document.getElementById('mp-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+  try {
+    // Use the atomic Postgres function from migration 009
+    const { data, error } = await supabase.rpc('record_payment', {
+      p_entry_id: entryId,
+      p_user_id:  currentUser.id,
+      p_amount:   amountCents,
+      p_currency: currency,
+      p_date:     payDate,
+      p_note:     note || null
+    });
+
+    if (error) throw error;
+    const result = data;
+
+    // Also insert a payment_recorded entry in the entries table for ledger visibility
+    const { data: origEntry } = await supabase.from('entries')
+      .select('contact_id, direction_sign').eq('id', entryId).single();
+    if (origEntry) {
+      // direction_sign for payment is opposite of original (+1 debt → -1 payment reduces it)
+      const paymentSign = origEntry.direction_sign != null ? -origEntry.direction_sign : 1;
+      await supabase.from('entries').insert({
+        user_id:        currentUser.id,
+        contact_id:     origEntry.contact_id,
+        tx_type:        'they_paid_you',          // legacy compat
+        category:       'payment_recorded',
+        direction_sign: paymentSign,
+        amount:         amountCents,
+        currency,
+        date:           payDate,
+        note:           note || null,
+        status:         'paid',
+        paid_amount:    amountCents,
+        outstanding_amount: 0,
+        entry_number:   null
+      });
+    }
+
+    closeModal();
+    const statusText = result?.status === 'paid' ? 'Fully paid ✓' : `Partially paid — ${fmtMoney(result?.outstanding_amount, currency)} still outstanding`;
+    toast(statusText, 'success');
+    _invalidateEntries(); navTo('entries');
+  } catch (err) {
+    toast('Error: ' + (err?.message || err), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Record Payment'; }
+  }
 };
 
 // ── Notify Invoice Modal ──────────────────────────────────────────
@@ -2492,36 +2619,71 @@ window.doSendReminder = async function(entryId) {
   _invalidateEntries(); navTo('entries');
 };
 
+// ── Tab definitions for new entry modal ───────────────────────────────────────
+const NE_TABS = [
+  {
+    id: 'owe-me', emoji: '💚', label: 'They Owe Me', color: 'var(--green)',
+    borderActive: 'rgba(74,222,128,.3)', bgActive: 'rgba(74,222,128,.1)',
+    actions: [
+      { category: 'owed_to_me',    label: 'They owe me',      icon: '💰', extra: [] },
+      { category: 'bill_sent',     label: 'Send a bill',      icon: '📄', extra: ['due_date','ref_number'], email: true },
+      { category: 'invoice_sent',  label: 'Send an invoice',  icon: '🧾', extra: ['inv_number','due_date'],  email: true }
+    ]
+  },
+  {
+    id: 'i-owe', emoji: '❤️', label: 'I Owe Them', color: 'var(--red)',
+    borderActive: 'rgba(248,113,113,.3)', bgActive: 'rgba(248,113,113,.1)',
+    actions: [
+      { category: 'i_owe',             label: 'I owe them',         icon: '💸', extra: [] },
+      { category: 'bill_received',     label: 'Receive a bill',     icon: '📬', extra: ['due_date','ref_number'] },
+      { category: 'invoice_received',  label: 'Receive an invoice', icon: '📩', extra: ['inv_number','due_date'] }
+    ]
+  },
+  {
+    id: 'advance', emoji: '⏳', label: 'Advances', color: '#f59e0b',
+    borderActive: 'rgba(245,158,11,.3)', bgActive: 'rgba(245,158,11,.1)',
+    actions: [
+      { category: 'advance_paid',     label: 'Pay in advance',           icon: '⬆️', extra: [] },
+      { category: 'advance_received', label: 'Receive advance payment',  icon: '⬇️', extra: [] }
+    ]
+  }
+];
+
 window.openNewEntryModal = async function(defaultDirection, preselectedContactId) {
   const [contacts, templates] = await Promise.all([
     listContacts(currentUser.id),
     listTemplates(currentUser.id)
   ]);
-  // Cache contacts for search
   window._neContacts = contacts;
   window._neSelectedContactId = preselectedContactId || (contacts.length === 1 ? contacts[0].id : '');
-  const dir = defaultDirection || 'they_owe_you';
-  const isToy = dir === 'they_owe_you';
+
+  // Determine initial tab from legacy defaultDirection arg
+  const initTabId = defaultDirection === 'you_owe_them' ? 'i-owe'
+                  : defaultDirection === 'advance'      ? 'advance'
+                  : 'owe-me';
+  window._neTab      = initTabId;
+  window._neCategory = NE_TABS.find(t => t.id === initTabId).actions[0].category;
 
   const selectedContact = window._neSelectedContactId ? contacts.find(c => c.id === window._neSelectedContactId) : null;
   const contactDisplayVal = selectedContact ? selectedContact.name : '';
 
+  // Build tab bar HTML
+  const tabBarHtml = NE_TABS.map(tab => `
+    <button id="ne-tab-${tab.id}" onclick="neSelectTab('${tab.id}')"
+      style="flex:1;padding:9px 4px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;text-align:center;
+             border:2px solid ${tab.id === initTabId ? tab.borderActive : 'var(--border)'};
+             background:${tab.id === initTabId ? tab.bgActive : 'var(--bg3)'};
+             color:${tab.id === initTabId ? tab.color : 'var(--muted)'};">
+      ${tab.emoji} ${tab.label}
+    </button>`).join('');
+
+  const initTab = NE_TABS.find(t => t.id === initTabId);
+  const actionRowHtml = _neActionRow(initTab, initTab.actions[0].category);
+
   openModal(`
     <div class="modal-title">New Entry</div>
-
-    <!-- Direction picker (v1 style) -->
-    <div style="display:flex;gap:6px;margin-bottom:16px;">
-      <button id="dir-toy" onclick="setEntryDirection('they_owe_you')"
-        style="flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:600;border:2px solid ${isToy ? 'var(--green)' : 'var(--border)'};background:${isToy ? 'rgba(74,222,128,.12)' : 'var(--bg3)'};color:${isToy ? 'var(--green)' : 'var(--muted)'};cursor:pointer;text-align:center;">
-        💚 They Owe Me
-      </button>
-      <button id="dir-yot" onclick="setEntryDirection('you_owe_them')"
-        style="flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:600;border:2px solid ${!isToy ? 'var(--red)' : 'var(--border)'};background:${!isToy ? 'rgba(248,113,113,.12)' : 'var(--bg3)'};color:${!isToy ? 'var(--red)' : 'var(--muted)'};cursor:pointer;text-align:center;">
-        ❤️ I Owe Them
-      </button>
-    </div>
-
-    <!-- Contact search with Add New -->
+    <div style="display:flex;gap:6px;margin-bottom:14px;">${tabBarHtml}</div>
+    <div id="ne-action-row" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">${actionRowHtml}</div>
     <div class="form-group" style="position:relative;">
       <label style="display:flex;justify-content:space-between;align-items:center;">
         <span>Contact *</span>
@@ -2537,60 +2699,44 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
         <div id="ne-contact-list" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:999;max-height:200px;overflow-y:auto;margin-top:2px;">
           ${contacts.map(c => {
             const col = contactColor(c.id);
-            return `<div onclick="selectNeContact('${c.id}','${esc(c.name)}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);" onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background=''">
-              <span style="width:28px;height:28px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;">${esc(c.name.charAt(0).toUpperCase())}</span>
-              <div><div style="font-weight:600;font-size:13px;">${esc(c.name)}</div>${c.email ? `<div style="font-size:11px;color:var(--muted);">${esc(c.email)}</div>` : ''}</div>
-            </div>`;
+            return \`<div onclick="selectNeContact('\${c.id}','\${esc(c.name)}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);" onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background=''">
+              <span style="width:28px;height:28px;border-radius:50%;background:\${col};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;">\${esc(c.name.charAt(0).toUpperCase())}</span>
+              <div><div style="font-weight:600;font-size:13px;">\${esc(c.name)}</div>\${c.email ? \`<div style="font-size:11px;color:var(--muted);">\${esc(c.email)}</div>\` : ''}</div>
+            </div>\`;
           }).join('')}
-          ${contacts.length === 0 ? '<div style="padding:12px;color:var(--muted);font-size:13px;text-align:center;">No contacts — click "Add New" above</div>' : ''}
+          ${contacts.length === 0 ? '<div style="padding:12px;color:var(--muted);font-size:13px;text-align:center;">No contacts — click "+ Add New" above</div>' : ''}
         </div>
       </div>
     </div>
-
-    <div class="form-group"><label>Transaction Type</label>
-      <select id="ne-type">
-        ${isToy ? `
-          <option value="they_owe_you">They Owe Me</option>
-          <option value="invoice">Invoice</option>
-          <option value="they_paid_you">They Settled Me</option>
-        ` : `
-          <option value="you_owe_them">I Owe Them</option>
-          <option value="bill">Bill</option>
-          <option value="you_paid_them">I Settled Them</option>
-        `}
-      </select>
-    </div>
-
     <div class="form-row">
-      <div class="form-group"><label>Amount *</label><input type="number" id="ne-amount" min="0" step="0.01" placeholder="0.00" autofocus></div>
+      <div class="form-group"><label>Amount *</label><input type="number" id="ne-amount" min="0" step="0.01" placeholder="0.00"></div>
       <div class="form-group"><label>Currency</label><select id="ne-currency">
         ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'].map(c => `<option value="${c}" ${(currentProfile?.default_currency||'USD')===c?'selected':''}>${c}</option>`).join('')}
       </select></div>
     </div>
-    <div class="form-group"><label>Date</label><input type="date" id="ne-date" value="${new Date().toISOString().slice(0,10)}"></div>
-    <div class="form-group"><label>Note</label><textarea id="ne-note" rows="2" placeholder="Optional note..."></textarea></div>
-
+    <div id="ne-extra-fields"></div>
+    <div class="form-group"><label>Issue Date</label><input type="date" id="ne-date" value="${new Date().toISOString().slice(0,10)}"></div>
+    <div class="form-group"><label>Note <span style="font-weight:400;color:var(--muted);">(optional)</span></label><textarea id="ne-note" rows="2" placeholder="Optional note..."></textarea></div>
     ${templates.length > 0 ? `
-      <div class="form-group"><label>Or use a template</label>
+      <div class="form-group"><label style="color:var(--muted);">Or use a template</label>
         <select id="ne-template" onchange="if(this.value){closeModal();useTemplateForEntry(this.value);}">
           <option value="">— Select template —</option>
           ${templates.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}
         </select>
-      </div>
-    ` : ''}
-
+      </div>` : ''}
+    <input type="hidden" id="ne-category" value="${window._neCategory}">
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="bs sm" onclick="closeModal()">Cancel</button>
-      <button class="btn sm" onclick="saveNewEntry()">Save Entry</button>
+      <button class="btn btn-primary sm" id="ne-save-btn" onclick="saveNewEntry()">Save Entry</button>
     </div>
-  `, { maxWidth: '480px' });
-  window._entryDirection = dir;
+  `, { maxWidth: '500px' });
 
-  // Close contact dropdown when clicking outside
+  window._entryDirection = initTabId;
+
   setTimeout(() => {
     document.addEventListener('click', function _cls(e) {
       const list = document.getElementById('ne-contact-list');
-      const inp = document.getElementById('ne-contact-search');
+      const inp  = document.getElementById('ne-contact-search');
       if (list && !list.contains(e.target) && e.target !== inp) list.style.display = 'none';
       if (!document.getElementById('ne-contact-search')) document.removeEventListener('click', _cls);
     });
@@ -2641,101 +2787,188 @@ window.openNewContactFromEntry = function() {
   `);
 };
 
-window.setEntryDirection = function(dir) {
-  window._entryDirection = dir;
-  const isToy = dir === 'they_owe_you';
-  // Update tabs
-  const toyBtn = document.getElementById('dir-toy');
-  const yotBtn = document.getElementById('dir-yot');
-  if (toyBtn) { toyBtn.style.borderColor = isToy ? 'var(--green)' : 'var(--border)'; toyBtn.style.background = isToy ? 'rgba(74,222,128,.12)' : 'var(--bg3)'; toyBtn.style.color = isToy ? 'var(--green)' : 'var(--muted)'; }
-  if (yotBtn) { yotBtn.style.borderColor = !isToy ? 'var(--red)' : 'var(--border)'; yotBtn.style.background = !isToy ? 'rgba(248,113,113,.12)' : 'var(--bg3)'; yotBtn.style.color = !isToy ? 'var(--red)' : 'var(--muted)'; }
-  // Update type dropdown
-  const sel = document.getElementById('ne-type');
-  if (sel) {
-    sel.innerHTML = isToy
-      ? '<option value="they_owe_you">They Owe Me</option><option value="invoice">Invoice</option><option value="they_paid_you">They Settled Me</option>'
-      : '<option value="you_owe_them">I Owe Them</option><option value="bill">Bill</option><option value="you_paid_them">I Settled Them</option>';
+// ── New 3-tab entry modal helpers ─────────────────────────────────────────────
+
+// Build action row HTML for a given tab + selected category
+function _neActionRow(tab, selectedCategory) {
+  return tab.actions.map(action => {
+    const sel = action.category === selectedCategory;
+    return `<button onclick="neSelectCategory('${action.category}')"
+      style="flex:1;min-width:110px;padding:8px 6px;border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;text-align:center;line-height:1.3;
+             border:2px solid ${sel ? tab.borderActive : 'var(--border)'};
+             background:${sel ? tab.bgActive : 'var(--bg3)'};
+             color:${sel ? tab.color : 'var(--muted)'};">
+      ${action.icon}<br>${action.label}
+    </button>`;
+  }).join('');
+}
+
+// Switch tab (They Owe Me / I Owe Them / Advances)
+window.neSelectTab = function(tabId) {
+  const tab = NE_TABS.find(t => t.id === tabId);
+  if (!tab) return;
+  window._neTab = tabId;
+  window._entryDirection = tabId;
+
+  // Update tab button styles
+  NE_TABS.forEach(t => {
+    const btn = document.getElementById('ne-tab-' + t.id);
+    if (!btn) return;
+    const active = t.id === tabId;
+    btn.style.borderColor  = active ? t.borderActive : 'var(--border)';
+    btn.style.background   = active ? t.bgActive     : 'var(--bg3)';
+    btn.style.color        = active ? t.color        : 'var(--muted)';
+  });
+
+  // Reset to first action of this tab
+  const firstAction = tab.actions[0];
+  window._neCategory = firstAction.category;
+  document.getElementById('ne-action-row').innerHTML = _neActionRow(tab, firstAction.category);
+  document.getElementById('ne-category').value = firstAction.category;
+  _neRenderExtraFields(firstAction);
+
+  // Update save button label
+  const saveBtn = document.getElementById('ne-save-btn');
+  if (saveBtn) saveBtn.textContent = firstAction.email ? '📤 Send & Save' : 'Save Entry';
+};
+
+// Select an action within the current tab
+window.neSelectCategory = function(category) {
+  const tab = NE_TABS.find(t => t.id === window._neTab);
+  if (!tab) return;
+  const action = tab.actions.find(a => a.category === category);
+  if (!action) return;
+  window._neCategory = category;
+  document.getElementById('ne-category').value = category;
+  document.getElementById('ne-action-row').innerHTML = _neActionRow(tab, category);
+  _neRenderExtraFields(action);
+  const saveBtn = document.getElementById('ne-save-btn');
+  if (saveBtn) saveBtn.textContent = action.email ? '📤 Send & Save' : 'Save Entry';
+};
+
+// Render extra fields based on action extras list
+function _neRenderExtraFields(action) {
+  const el = document.getElementById('ne-extra-fields');
+  if (!el) return;
+  let html = '';
+  if ((action.extra || []).includes('inv_number')) {
+    html += `<div class="form-group"><label>Invoice Number</label>
+      <input type="text" id="ne-inv-number" placeholder="INV-001" style="width:100%;"></div>`;
   }
+  if ((action.extra || []).includes('ref_number')) {
+    html += `<div class="form-group"><label>Bill / Ref Number <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+      <input type="text" id="ne-ref-number" placeholder="REF-001" style="width:100%;"></div>`;
+  }
+  if ((action.extra || []).includes('due_date')) {
+    html += `<div class="form-group"><label>Due Date <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+      <input type="date" id="ne-due-date" style="width:100%;"></div>`;
+  }
+  el.innerHTML = html;
+}
+
+// Legacy shim — keep callers like dashboard "They Owe Me" buttons working
+window.setEntryDirection = function(dir) {
+  const tabId = dir === 'you_owe_them' ? 'i-owe' : dir === 'advance' ? 'advance' : 'owe-me';
+  neSelectTab(tabId);
 };
 
 window.saveNewEntry = async function() {
-  const contactId = (document.getElementById('ne-contact')?.value || '').trim();
-  const txType = document.getElementById('ne-type').value;
-  const amount = document.getElementById('ne-amount').value;
-  const currency = document.getElementById('ne-currency')?.value || currentProfile?.default_currency || 'USD';
-  const date = document.getElementById('ne-date').value;
-  const note = document.getElementById('ne-note').value.trim();
+  const contactId  = (document.getElementById('ne-contact')?.value || '').trim();
+  const category   = document.getElementById('ne-category')?.value || 'owed_to_me';
+  const amount     = document.getElementById('ne-amount').value;
+  const currency   = document.getElementById('ne-currency')?.value || currentProfile?.default_currency || 'USD';
+  const date       = document.getElementById('ne-date').value;
+  const note       = document.getElementById('ne-note').value.trim();
+  const invNumber  = document.getElementById('ne-inv-number')?.value?.trim() || '';
+  const refNumber  = document.getElementById('ne-ref-number')?.value?.trim() || '';
+  const dueDate    = document.getElementById('ne-due-date')?.value || null;
+  const dirSign    = DIRECTION_SIGN[category] ?? 1;
+
   if (!contactId) return toast('Please select a contact.', 'error');
   if (!amount || parseFloat(amount) <= 0) return toast('Enter a valid amount.', 'error');
 
-  const entry = await createEntry(currentUser.id, { contactId, txType, amount: parseFloat(amount), currency, date, note });
+  // Map category back to legacy tx_type for backward compat with createEntry
+  const TX_CATEGORY_TO_TYPE = {
+    owed_to_me: 'they_owe_you', bill_sent: 'bill', invoice_sent: 'invoice',
+    i_owe: 'you_owe_them', bill_received: 'bill', invoice_received: 'invoice',
+    advance_paid: 'you_owe_them', advance_received: 'they_owe_you',
+    payment_recorded: 'they_paid_you'
+  };
+  const txType = TX_CATEGORY_TO_TYPE[category] || 'they_owe_you';
+
+  const entry = await createEntry(currentUser.id, {
+    contactId, txType, amount: parseFloat(amount), currency, date, note,
+    invoiceNumber: invNumber || refNumber || ''
+  });
+
+  // Persist new fields onto the entry row
+  if (entry?.id) {
+    const updates = { category, direction_sign: dirSign, outstanding_amount: Math.round(parseFloat(amount) * 100) };
+    if (dueDate) updates.due_date = dueDate;
+    await supabase.from('entries').update(updates).eq('id', entry.id);
+  }
+
   closeModal();
   toast('Entry created.', 'success');
   _invalidateEntries(); navTo('entries');
 
-  // ── Notify both parties ─────────────────────────────────────────
+  // ── Post-save notifications ─────────────────────────────────────
   try {
     const contactName = window._neContacts?.find(c => c.id === contactId)?.name || 'Contact';
-    const fromName    = currentProfile?.display_name || 'Someone';
-    const txLabel     = TX_LABELS[txType] || txType;
+    const fromName    = currentProfile?.display_name || currentProfile?.company_name || 'Someone';
+    const txLabel     = TX_LABELS[category] || category;
     const amtLabel    = `${currency} ${parseFloat(amount).toLocaleString()}`;
     const entryId     = entry?.id;
 
-    // 1) Self-notification (so user has a record in their own feed)
+    // 1) Self-notification
     await supabase.from('notifications').insert({
-      user_id: currentUser.id,
-      type: 'notification',
-      message: `Entry added: ${txLabel} with ${contactName} — ${amtLabel}${note ? '. ' + note : ''}`,
-      amount: parseFloat(amount),
-      currency,
-      contact_name: contactName,
-      entry_id: entryId,
-      is_read: false
+      user_id: currentUser.id, type: 'notification',
+      message: `${txLabel} with ${contactName} — ${amtLabel}${note ? '. ' + note : ''}`,
+      amount: parseFloat(amount), currency, contact_name: contactName,
+      entry_id: entryId, is_read: false
     });
 
-    // 2) Notify the contact if they have a Money IntX account
-    const { data: contactUser } = await supabase
-      .from('contacts')
-      .select('email, linked_user_id')
-      .eq('id', contactId)
-      .single();
+    // 2) Fetch contact details for linked account + email
+    const { data: contactRow } = await supabase.from('contacts')
+      .select('email, linked_user_id').eq('id', contactId).single();
+    const contactEmail  = contactRow?.email;
+    const linkedUserId  = contactRow?.linked_user_id;
 
-    const linkedUserId = contactUser?.linked_user_id;
-    const contactEmail = contactUser?.email;
+    // Mirror label: owed_to_me → i_owe, bill_sent → bill_received, etc.
+    const MIRROR = {
+      owed_to_me: 'i_owe', bill_sent: 'bill_received', invoice_sent: 'invoice_received',
+      i_owe: 'owed_to_me', bill_received: 'bill_sent', invoice_received: 'invoice_sent',
+      advance_paid: 'advance_received', advance_received: 'advance_paid'
+    };
+    const mirrorLabel = TX_LABELS[MIRROR[category] || category] || txLabel;
 
     if (linkedUserId) {
-      // Contact has an account — create an in-app notification for them
-      const reverseType = {
-        they_owe_you: 'you_owe_them',
-        you_owe_them: 'they_owe_you',
-        they_paid_you: 'you_paid_them',
-        you_paid_them: 'they_paid_you',
-        invoice: 'invoice',
-        bill: 'bill'
-      }[txType] || txType;
-      const reverseLabel = TX_LABELS[reverseType] || reverseType;
       await supabase.from('notifications').insert({
-        user_id: linkedUserId,
-        type: 'notification',
-        message: `${fromName} added a record: ${reverseLabel} — ${amtLabel}${note ? '. ' + note : ''}`,
-        amount: parseFloat(amount),
-        currency,
-        contact_name: fromName,
-        entry_id: entryId,
-        is_read: false
+        user_id: linkedUserId, type: 'notification',
+        message: `${fromName}: ${mirrorLabel} — ${amtLabel}${note ? '. ' + note : ''}`,
+        amount: parseFloat(amount), currency, contact_name: fromName,
+        entry_id: entryId, is_read: false
       });
     }
 
-    // 3) Send email to contact if they have an email on file
-    if (contactEmail) {
+    // 3) Email — only for bill_sent and invoice_sent (per spec section 8)
+    if (contactEmail && category === 'invoice_sent') {
+      const invoiceNum = invNumber || `INV-${String(entry?.entry_number || '').padStart(4,'0')}`;
+      await sendInvoiceEmail(currentUser.id, {
+        to: contactEmail, fromName,
+        invoiceNumber: invoiceNum,
+        amount: parseFloat(amount), currency,
+        companyName: currentProfile?.company_name,
+        companyEmail: currentProfile?.company_email,
+        companyAddress: currentProfile?.company_address,
+        logoUrl: currentProfile?.logo_url,
+        dueDate, message: note, entryId
+      });
+    } else if (contactEmail && category === 'bill_sent') {
+      // Bill email: subject = "Bill from {Name} - {Description}"
       await sendNotificationEmail(currentUser.id, {
-        to: contactEmail,
-        fromName,
-        txType,
-        amount: parseFloat(amount),
-        currency,
-        message: note,
-        entryId
+        to: contactEmail, fromName, txType: 'bill_sent',
+        amount: parseFloat(amount), currency, message: note, entryId
       });
     }
   } catch (notifErr) {
