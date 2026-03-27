@@ -322,12 +322,12 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
       <div style="font-size:11px;color:#6b7280;line-height:1.5;">Who owes you, who you owe — net balance</div>
     </div>
     <div style="background:#0f1117;padding:22px 18px;text-align:center;">
-      <div style="font-size:26px;margin-bottom:8px;">👥</div>
+      <div style="margin-bottom:8px;display:flex;justify-content:center;"><img src="group-logo.png" alt="Groups" style="width:36px;height:36px;border-radius:8px;object-fit:cover;" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span style="font-size:26px;display:none;">👥</span></div>
       <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Groups</div>
       <div style="font-size:11px;color:#6b7280;line-height:1.5;">Savings circles, ajo, chamas &amp; ventures</div>
     </div>
     <div style="background:#0f1117;padding:22px 18px;text-align:center;">
-      <div style="font-size:26px;margin-bottom:8px;">📈</div>
+      <div style="margin-bottom:8px;display:flex;justify-content:center;"><img src="investment-logo.png" alt="Investments" style="width:36px;height:36px;border-radius:8px;object-fit:cover;" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span style="font-size:26px;display:none;">📈</span></div>
       <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Investments</div>
       <div style="font-size:11px;color:#6b7280;line-height:1.5;">ROI tracking with multiple partners</div>
     </div>
@@ -523,6 +523,7 @@ import { generateInvoiceHTML, openInvoiceWindow } from './js/invoices.js';
 import { listTrustees, createTrustee, deleteTrustee, verifyTrustee, activateTrustee } from './js/nok.js';
 import { listRecurring, createRecurring, deleteRecurring, toggleRecurring, processDueRecurring, FREQUENCIES } from './js/recurring.js';
 import { toast, esc, navigate, statusBadge, TX_LABELS, TX_COLORS, fmtDate, fmtRelative, openModal, closeModal } from './js/ui.js';
+import { sendNotificationEmail, sendInvoiceEmail, logEmail } from './js/email.js';
 
 let currentUser = null;
 let currentProfile = null;
@@ -1128,7 +1129,7 @@ async function renderDash(el) {
           </span>` : `<span style="color:var(--muted);">${esc(cName)}</span>`}
         </td>
         <td style="font-weight:700;cursor:pointer;" onclick="openEntryDetail('${e.id}')">${amtHtml}</td>
-        <td class="hide-mobile">${e.invoice_number ? `<span style="font-size:11px;font-family:monospace;color:var(--accent);font-weight:700;">${esc(e.invoice_number)}</span>` : '<span style="color:var(--bg3);">—</span>'}</td>
+        <td class="hide-mobile">${e.invoice_number ? `<span style="font-size:11px;font-family:monospace;color:var(--accent);font-weight:700;">${esc(e.invoice_number)}</span>` : e.entry_number ? `<span style="font-size:11px;font-family:monospace;color:var(--muted);font-weight:700;">#${String(e.entry_number).padStart(4,'0')}</span>` : '<span style="color:var(--bg3);">—</span>'}</td>
         <td class="hide-mobile"><span style="font-weight:600;font-size:12px;color:${txColor};">${esc(txLabel)}</span></td>
         <td style="color:var(--muted);font-size:12px;">${fmtDate(e.date)}</td>
         <td>${statusBadge(e.status)}${reminderHtml}</td>
@@ -2016,6 +2017,7 @@ window.openNotifyInvoiceModal = async function(id) {
   const invLabel = entry.invoice_number ? ` (${entry.invoice_number})` : '';
   const amtLabel = fmtMoney(entry.amount, entry.currency);
 
+  const contactEmail = entry.contact?.email || '';
   openModal(`
     <h3 style="margin-bottom:4px;">🔔 Notify Contact</h3>
     <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">${esc(cName)}${invLabel} — ${amtLabel}</p>
@@ -2031,6 +2033,10 @@ window.openNotifyInvoiceModal = async function(id) {
         <option value="viewed">Viewed</option>
       </select>
     </div>
+    ${contactEmail ? `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:14px;">
+      <input type="checkbox" id="notif-send-email" checked style="accent-color:var(--accent);width:15px;height:15px;">
+      Also send email to <strong>${esc(contactEmail)}</strong>
+    </label>` : `<p style="font-size:12px;color:var(--muted);margin-bottom:14px;">💡 Add an email to this contact to also send email notifications.</p>`}
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="sendInvoiceNotification('${id}')">Send Notification</button>
@@ -2041,14 +2047,16 @@ window.openNotifyInvoiceModal = async function(id) {
 window.sendInvoiceNotification = async function(entryId) {
   const message = document.getElementById('notif-msg').value.trim();
   const newStatus = document.getElementById('notif-status').value;
+  const sendEmail = document.getElementById('notif-send-email')?.checked !== false;
   if (!message) return toast('Message required.', 'error');
 
   const entry = await getEntry(entryId);
   const cName = entry?.contact?.name || 'Someone';
+  const cEmail = entry?.contact?.email || '';
 
   // Notify the linked contact (if on the platform)
   if (entry?.contact_id) {
-    const { data: contact } = await supabase.from('contacts').select('linked_user_id').eq('id', entry.contact_id).single();
+    const { data: contact } = await supabase.from('contacts').select('linked_user_id, email').eq('id', entry.contact_id).single();
     if (contact?.linked_user_id) {
       await supabase.from('notifications').insert({
         user_id: contact.linked_user_id,
@@ -2059,6 +2067,18 @@ window.sendInvoiceNotification = async function(entryId) {
         amount: entry.amount,
         currency: entry.currency
       });
+    }
+    // Send email if contact has email and checkbox is checked
+    const emailTo = contact?.email || cEmail;
+    if (sendEmail && emailTo) {
+      try {
+        const fromName = currentProfile?.display_name || currentProfile?.company_name || 'Money IntX';
+        await sendNotificationEmail(currentUser.id, {
+          to: emailTo, fromName, txType: entry.tx_type,
+          amount: fmtMoney(entry.amount, entry.currency),
+          currency: entry.currency, message, entryId, isReminder: false
+        });
+      } catch(e) { console.warn('Email send failed:', e); }
     }
   }
 
@@ -2079,7 +2099,7 @@ window.sendInvoiceNotification = async function(entryId) {
   });
 
   closeModal();
-  toast('Notification sent.', 'success');
+  toast('Notification sent.' + (sendEmail && cEmail ? ' Email queued.' : ''), 'success');
   _invalidateEntries(); navTo('entries');
 };
 
@@ -2358,6 +2378,7 @@ window.doSendReminder = async function(entryId) {
     // Send immediately
     const entry = await getEntry(entryId);
     const cName = entry?.contact?.name || 'Someone';
+    const cEmail = entry?.contact?.email || '';
     const linkedUserId = entry?.contact?.linked_user_id;
     if (linkedUserId) {
       await supabase.from('notifications').insert({
@@ -2366,6 +2387,17 @@ window.doSendReminder = async function(entryId) {
         entry_id: entryId, contact_name: currentProfile?.display_name || '',
         amount: entry.amount, currency: entry.currency
       });
+    }
+    // Also send email reminder if contact has email
+    if (cEmail) {
+      try {
+        const fromName = currentProfile?.display_name || currentProfile?.company_name || 'Money IntX';
+        await sendNotificationEmail(currentUser.id, {
+          to: cEmail, fromName, txType: entry.tx_type,
+          amount: fmtMoney(entry.amount, entry.currency),
+          currency: entry.currency, message, entryId, isReminder: true
+        });
+      } catch(e) { console.warn('Email reminder failed:', e); }
     }
     await supabase.from('notifications').insert({
       user_id: currentUser.id, type: 'reminder',
@@ -2380,7 +2412,7 @@ window.doSendReminder = async function(entryId) {
       updated_at: new Date().toISOString()
     }).eq('id', entryId);
     closeModal();
-    toast('Reminder sent.', 'success');
+    toast('Reminder sent.' + (cEmail ? ' Email queued.' : ''), 'success');
   } else {
     // Schedule
     const schedDate = document.getElementById('rem-date').value;
@@ -2676,7 +2708,10 @@ async function renderInvestments(el) {
   }
 
   let html = `<div class="page-header">
-    <div><h2 style="margin:0;">📈 Investments</h2><p style="font-size:13px;color:var(--muted);margin-top:2px;">${investments.length} investment${investments.length !== 1 ? 's' : ''}</p></div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <img src="investment-logo.png" alt="Investments" style="width:48px;height:48px;border-radius:12px;object-fit:cover;" onerror="this.style.display='none'">
+      <div><h2 style="margin:0;">Investments</h2><p style="font-size:13px;color:var(--muted);margin-top:2px;">${investments.length} investment${investments.length !== 1 ? 's' : ''}</p></div>
+    </div>
     <button class="btn btn-primary btn-sm" onclick="openNewInvestmentModal()">+ New Investment</button>
   </div>`;
 
@@ -3026,7 +3061,10 @@ async function renderGroups(el) {
   }
 
   let html = `<div class="page-header">
-    <div><h2 style="margin:0;">👥 Group Savings</h2><p style="font-size:13px;color:var(--muted);margin-top:2px;">${groups.length} group${groups.length!==1?'s':''}</p></div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <img src="group-logo.png" alt="Groups" style="width:48px;height:48px;border-radius:12px;object-fit:cover;" onerror="this.style.display='none'">
+      <div><h2 style="margin:0;">Group Savings</h2><p style="font-size:13px;color:var(--muted);margin-top:2px;">${groups.length} group${groups.length!==1?'s':''}</p></div>
+    </div>
     <button class="btn btn-primary btn-sm" onclick="openNewGroupModal()">+ New Group</button>
   </div>`;
 
