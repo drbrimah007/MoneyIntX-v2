@@ -558,26 +558,26 @@ let currentUser = null;
 let currentProfile = null;
 let notifChannel = null;
 
-// ── Contact color: deterministic per ID, stored in localStorage ───
-// Cache key includes version — bump to invalidate stale pale colors
-const _CC_KEY = 'mxi_cc_v3';
+/// ── Contact color: deterministic per ID, stored in localStorage ───
+// Cache key includes version — bump to invalidate stale colors
+const _CC_KEY = 'mxi_cc_v4';
 function contactColor(id) {
   try {
     const stored = JSON.parse(localStorage.getItem(_CC_KEY) || '{}');
     if (stored[id]) return stored[id];
-    // Strong HSL palette — 24 vivid distinct hues, never pale or near-white
+    // Vivid HSL palette — 24 distinct hues
     const VIVID_HUES = [4,15,30,48,140,158,175,196,210,225,240,255,270,285,300,318,330,347,95,115,62,200,80,168];
     let h = 0;
     for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
     const hue = VIVID_HUES[h % VIVID_HUES.length];
-    // Saturation 72–82%, Lightness 44–50% — vivid, dark enough for white text
-    const sat = 72 + (h % 10);
-    const lit = 44 + ((h >> 4) % 6);
+    // Saturation 70–80%, Lightness 68–76% — bright enough to read on dark backgrounds
+    const sat = 70 + (h % 10);
+    const lit = 68 + ((h >> 4) % 8);
     const color = `hsl(${hue}, ${sat}%, ${lit}%)`;
     stored[id] = color;
     localStorage.setItem(_CC_KEY, JSON.stringify(stored));
     return color;
-  } catch (_) { return '#6c63ff'; }
+  } catch (_) { return '#a5b4fc'; }
 }
 window.contactColor = contactColor;
 
@@ -2742,16 +2742,27 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
     <div id="ne-extra-fields"></div>
     <div class="form-group"><label>Issue Date</label><input type="date" id="ne-date" value="${new Date().toISOString().slice(0,10)}"></div>
     <div class="form-group"><label>Note <span style="font-weight:400;color:var(--muted);">(optional)</span></label><textarea id="ne-note" rows="2" placeholder="Optional note..."></textarea></div>
-    <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg3);border-radius:10px;cursor:pointer;margin-bottom:12px;">
-      <div>
-        <div style="font-size:13px;font-weight:600;">Notify Contact</div>
-        <div style="font-size:11px;color:var(--muted);">Send notification &amp; email to contact</div>
+
+    <div style="margin-bottom:12px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Message <span style="font-weight:400;color:var(--muted);">(optional, sent with notification)</span></div>
+      <textarea id="ne-message" rows="2" placeholder="Add a note for the recipient..." style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;resize:vertical;box-sizing:border-box;"></textarea>
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Notify</div>
+      <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--border);margin-bottom:10px;">
+        <button id="ne-nw-contact" onclick="setNeNotifyWho('contact')" style="flex:1;padding:8px 4px;font-size:13px;font-weight:600;border:none;background:var(--accent);color:#fff;cursor:pointer;">Contact</button>
+        <button id="ne-nw-you" onclick="setNeNotifyWho('you')" style="flex:1;padding:8px 4px;font-size:13px;font-weight:600;border:none;border-left:1px solid var(--border);border-right:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer;">You</button>
+        <button id="ne-nw-both" onclick="setNeNotifyWho('both')" style="flex:1;padding:8px 4px;font-size:13px;font-weight:600;border:none;background:var(--bg3);color:var(--text);cursor:pointer;">Both</button>
       </div>
-      <label style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0;">
-        <input type="checkbox" id="ne-notify" style="opacity:0;width:0;height:0;" onchange="document.getElementById('ne-notify-track').style.background=this.checked?'var(--accent)':'var(--border)'">
-        <span id="ne-notify-track" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--border);border-radius:22px;transition:.2s;"></span>
-      </label>
-    </label>
+      <div id="ne-notify-email-row" style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:8px;padding:10px 12px;display:none;">
+        <div style="font-size:12px;color:#b45309;margin-bottom:6px;">⚠️ Contact has no email.</div>
+        <input type="email" id="ne-notify-email-override" placeholder="Enter email" style="width:100%;padding:7px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:13px;box-sizing:border-box;">
+      </div>
+    </div>
+    <input type="hidden" id="ne-notify-who" value="contact">
+    <input type="hidden" id="ne-notify" value="1">
+
     ${templates.length > 0 ? `
       <div class="form-group"><label style="color:var(--muted);">Or use a template</label>
         <select id="ne-template" onchange="if(this.value){closeModal();useTemplateForEntry(this.value);}">
@@ -2820,6 +2831,38 @@ window.openNewContactFromEntry = function() {
       <button class="btn btn-primary btn-sm" onclick="saveNewContact(function(c){if(c){window._neContacts=(window._neContacts||[]).concat(c);openNewEntryModal(window._entryDirection,c.id);}else{openNewEntryModal(window._entryDirection);}})">Save &amp; Select</button>
     </div>
   `);
+};
+
+// ── Notify-who tab switcher ────────────────────────────────────────
+window.setNeNotifyWho = function(who) {
+  window._neNotifyWho = who;
+  document.getElementById('ne-notify-who').value = who;
+  ['contact','you','both'].forEach(w => {
+    const btn = document.getElementById('ne-nw-' + w);
+    if (!btn) return;
+    const active = w === who;
+    btn.style.background = active ? 'var(--accent)' : 'var(--bg3)';
+    btn.style.color = active ? '#fff' : 'var(--text)';
+  });
+  // Show email warning when contact will receive notification
+  const needsEmail = (who === 'contact' || who === 'both');
+  const emailRow = document.getElementById('ne-notify-email-row');
+  if (emailRow) {
+    // Only show if selected contact has no email
+    const hasEmail = !!(window._neSelectedContactEmail);
+    emailRow.style.display = (needsEmail && !hasEmail) ? '' : 'none';
+  }
+};
+
+// Update contact email state when a contact is selected
+const _origSelectNeContact = window.selectNeContact;
+window.selectNeContact = function(id, name) {
+  _origSelectNeContact(id, name);
+  const contact = (window._neContacts || []).find(c => c.id === id);
+  window._neSelectedContactEmail = contact?.email || '';
+  // Re-evaluate email warning
+  const who = window._neNotifyWho || 'contact';
+  setNeNotifyWho(who);
 };
 
 // ── New 3-tab entry modal helpers ─────────────────────────────────────────────
@@ -2952,7 +2995,10 @@ window.saveNewEntry = async function() {
   const currency   = document.getElementById('ne-currency')?.value || currentProfile?.default_currency || 'USD';
   const date       = document.getElementById('ne-date').value;
   const note       = document.getElementById('ne-note').value.trim();
-  const notifyOn   = document.getElementById('ne-notify')?.checked ?? false;
+  const notifyOn   = true; // notify is always on with the new tab UI
+  const notifyWho  = document.getElementById('ne-notify-who')?.value || 'contact'; // 'contact' | 'you' | 'both'
+  const notifyMsgExtra = document.getElementById('ne-message')?.value?.trim() || '';
+  const notifyEmailOverride = document.getElementById('ne-notify-email-override')?.value?.trim() || '';
   const invNumber  = document.getElementById('ne-inv-number')?.value?.trim() || '';
   const refNumber  = document.getElementById('ne-ref-number')?.value?.trim() || '';
   const dueDate    = document.getElementById('ne-due-date')?.value || null;
@@ -3002,18 +3048,24 @@ window.saveNewEntry = async function() {
     const amtLabel    = `${currency} ${parseFloat(amount).toLocaleString()}`;
     const entryId     = entry?.id;
 
-    // 1) Self-notification
-    await supabase.from('notifications').insert({
-      user_id: currentUser.id, type: 'notification',
-      message: `${txLabel} with ${contactName} — ${amtLabel}${note ? '. ' + note : ''}`,
-      amount: parseFloat(amount), currency, contact_name: contactName,
-      entry_id: entryId, is_read: false
-    });
+    const notifyContact = (notifyWho === 'contact' || notifyWho === 'both');
+    const notifySelf    = (notifyWho === 'you'     || notifyWho === 'both');
+    const combinedMsg   = [notifyMsgExtra, combinedNote].filter(Boolean).join(' · ');
+
+    // 1) Self-notification (always if notifyWho includes 'you' or 'both', or default)
+    if (notifySelf || notifyWho === 'contact') {
+      await supabase.from('notifications').insert({
+        user_id: currentUser.id, type: 'notification',
+        message: `${txLabel} with ${contactName} — ${amtLabel}${combinedMsg ? '. ' + combinedMsg : ''}`,
+        amount: parseFloat(amount), currency, contact_name: contactName,
+        entry_id: entryId, is_read: false
+      });
+    }
 
     // 2) Fetch contact details for linked account + email
     const { data: contactRow } = await supabase.from('contacts')
       .select('email, linked_user_id').eq('id', contactId).single();
-    const contactEmail  = contactRow?.email;
+    const contactEmail  = notifyEmailOverride || contactRow?.email || '';
     const linkedUserId  = contactRow?.linked_user_id;
 
     // Mirror label: owed_to_me → i_owe, bill_sent → bill_received, etc.
@@ -3024,17 +3076,18 @@ window.saveNewEntry = async function() {
     };
     const mirrorLabel = TX_LABELS[MIRROR[category] || category] || txLabel;
 
-    if (linkedUserId) {
+    // In-app notification to linked contact account
+    if (notifyContact && linkedUserId) {
       await supabase.from('notifications').insert({
         user_id: linkedUserId, type: 'notification',
-        message: `${fromName}: ${mirrorLabel} — ${amtLabel}${note ? '. ' + note : ''}`,
+        message: `${fromName}: ${mirrorLabel} — ${amtLabel}${combinedMsg ? '. ' + combinedMsg : ''}`,
         amount: parseFloat(amount), currency, contact_name: fromName,
         entry_id: entryId, is_read: false
       });
     }
 
-    // 3) Email — send for ALL categories when contact has email + notify is ON
-    if (contactEmail) {
+    // 3) Email — send when contact is selected recipient and email available
+    if (notifyContact && contactEmail) {
       let emailResult;
       if (category === 'invoice_sent') {
         // Rich invoice email
@@ -3047,7 +3100,7 @@ window.saveNewEntry = async function() {
           companyEmail: currentProfile?.company_email,
           companyAddress: currentProfile?.company_address,
           logoUrl: currentProfile?.logo_url,
-          dueDate, message: note, entryId
+          dueDate, message: combinedMsg || note, entryId
         });
       } else {
         // Standard notification email for all other categories
@@ -3055,7 +3108,7 @@ window.saveNewEntry = async function() {
           to: contactEmail, fromName,
           txType: category,
           amount: parseFloat(amount), currency,
-          message: combinedNote || note, entryId
+          message: combinedMsg || note, entryId
         });
       }
       if (emailResult?.ok) {
@@ -3065,9 +3118,8 @@ window.saveNewEntry = async function() {
         toast('Notification saved — email failed: ' + errDetail, 'info');
         console.warn('[email]', errDetail);
       }
-    } else {
-      // No email on contact — silent but logged
-      console.info('[notify] Contact has no email address, skipping email.');
+    } else if (notifyContact && !contactEmail) {
+      toast('Notified (no email on contact — add one in the form or contact record)', 'info');
     }
   } catch (notifErr) {
     console.warn('Post-entry notify error:', notifErr);
