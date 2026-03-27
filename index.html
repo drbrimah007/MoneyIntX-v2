@@ -2476,7 +2476,7 @@ function renderFieldList(scrollToBottom) {
     : window._tplFields.map((f, i) => {
     const showPaired = f.type === 'paired';
     const showOptions = f.type === 'select';
-    const showCalc = ['computed','number','currency'].includes(f.type);
+    const showCalc = ['computed','number','currency','paired'].includes(f.type);
     return `
     <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;" data-field-idx="${i}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
