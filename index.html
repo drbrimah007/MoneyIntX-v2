@@ -177,6 +177,12 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
 @media(max-width:640px) { .hide-mobile { display: none; } }
 .mobile-label { display: none; }
 @media(max-width:640px) { .mobile-label { display: block; } }
+/* Hero other-currency panel: stack below main balance on small screens */
+@media(max-width:520px) {
+  .hero-flex { flex-direction: column !important; }
+  .other-cur-panel { flex-direction: row !important; overflow-x: auto; min-width: 0 !important; gap: 8px; padding-bottom: 2px; }
+  .other-cur-panel > div { flex-shrink: 0; min-width: 120px; }
+}
 
 /* Badge — v1 style */
 .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
@@ -414,9 +420,8 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
   <div id="topbar">
     <div id="topbar-left">
       <button class="hamburger" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
-      <div style="cursor:pointer;display:flex;align-items:center;gap:8px;" onclick="app.navigate('dash')">
-        <img src="money.png" alt="Money IntX" style="width:28px;height:28px;border-radius:6px;object-fit:contain;" onerror="this.style.display='none'">
-        <strong style="font-size:17px;letter-spacing:-.02em;">Money IntX</strong>
+      <div style="cursor:pointer;display:flex;align-items:center;gap:8px;" onclick="app.navigate('dash')" title="Money IntX — Dashboard">
+        <img id="topbar-logo" src="money.png" alt="Money IntX" style="width:34px;height:34px;border-radius:8px;object-fit:contain;" onerror="this.style.display='none'">
         <span style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);opacity:.85;white-space:nowrap;" class="hide-mobile">Record · Manage · Grow</span>
       </div>
     </div>
@@ -523,7 +528,7 @@ import { generateInvoiceHTML, openInvoiceWindow } from './js/invoices.js';
 import { listTrustees, createTrustee, deleteTrustee, verifyTrustee, activateTrustee } from './js/nok.js';
 import { listRecurring, createRecurring, deleteRecurring, toggleRecurring, processDueRecurring, FREQUENCIES } from './js/recurring.js';
 import { toast, esc, navigate, statusBadge, TX_LABELS, TX_COLORS, fmtDate, fmtRelative, openModal, closeModal } from './js/ui.js';
-import { sendNotificationEmail, sendInvoiceEmail, logEmail } from './js/email.js';
+import { sendNotificationEmail, sendInvoiceEmail, sendOtpEmail, sendInviteEmail, logEmail } from './js/email.js';
 
 let currentUser = null;
 let currentProfile = null;
@@ -967,7 +972,7 @@ async function renderDash(el) {
   // Other-currency expanded cards — RIGHT of main balance.
   // No truncation: full amounts, owed + owe rows, auto-width.
   const otherCurPanel = otherRows.length > 0 ? `
-    <div style="display:flex;flex-direction:column;gap:6px;min-width:130px;flex-shrink:0;justify-content:center;">
+    <div class="other-cur-panel" style="display:flex;flex-direction:column;gap:6px;min-width:130px;flex-shrink:0;justify-content:center;">
       ${otherRows.map(row => {
         const cur = row.currency;
         const owed = row.owed_to_me || 0;
@@ -997,8 +1002,8 @@ async function renderDash(el) {
   html += `
   <div style="background:${heroGrad};border-radius:18px;padding:22px;color:#fff;margin-bottom:14px;position:relative;overflow:hidden;">
     <div style="position:absolute;right:-16px;top:-16px;font-size:110px;opacity:0.07;pointer-events:none;">${netIcon}</div>
-    <!-- Hero inner: primary currency LEFT, other currencies RIGHT -->
-    <div style="display:flex;align-items:stretch;gap:14px;">
+    <!-- Hero inner: primary currency LEFT, other currencies RIGHT (wraps below on mobile) -->
+    <div class="hero-flex" style="display:flex;align-items:stretch;gap:14px;flex-wrap:wrap;">
       <!-- Primary currency block -->
       <div style="flex:1;min-width:0;">
         <div style="font-size:11px;opacity:0.75;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px;">${netLabel} · ${defaultCur}</div>
@@ -1125,7 +1130,7 @@ async function renderDash(el) {
         <td style="min-width:80px;">
           ${cId ? `<span style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;" onclick="openContactDetail('${cId}')">
             <span style="width:24px;height:24px;border-radius:50%;background:${col};display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;color:#fff;">${esc(cName.charAt(0).toUpperCase())}</span>
-            <span style="font-weight:600;">${esc(cName)}</span>
+            <span style="font-weight:600;color:${col};">${esc(cName)}</span>
           </span>` : `<span style="color:var(--muted);">${esc(cName)}</span>`}
         </td>
         <td style="font-weight:700;cursor:pointer;" onclick="openEntryDetail('${e.id}')">${amtHtml}</td>
@@ -1598,7 +1603,7 @@ async function renderEntries(el, page, forceRefresh) {
         <td style="min-width:80px;">
           ${cId ? `<span style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;" onclick="openContactDetail('${cId}')">
             <span style="width:24px;height:24px;border-radius:50%;background:${col};display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;color:#fff;">${esc(cName.charAt(0).toUpperCase())}</span>
-            <span style="font-weight:600;">${esc(cName)}</span>
+            <span style="font-weight:600;color:${col};">${esc(cName)}</span>
           </span>` : `<span style="color:var(--muted);">${esc(cName)}</span>`}
         </td>
         <td style="font-weight:700;cursor:pointer;" onclick="openEntryDetail('${e.id}')">${amtHtml}</td>
@@ -2028,20 +2033,59 @@ window.openNotifyInvoiceModal = async function(id) {
     <div class="form-group">
       <label>Mark as</label>
       <select id="notif-status">
+        <option value="sent" ${entry.status!=='viewed'?'selected':''}>Sent</option>
+        <option value="viewed" ${entry.status==='viewed'?'selected':''}>Viewed</option>
         <option value="">— Keep current status —</option>
-        <option value="sent" ${entry.status==='sent'?'selected':''}>Sent</option>
-        <option value="viewed">Viewed</option>
       </select>
     </div>
     ${contactEmail ? `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:14px;">
       <input type="checkbox" id="notif-send-email" checked style="accent-color:var(--accent);width:15px;height:15px;">
       Also send email to <strong>${esc(contactEmail)}</strong>
     </label>` : `<p style="font-size:12px;color:var(--muted);margin-bottom:14px;">💡 Add an email to this contact to also send email notifications.</p>`}
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+      <button class="bs sm" onclick="copyNotifLink('${id}')" title="Copy share link to clipboard">🔗 Copy Link</button>
+      <button class="bs sm" onclick="copyNotifMessage('${id}')" title="Copy message + link to clipboard">📋 Copy Message + Link</button>
+    </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="sendInvoiceNotification('${id}')">Send Notification</button>
     </div>
   `, { maxWidth: '440px' });
+};
+
+window.copyNotifLink = async function(entryId) {
+  const entry = await getEntry(entryId);
+  if (!entry) return;
+  let shareUrl = '';
+  try {
+    const { data } = await supabase.from('share_tokens').select('token').eq('entry_id', entryId).maybeSingle();
+    if (data?.token) {
+      shareUrl = window.location.origin + '/view?t=' + data.token;
+    } else {
+      const res = await createShareToken(currentUser.id, entryId);
+      if (res?.token) shareUrl = window.location.origin + '/view?t=' + res.token;
+    }
+  } catch(_) {}
+  if (!shareUrl) return toast('Could not generate link.', 'error');
+  navigator.clipboard.writeText(shareUrl).then(() => toast('Link copied!', 'success')).catch(() => { prompt('Copy this link:', shareUrl); });
+};
+
+window.copyNotifMessage = async function(entryId) {
+  const entry = await getEntry(entryId);
+  if (!entry) return;
+  const msg = document.getElementById('notif-msg')?.value?.trim() || '';
+  let shareUrl = '';
+  try {
+    const { data } = await supabase.from('share_tokens').select('token').eq('entry_id', entryId).maybeSingle();
+    if (data?.token) {
+      shareUrl = window.location.origin + '/view?t=' + data.token;
+    } else {
+      const res = await createShareToken(currentUser.id, entryId);
+      if (res?.token) shareUrl = window.location.origin + '/view?t=' + res.token;
+    }
+  } catch(_) {}
+  const full = msg ? `${msg}\n\n${shareUrl}` : shareUrl;
+  navigator.clipboard.writeText(full).then(() => toast('Message + link copied!', 'success')).catch(() => { prompt('Copy this:', full); });
 };
 
 window.sendInvoiceNotification = async function(entryId) {
@@ -2468,7 +2512,7 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
         <input type="text" id="ne-contact-search" placeholder="Search contacts…" autocomplete="off"
           value="${esc(contactDisplayVal)}"
           oninput="filterNeContacts(this.value)"
-          onfocus="showNeContactList()"
+          onfocus="this.select();showNeContactList();filterNeContacts(this.value)"
           style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:14px;outline:none;box-sizing:border-box;">
         <input type="hidden" id="ne-contact" value="${esc(window._neSelectedContactId)}">
         <div id="ne-contact-list" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:999;max-height:200px;overflow-y:auto;margin-top:2px;">
@@ -3526,17 +3570,9 @@ window.requestLockerOtp = async function() {
   window._lockerOtp       = code;
   window._lockerOtpExpiry = Date.now() + 30 * 60 * 1000; // 30 min
 
-  // Send via Supabase notification (shown in-app), AND attempt email
+  // Send OTP via branded email only — never show the code in in-app notifications
   try {
-    await supabase.from('notifications').insert({
-      user_id: currentUser.id,
-      type: 'locker_otp',
-      message: `Your Asset Locker access code is: ${code} (expires in 30 minutes)`,
-    });
-    // Attempt real email via edge function if available
-    await supabase.functions.invoke('send-email', {
-      body: { to: email, subject: 'Your Asset Locker Access Code', body: `Your code: ${code}\n\nThis code expires in 30 minutes. Do not share it.` }
-    }).catch(() => {}); // silently ignore if function not deployed
+    await sendOtpEmail(currentUser.id, { to: email, otp: code, lockerName: 'Asset Locker' });
   } catch (_) {}
 
   document.body.insertAdjacentHTML('beforeend', `<div class="modal-bg" id="lockerOtpBg" onclick="if(event.target===this)this.remove()">
@@ -3545,8 +3581,7 @@ window.requestLockerOtp = async function() {
       <div style="font-size:17px;font-weight:800;margin-bottom:6px;">Check Your Email</div>
       <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6;">
         A 6-digit access code has been sent to <strong>${esc(email)}</strong>.<br>
-        Enter it below to unlock your Asset Lockers.<br>
-        <span style="font-size:11px;">(Also check your Notifications tab.)</span>
+        Enter it below to unlock your Asset Lockers.
       </div>
       <input id="lockerOtpInput" type="text" inputmode="numeric" maxlength="6"
         placeholder="000000"
@@ -4736,6 +4771,13 @@ async function renderSettings(el) {
     <div class="form-group"><label>Default Currency</label><select id="s-currency">
       ${CURLIST.map(c => `<option value="${c}" ${p.default_currency === c ? 'selected' : ''}>${c}</option>`).join('')}
     </select></div>
+    <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:10px 0;border-top:1px solid var(--border);margin-top:8px;">
+      <div>
+        <div style="font-size:14px;font-weight:600;">Searchable Username</div>
+        <div style="font-size:12px;color:var(--muted);">Allow other users to find you by your display name</div>
+      </div>
+      <input type="checkbox" id="s-searchable" ${p.is_searchable !== false ? 'checked' : ''} style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;">
+    </label>
     <button class="btn btn-primary btn-sm" onclick="saveSettings()">Save Profile</button>
   </div>`;
 
@@ -4744,9 +4786,21 @@ async function renderSettings(el) {
     <h3 style="font-size:16px;font-weight:700;margin-bottom:4px;">Invoice & Company Info</h3>
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Shown on your invoices and printed documents.</p>
     <div class="form-group">
-      <label>Logo URL <span style="font-size:11px;color:var(--muted);">— paste a link to your logo image</span></label>
-      <input type="text" id="s-logourl" value="${esc(p.logo_url || '')}" placeholder="https://...logo.png">
-      ${p.logo_url ? `<div style="margin-top:8px;"><img src="${esc(p.logo_url)}" style="max-height:52px;border-radius:8px;border:1px solid var(--border);" onerror="this.style.display='none'"></div>` : ''}
+      <label>Logo</label>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div id="s-logo-preview" style="${p.logo_url ? '' : 'display:none;'}">
+          <img id="s-logo-img" src="${esc(p.logo_url || '')}" style="max-height:56px;max-width:140px;border-radius:8px;border:1px solid var(--border);object-fit:contain;" onerror="this.style.display='none'">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="cursor:pointer;display:inline-flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;">
+            <span>📁</span> Upload Logo
+            <input type="file" id="s-logo-file" accept="image/*" style="display:none;" onchange="uploadLogoFile(this)">
+          </label>
+          <div id="s-logo-upload-status" style="font-size:11px;color:var(--muted);"></div>
+        </div>
+        ${p.logo_url ? `<button class="bs sm" onclick="clearLogo()" style="color:var(--red);font-size:12px;">✕ Remove</button>` : ''}
+      </div>
+      <input type="hidden" id="s-logourl" value="${esc(p.logo_url || '')}">
     </div>
     <div class="form-row">
       <div class="form-group"><label>Company / Business Name</label><input type="text" id="s-company" value="${esc(p.company_name || '')}"></div>
@@ -4865,12 +4919,13 @@ async function renderSettings(el) {
 
 window.saveSettings = async function() {
   const { error } = await supabase.from('users').update({
-    display_name: document.getElementById('s-name').value.trim(),
-    phone:        document.getElementById('s-phone').value.trim(),
-    city:         document.getElementById('s-city').value.trim(),
-    bio:          document.getElementById('s-bio').value.trim(),
+    display_name:  document.getElementById('s-name').value.trim(),
+    phone:         document.getElementById('s-phone').value.trim(),
+    city:          document.getElementById('s-city').value.trim(),
+    bio:           document.getElementById('s-bio').value.trim(),
     default_currency: document.getElementById('s-currency').value,
-    updated_at:   new Date().toISOString()
+    is_searchable: document.getElementById('s-searchable').checked,
+    updated_at:    new Date().toISOString()
   }).eq('id', currentUser.id);
   if (error) return toast(error.message, 'error');
   currentProfile = await getProfile(currentUser.id);
@@ -4890,6 +4945,36 @@ window.saveInvoiceInfo = async function() {
   if (error) return toast(error.message, 'error');
   currentProfile = await getProfile(currentUser.id);
   toast('Invoice info saved.', 'success');
+};
+
+window.uploadLogoFile = async function(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('s-logo-upload-status');
+  const previewEl = document.getElementById('s-logo-preview');
+  const imgEl    = document.getElementById('s-logo-img');
+  statusEl.textContent = '⏳ Uploading…';
+  const ext  = file.name.split('.').pop();
+  const path = `${currentUser.id}/logo.${ext}`;
+  const { error } = await supabase.storage.from('user-logos').upload(path, file, { upsert: true });
+  if (error) { statusEl.textContent = '❌ ' + error.message; return; }
+  const { data } = supabase.storage.from('user-logos').getPublicUrl(path);
+  const url = data.publicUrl + '?t=' + Date.now(); // cache-bust
+  document.getElementById('s-logourl').value = url;
+  imgEl.src = url;
+  imgEl.style.display = '';
+  previewEl.style.display = '';
+  statusEl.textContent = '✅ Uploaded';
+};
+
+window.clearLogo = function() {
+  document.getElementById('s-logourl').value = '';
+  const previewEl = document.getElementById('s-logo-preview');
+  const imgEl    = document.getElementById('s-logo-img');
+  if (imgEl) { imgEl.src = ''; imgEl.style.display = 'none'; }
+  if (previewEl) previewEl.style.display = 'none';
+  const statusEl = document.getElementById('s-logo-upload-status');
+  if (statusEl) statusEl.textContent = '';
 };
 
 window.saveNotifPrefs = async function() {
