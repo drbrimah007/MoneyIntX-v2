@@ -429,6 +429,8 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
       <button class="bs sm" onclick="app.logOut()">Sign Out</button>
     </div>
   </div>
+  <!-- Tip bar: single random tip per page load, centered between topbar and nav -->
+  <div id="app-tip-bar" class="no-print" style="background:linear-gradient(90deg,rgba(108,99,255,.08),rgba(108,99,255,.13),rgba(108,99,255,.08));border-bottom:1px solid rgba(108,99,255,.18);padding:5px 20px;text-align:center;font-size:11.5px;color:#a78bfa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em;cursor:default;"></div>
 
   <!-- Horizontal Nav -->
   <div id="nav">
@@ -799,6 +801,35 @@ async function enterApp(user) {
   });
 
   updateNotifBadge();
+
+  // Load a random tip into the persistent topbar strip (changes every page load/refresh)
+  (async () => {
+    const TIPS_DEFAULT = [
+      'Add contacts first — entries are always linked to a person.',
+      'Use "They Owe Me" for loans given, "Invoice" for services rendered.',
+      'Templates save you time — build once, use on every invoice.',
+      'Settle partially — record part-payments as they come in.',
+      'Asset Lockers keep your important financial details safe and organised.',
+      'Trusted Access lets a designated person view your records if needed.',
+      'Export to CSV for your accountant or tax records anytime.',
+      'Separate currencies keep your international dealings clean.',
+      'A debt unrecorded is a debt forgotten — always write it down.',
+      'Assign a Trusted Contact to protect your records for your family.',
+      'Savings circles (ajo/susu) work best with clear records — use Groups.',
+      'Send payment reminders directly from the app — stay professional.',
+      'Track ROI on investments by adding all partners and transactions.',
+      'Recurring entries automate regular bills and income records.',
+    ];
+    let tips = TIPS_DEFAULT;
+    try {
+      const { data: tr } = await supabase.from('app_settings').select('value').eq('key','banner_tips').maybeSingle();
+      if (tr?.value && Array.isArray(tr.value) && tr.value.length > 0) tips = tr.value;
+    } catch(_) {}
+    const pick = tips[Math.floor(Math.random() * tips.length)];
+    const bar = document.getElementById('app-tip-bar');
+    if (bar) bar.textContent = '💡 ' + pick;
+  })();
+
   const savedPage = localStorage.getItem('mxi_last_page') || 'dash';
   navTo(savedPage);
   // Process scheduled reminders + recurring rules every 60s
@@ -847,7 +878,7 @@ function navTo(page) {
   switch (page) {
     case 'dash': renderDash(content); break;
     case 'contacts': renderContacts(content); break;
-    case 'entries': renderEntries(content); break;
+    case 'entries': _entriesAll = []; renderEntries(content); break; // always fresh on navigation
     case 'groups': renderGroups(content); break;
     case 'investments': renderInvestments(content); break;
     case 'templates': renderTemplatesPage(content); break;
@@ -988,32 +1019,7 @@ async function renderDash(el) {
     </div>
   </div>`;
 
-  // ── Single rotating tip (replaces scrolling ticker) ──────────────
-  // Pick one message per page load — loaded from app_settings or hardcoded defaults
-  const DEFAULT_TIPS = [
-    'Add contacts first — entries are always linked to a person.',
-    'Use "They Owe Me" for loans given, "Invoice" for services rendered.',
-    'Templates save you time — build once, use on every invoice.',
-    'Settle partially — record part-payments as they come in.',
-    'Asset Lockers keep your important financial details safe and organised.',
-    'Trusted Access lets a designated person view your records if needed.',
-    'Export to CSV for your accountant or tax records anytime.',
-    'Separate currencies keep your international dealings clean.',
-    'A debt unrecorded is a debt forgotten — always write it down.',
-    'Assign a Trusted Contact to protect your records for your family.',
-    'Savings circles (ajo/susu) work best with clear records — use Groups.',
-    'Send payment reminders directly from the app — stay professional.',
-    'Track ROI on investments by adding all partners and transactions.',
-    'Recurring entries automate regular bills and income records.',
-  ];
-  // Load from app_settings if available (admin-managed list)
-  let tipList = DEFAULT_TIPS;
-  try {
-    const { data: tipRow } = await supabase.from('app_settings').select('value').eq('key','banner_tips').maybeSingle();
-    if (tipRow?.value && Array.isArray(tipRow.value) && tipRow.value.length > 0) tipList = tipRow.value;
-  } catch(_) {}
-  const todayTipIdx = Math.floor(Date.now() / 86400000) % tipList.length; // changes daily
-  html += `<div class="dash-tip no-print"><span style="font-size:16px;">💡</span><span>${esc(tipList[todayTipIdx])}</span></div>`;
+  // Tip is now shown in the persistent topbar strip (loaded in enterApp, random per refresh)
 
   // Stat cards row
   const pendingCount = recent.filter(e => !['settled','voided','cancelled','fulfilled'].includes(e.status)).length;
