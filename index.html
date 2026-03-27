@@ -98,7 +98,14 @@ a { color: var(--accent); text-decoration: none; }
 /* Shell — v1 layout: top bar + horizontal nav + content */
 .shell { display: none; flex-direction: column; min-height: 100vh; }
 .shell.active { display: flex; }
-#topbar { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 0 16px; display: flex; align-items: center; gap: 12px; height: 56px; position: sticky; top: 0; z-index: 100; }
+#topbar { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 0 16px; display: flex; align-items: center; gap: 12px; height: 60px; position: sticky; top: 0; z-index: 100; }
+/* Adaptive username colour — readable on both dark and light themes */
+[data-theme="light"] #sidebar-user-name { color: #1a1a2e; }
+[data-theme="dark"] #sidebar-user-name,
+[data-theme="purple"] #sidebar-user-name,
+[data-theme="midnight"] #sidebar-user-name,
+[data-theme="forest"] #sidebar-user-name { color: #e2e2f0; }
+#sidebar-user-name { font-weight: 700; letter-spacing: .01em; }
 #topbar-left { display: flex; align-items: center; gap: 12px; }
 #topbar-center { flex: 1; }
 #topbar-right { display: flex; align-items: center; gap: 8px; }
@@ -189,6 +196,7 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
 .badge-green { background: rgba(74,222,128,.15); color: var(--green); }
 .badge-red { background: rgba(248,113,113,.15); color: var(--red); }
 .badge-yellow { background: rgba(251,191,36,.15); color: var(--amber); }
+.badge-purple { background: rgba(108,99,255,.18); color: var(--accent); }
 .badge-blue { background: rgba(96,165,250,.15); color: var(--blue, var(--accent)); }
 .badge-gray { background: var(--bg3); color: var(--muted); }
 
@@ -421,7 +429,7 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
     <div id="topbar-left">
       <button class="hamburger" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
       <div style="cursor:pointer;display:flex;align-items:center;gap:8px;" onclick="app.navigate('dash')" title="Money IntX — Dashboard">
-        <img id="topbar-logo" src="money.png" alt="Money IntX" style="width:34px;height:34px;border-radius:8px;object-fit:contain;" onerror="this.style.display='none'">
+        <img id="topbar-logo" src="money.png" alt="Money IntX" style="width:52px;height:52px;border-radius:10px;object-fit:contain;" onerror="this.style.display='none'">
         <span style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);opacity:.85;white-space:nowrap;" class="hide-mobile">Record · Manage · Grow</span>
       </div>
     </div>
@@ -889,7 +897,13 @@ async function updateNotifBadge() {
 }
 
 // ── Navigation ────────────────────────────────────────────────────
+// Navigation history stack for in-app back button
+if (!window._navHistory) window._navHistory = [];
+
 function navTo(page) {
+  const prev = window._currentPage;
+  if (prev && prev !== page) window._navHistory.push(prev);
+  if (window._navHistory.length > 20) window._navHistory.shift();
   window._currentPage = page;
   localStorage.setItem('mxi_last_page', page);
   // Update sidebar active state
@@ -917,6 +931,12 @@ function navTo(page) {
   }
   history.replaceState(null, '', '#' + page);
 }
+
+window.goBack = function() {
+  const prev = window._navHistory?.pop();
+  if (prev) navTo(prev);
+  else navTo('dash');
+};
 
 // ── Dashboard ─────────────────────────────────────────────────────
 async function renderDash(el) {
@@ -1071,7 +1091,7 @@ async function renderDash(el) {
     <div style="display:flex;flex-wrap:wrap;gap:8px;">
       <button class="btn sm" onclick="openNewEntryModal('owe-me')" style="background:linear-gradient(135deg,#16a34a,#15803d);">💚 They Owe Me</button>
       <button class="btn sm" onclick="openNewEntryModal('i-owe')" style="background:linear-gradient(135deg,#dc2626,#b91c1c);">❤️ I Owe Them</button>
-      <button class="btn sm" onclick="openNewEntryModal('advance')" style="background:linear-gradient(135deg,#d97706,#b45309);">⏳ Advance</button>
+      <button class="btn sm" onclick="openNewEntryModal('advance')" style="background:linear-gradient(135deg,#d97706,#b45309);">⏳ Advances</button>
       <button class="btn sm" onclick="navTo('templates')" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);">📄 New Invoice</button>
       <button class="bs sm" onclick="openNewContactModal()">+ Contact</button>
       <button class="bs sm" onclick="navTo('groups')">👥 Groups</button>
@@ -2643,8 +2663,8 @@ const NE_TABS = [
     id: 'advance', emoji: '⏳', label: 'Advances', color: '#f59e0b',
     borderActive: 'rgba(245,158,11,.3)', bgActive: 'rgba(245,158,11,.1)',
     actions: [
-      { category: 'advance_paid',     label: 'Pay in advance',           icon: '⬆️', extra: [] },
-      { category: 'advance_received', label: 'Receive advance payment',  icon: '⬇️', extra: [] }
+      { category: 'advance_paid',     label: 'Send Advance',     icon: '⬆️', extra: ['advance_note','fulfillment'] },
+      { category: 'advance_received', label: 'Receive Advance', icon: '⬇️', extra: ['advance_note','fulfillment'] }
     ]
   }
 ];
@@ -2717,6 +2737,16 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
     <div id="ne-extra-fields"></div>
     <div class="form-group"><label>Issue Date</label><input type="date" id="ne-date" value="${new Date().toISOString().slice(0,10)}"></div>
     <div class="form-group"><label>Note <span style="font-weight:400;color:var(--muted);">(optional)</span></label><textarea id="ne-note" rows="2" placeholder="Optional note..."></textarea></div>
+    <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg3);border-radius:10px;cursor:pointer;margin-bottom:12px;">
+      <div>
+        <div style="font-size:13px;font-weight:600;">Notify Contact</div>
+        <div style="font-size:11px;color:var(--muted);">Send notification &amp; email to contact</div>
+      </div>
+      <label style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0;">
+        <input type="checkbox" id="ne-notify" style="opacity:0;width:0;height:0;" onchange="document.getElementById('ne-notify-track').style.background=this.checked?'var(--accent)':'var(--border)'">
+        <span id="ne-notify-track" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--border);border-radius:22px;transition:.2s;"></span>
+      </label>
+    </label>
     ${templates.length > 0 ? `
       <div class="form-group"><label style="color:var(--muted);">Or use a template</label>
         <select id="ne-template" onchange="if(this.value){closeModal();useTemplateForEntry(this.value);}">
@@ -2863,7 +2893,45 @@ function _neRenderExtraFields(action) {
     html += `<div class="form-group"><label>Due Date <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
       <input type="date" id="ne-due-date" style="width:100%;"></div>`;
   }
+  if ((action.extra || []).includes('advance_note')) {
+    html += `<div class="form-group"><label>Advance Note <span style="font-weight:400;color:var(--muted);">(optional, visible to contact)</span></label>
+      <input type="text" id="ne-advance-note" placeholder="Deposits, loans, for item, for invoice #, etc." style="width:100%;"></div>`;
+  }
+  if ((action.extra || []).includes('fulfillment')) {
+    html += `
+    <div style="background:var(--bg3);border-radius:10px;padding:12px 14px;margin-bottom:4px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text);">Fulfillment Expectation <span style="font-weight:400;color:var(--muted);">(optional)</span></div>
+      <label style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0;cursor:pointer;">
+        <span style="font-size:13px;">Set Reminder</span>
+        <label style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0;">
+          <input type="checkbox" id="ne-adv-remind" style="opacity:0;width:0;height:0;" onchange="document.getElementById('ne-adv-remind-fields').style.display=this.checked?'block':'none'">
+          <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--border);border-radius:22px;transition:.2s;"
+            onmouseover="" id="ne-adv-remind-track"></span>
+        </label>
+      </label>
+      <div id="ne-adv-remind-fields" style="display:none;margin-top:10px;display:none;">
+        <div style="display:flex;gap:10px;">
+          <div class="form-group" style="flex:1;margin-bottom:0;">
+            <label style="font-size:12px;">Days before reminder</label>
+            <input type="number" id="ne-adv-days" min="1" max="365" value="3" style="width:100%;">
+          </div>
+          <div class="form-group" style="flex:1;margin-bottom:0;">
+            <label style="font-size:12px;">Number of reminders</label>
+            <input type="number" id="ne-adv-count" min="1" max="10" value="1" style="width:100%;">
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
   el.innerHTML = html;
+  // Wire the toggle track colour
+  const remCb = document.getElementById('ne-adv-remind');
+  if (remCb) {
+    const track = document.getElementById('ne-adv-remind-track');
+    remCb.addEventListener('change', () => {
+      if (track) track.style.background = remCb.checked ? 'var(--accent)' : 'var(--border)';
+    });
+  }
 }
 
 // Legacy shim — keep callers like dashboard "They Owe Me" buttons working
@@ -2879,9 +2947,14 @@ window.saveNewEntry = async function() {
   const currency   = document.getElementById('ne-currency')?.value || currentProfile?.default_currency || 'USD';
   const date       = document.getElementById('ne-date').value;
   const note       = document.getElementById('ne-note').value.trim();
+  const notifyOn   = document.getElementById('ne-notify')?.checked ?? false;
   const invNumber  = document.getElementById('ne-inv-number')?.value?.trim() || '';
   const refNumber  = document.getElementById('ne-ref-number')?.value?.trim() || '';
   const dueDate    = document.getElementById('ne-due-date')?.value || null;
+  const advNote    = document.getElementById('ne-advance-note')?.value?.trim() || '';
+  const advRemind  = document.getElementById('ne-adv-remind')?.checked ?? false;
+  const advDays    = parseInt(document.getElementById('ne-adv-days')?.value || '3', 10);
+  const advCount   = parseInt(document.getElementById('ne-adv-count')?.value || '1', 10);
   const dirSign    = DIRECTION_SIGN[category] ?? 1;
 
   if (!contactId) return toast('Please select a contact.', 'error');
@@ -2896,8 +2969,11 @@ window.saveNewEntry = async function() {
   };
   const txType = TX_CATEGORY_TO_TYPE[category] || 'they_owe_you';
 
+  // Combine main note + advance note
+  const combinedNote = [note, advNote].filter(Boolean).join(' · ');
   const entry = await createEntry(currentUser.id, {
-    contactId, txType, amount: parseFloat(amount), currency, date, note,
+    contactId, txType, amount: parseFloat(amount), currency, date,
+    note: combinedNote,
     invoiceNumber: invNumber || refNumber || ''
   });
 
@@ -2912,7 +2988,8 @@ window.saveNewEntry = async function() {
   toast('Entry created.', 'success');
   _invalidateEntries(); navTo('entries');
 
-  // ── Post-save notifications ─────────────────────────────────────
+  // ── Post-save notifications (only when Notify toggle is ON) ─────
+  if (!notifyOn) return;
   try {
     const contactName = window._neContacts?.find(c => c.id === contactId)?.name || 'Contact';
     const fromName    = currentProfile?.display_name || currentProfile?.company_name || 'Someone';
@@ -3568,23 +3645,57 @@ window.doCreateGroup = async function() {
 };
 
 // ── Group Detail ──────────────────────────────────────────────────
+// Role permission matrix
+const GROUP_ROLE_PERMS = {
+  owner:   { label: 'Owner',   badge: 'badge-purple', canManageMembers: true,  canManageRounds: true,  canEditGroup: true,  canPost: true, canUploadDocs: true, canViewAll: true },
+  admin:   { label: 'Admin',   badge: 'badge-blue',   canManageMembers: true,  canManageRounds: true,  canEditGroup: true,  canPost: true, canUploadDocs: true, canViewAll: true },
+  member:  { label: 'Member',  badge: 'badge-gray',   canManageMembers: false, canManageRounds: false, canEditGroup: false, canPost: true, canUploadDocs: true, canViewAll: true },
+  invitee: { label: 'Invitee', badge: 'badge-yellow', canManageMembers: false, canManageRounds: false, canEditGroup: false, canPost: false, canUploadDocs: false, canViewAll: false }
+};
+function getMyGroupRole(g) {
+  if (g.user_id === currentUser.id) return 'owner';
+  const me = (g.members || []).find(m => m.user_id === currentUser.id || m.contact_id === currentUser.id);
+  return me?.role || 'member';
+}
+
 window.openGroupDetail = async function(id) {
   const g = await getGroup(id);
   if (!g) return toast('Group not found.', 'error');
   const stats = calcGroupStats(g);
-  const members = (g.members || []).filter(m => m.status === 'active');
+  const members = (g.members || []).filter(m => m.status === 'active' || m.status === 'invited');
   const rounds = g.rounds || [];
   const notices = await getNoticeBoard(id);
-  const isOwner = g.user_id === currentUser.id;
+  const myRole  = getMyGroupRole(g);
+  const myPerms = GROUP_ROLE_PERMS[myRole] || GROUP_ROLE_PERMS.member;
+  const isOwner = myRole === 'owner';
+  const isAdmin = myRole === 'admin' || isOwner;
+  const rotationLocked = g.rotation_locked ?? false;
 
-  const membersHtml = members.map(m => `
+  const ROLE_BADGE = { owner: 'badge-purple', admin: 'badge-blue', member: 'badge-gray', invitee: 'badge-yellow' };
+  const membersHtml = members.map(m => {
+    const rBadge = ROLE_BADGE[m.role] || 'badge-gray';
+    const isInvitee = m.status === 'invited' || m.role === 'invitee';
+    return `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
       <div>
         <span style="font-weight:600;">${esc(m.name)}</span>
-        <span class="badge badge-gray" style="margin-left:6px;font-size:10px;">${esc(m.role)}</span>
+        <span class="badge ${rBadge}" style="margin-left:6px;font-size:10px;">${esc(GROUP_ROLE_PERMS[m.role]?.label || m.role)}</span>
+        ${isInvitee ? '<span class="badge badge-yellow" style="margin-left:4px;font-size:10px;">Pending invite</span>' : ''}
+        ${m.role === 'member' ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Can post, upload docs, view all data, leave group</div>' : ''}
+        ${m.role === 'admin'  ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Full control (cannot delete group)</div>' : ''}
+        ${isInvitee           ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Invited to join — no permissions until accepted</div>' : ''}
       </div>
-      ${isOwner && m.role !== 'owner' ? `<button class="bs sm" style="font-size:11px;color:var(--red);" onclick="doRemoveMember('${m.id}','${esc(m.name)}')">Remove</button>` : ''}
-    </div>`).join('') || '<p style="color:var(--muted);font-size:13px;">No members yet.</p>';
+      <div style="display:flex;gap:6px;align-items:center;">
+        ${isAdmin && m.role !== 'owner' ? `
+          <select onchange="doChangeRole('${m.id}','${id}',this.value)" style="font-size:11px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);">
+            <option value="member" ${m.role==='member'?'selected':''}>Member</option>
+            <option value="admin"  ${m.role==='admin'?'selected':''}>Admin</option>
+            <option value="invitee" ${m.role==='invitee'?'selected':''}>Invitee</option>
+          </select>
+          <button class="bs sm" style="font-size:11px;color:var(--red);" onclick="doRemoveMember('${m.id}','${esc(m.name)}','${id}')">✕</button>` : ''}
+      </div>
+    </div>`;
+  }).join('') || '<p style="color:var(--muted);font-size:13px;">No members yet.</p>';
 
   const recentRounds = rounds.slice(-3).reverse();
   const roundsHtml = recentRounds.map(r => {
@@ -3618,6 +3729,7 @@ window.openGroupDetail = async function(id) {
       <div>
         <h3 style="margin:0;">${esc(g.name)}</h3>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${esc(g.description||'')}${g.use_rotation?' · ⟳ Rotation':''}${g.frequency?' · '+esc(g.frequency):''}</p>
+        <span class="badge ${GROUP_ROLE_PERMS[myRole]?.badge||'badge-gray'}" style="margin-top:4px;display:inline-block;">You: ${GROUP_ROLE_PERMS[myRole]?.label||myRole}</span>
       </div>
       <button class="btn btn-secondary btn-sm" onclick="closeModal()">Close</button>
     </div>
@@ -3629,24 +3741,38 @@ window.openGroupDetail = async function(id) {
     <div style="margin-bottom:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
         <h4 style="font-size:14px;font-weight:700;">Members</h4>
-        ${isOwner?`<button class="bs sm" style="font-size:11px;" onclick="closeModal();openAddMemberModal('${id}')">+ Add Member</button>`:''}
+        ${isAdmin?`<button class="bs sm" style="font-size:11px;" onclick="closeModal();openAddMemberModal('${id}')">+ Add Member</button>`:''}
       </div>
       ${membersHtml}
     </div>
+    ${g.use_rotation && isAdmin ? `
+    <div style="margin-bottom:16px;padding:12px 14px;background:var(--bg3);border-radius:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div>
+          <div style="font-size:13px;font-weight:700;">⟳ Rotation Order</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">${rotationLocked ? '🔒 Locked — order cannot be changed by members' : '🔓 Unlocked — you can reorder members'}</div>
+        </div>
+        ${rotationLocked
+          ? `<button class="bs sm" style="color:var(--amber);font-size:12px;" onclick="doSetRotationLock('${id}',false)">🔓 Unlock Rotation Order</button>`
+          : `<button class="btn sm" style="font-size:12px;padding:6px 14px;" onclick="doSetRotationLock('${id}',true)">🔒 Lock Rotation Order</button>`
+        }
+      </div>
+    </div>` : ''}
     <div style="margin-bottom:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
         <h4 style="font-size:14px;font-weight:700;">Recent Rounds</h4>
-        ${isOwner?`<button class="bs sm" style="font-size:11px;" onclick="doCreateRound('${id}');closeModal();">+ New Round</button>`:''}
+        ${isAdmin?`<button class="bs sm" style="font-size:11px;" onclick="doCreateRound('${id}');closeModal();">+ New Round</button>`:''}
       </div>
       ${roundsHtml}
     </div>
     <div>
       <h4 style="font-size:14px;font-weight:700;margin-bottom:8px;">Notice Board</h4>
       <div style="max-height:200px;overflow-y:auto;">${noticesHtml}</div>
+      ${myPerms.canPost ? `
       <div style="display:flex;gap:8px;margin-top:10px;">
         <input type="text" id="notice-msg" placeholder="Write a message to the group…" style="flex:1;">
         <button class="btn btn-primary btn-sm" onclick="doPostNotice('${id}')">Post</button>
-      </div>
+      </div>` : '<p style="font-size:12px;color:var(--muted);margin-top:8px;">Accept your invite to post on the notice board.</p>'}
     </div>
   `, { maxWidth: '580px' });
 };
@@ -3657,10 +3783,13 @@ window.openAddMemberModal = async function(groupId) {
   openModal(`
     <h3 style="margin-bottom:16px;">Add Member</h3>
     <div class="form-group"><label>Contact</label><select id="am-contact">${opts||'<option value="">No contacts</option>'}</select></div>
-    <div class="form-group"><label>Role</label><select id="am-role">
-      <option value="member">Member</option>
-      <option value="admin">Admin</option>
-    </select></div>
+    <div class="form-group"><label>Role</label>
+      <select id="am-role">
+        <option value="member">Member — can post, upload docs, view all data, leave</option>
+        <option value="admin">Admin — full control (cannot delete group)</option>
+        <option value="invitee">Invitee — pending acceptance, no permissions yet</option>
+      </select>
+    </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="bs sm" onclick="closeModal()">Cancel</button>
       <button class="btn sm" onclick="doAddMember('${groupId}')">Add Member</button>
@@ -3681,12 +3810,29 @@ window.doAddMember = async function(groupId) {
   navTo('groups');
 };
 
-window.doRemoveMember = async function(memberId, name) {
+window.doRemoveMember = async function(memberId, name, groupId) {
   if (!confirm(`Remove ${name} from the group?`)) return;
   await removeGroupMember(memberId);
   toast('Member removed.', 'success');
   closeModal();
-  navTo('groups');
+  if (groupId) openGroupDetail(groupId);
+  else navTo('groups');
+};
+
+window.doChangeRole = async function(memberId, groupId, newRole) {
+  const { error } = await supabase.from('group_members').update({ role: newRole }).eq('id', memberId);
+  if (error) { toast('Failed to update role.', 'error'); return; }
+  toast(`Role updated to ${newRole}.`, 'success');
+  closeModal();
+  openGroupDetail(groupId);
+};
+
+window.doSetRotationLock = async function(groupId, lock) {
+  const { error } = await supabase.from('groups').update({ rotation_locked: lock }).eq('id', groupId);
+  if (error) { toast('Failed to update rotation lock.', 'error'); return; }
+  toast(lock ? '🔒 Rotation order locked.' : '🔓 Rotation order unlocked.', 'success');
+  closeModal();
+  openGroupDetail(groupId);
 };
 
 window.doCreateRound = async function(groupId) {
@@ -4998,7 +5144,7 @@ window.openPublicTemplateDB = async function() {
 
   el.innerHTML = `<div class="page-header">
     <h2>Public Template DB</h2>
-    <button class="btn btn-secondary btn-sm" onclick="navTo('templates')">← Back</button>
+    <button class="btn btn-secondary btn-sm" onclick="goBack()">← Back</button>
   </div>
   <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
     <input id="tpl-search" type="text" placeholder="Search templates…" oninput="filterPublicTemplates(this.value)"
