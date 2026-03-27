@@ -753,11 +753,14 @@ window.filterContactRows = function(q) {
 
 // ── Contact Detail ────────────────────────────────────────────────
 window.openContactDetail = async function(id) {
-  const contact = await supabase.from('contacts').select('*').eq('id', id).single();
+  const [contact, entries, allLedger] = await Promise.all([
+    supabase.from('contacts').select('*').eq('id', id).single(),
+    listEntries(currentUser.id, { contactId: id, limit: 30 }),
+    getLedgerSummary(currentUser.id)
+  ]);
   if (!contact.data) return;
   const c = contact.data;
-  const entries = await listEntries(currentUser.id, { contactId: id, limit: 30 });
-  const ledger = (await getLedgerSummary(currentUser.id)).find(l => l.contact_id === id) || {};
+  const ledger = allLedger.find(l => l.contact_id === id) || {};
   const toy = ledger.they_owe_me || 0;
   const yot = ledger.i_owe_them || 0;
   const net = toy - yot;
@@ -1534,9 +1537,11 @@ window.doSendReminder = async function(entryId) {
 };
 
 window.openNewEntryModal = async function(defaultDirection) {
-  const contacts = await listContacts(currentUser.id);
+  const [contacts, templates] = await Promise.all([
+    listContacts(currentUser.id),
+    listTemplates(currentUser.id)
+  ]);
   const contactOpts = contacts.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
-  const templates = await listTemplates(currentUser.id);
   const dir = defaultDirection || 'they_owe_you';
   const isToy = dir === 'they_owe_you';
 
