@@ -138,6 +138,10 @@ h3 { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
 /* Forms */
 input, select, textarea { background: var(--bg3); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 14px; width: 100%; outline: none; font-family: inherit; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+/* Green text for filled entry form fields */
+.tpl-field:not([readonly]):not(:placeholder-shown) { color: #22c55e !important; }
+input.tpl-field:focus:not([readonly]) { color: #22c55e !important; border-color: #22c55e; }
+textarea.tpl-field:not(:placeholder-shown) { color: #22c55e !important; }
 label { font-size: 13px; color: var(--muted); margin-bottom: 4px; display: block; }
 .fg { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
 .form-group { margin-bottom: 14px; }
@@ -2366,7 +2370,18 @@ async function renderTemplatesPage(el) {
           </div>
         </div>
         ${fCount > 0 ? `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;display:flex;flex-wrap:wrap;gap:4px;">
-          ${(t.fields || []).map(f => `<span style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:11px;">${esc(f.label || '?')} <span style="color:var(--muted);">[${f.type}]</span></span>`).join('')}
+          ${(t.fields || []).map(f => {
+            const calcDesc = (f.calculators||[]).filter(c=>c.operation&&c.operation!=='').map(c => {
+              const target = c.targetFieldId ? (t.fields.find(tf=>tf.id===c.targetFieldId)?.label||'?') : '';
+              if (c.operation==='multiply') return `×${c.operand||'?'}${target?' on '+target:''}`;
+              if (c.operation==='add') return `+ ${target||'?'}`;
+              if (c.operation==='subtract') return `${target||'?'} −`;
+              if (c.operation==='aggregate') return 'Σ all';
+              if (c.operation==='select_aggregate') return 'Σ selected';
+              return c.operation;
+            }).join(' · ');
+            return `<span style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:11px;">${esc(f.label||'?')} <span style="color:var(--muted);">[${f.type}]</span>${calcDesc?`<span style="color:#60a5fa;"> ${calcDesc}</span>`:''}  </span>`;
+          }).join('')}
         </div>` : ''}
         <div style="display:flex;gap:6px;margin-top:8px;">
           ${!t.archived_at ? `<button class="btn btn-primary btn-sm" onclick="useTemplateForEntry('${t.id}')">Use Template</button>` : ''}
@@ -2392,6 +2407,15 @@ const CALC_TYPES = {
   select_aggregate: 'Sum selected fields'
 };
 const LEDGER_EFFECTS = { '': 'None', toy: 'They Owe (TOY)', toy_credit: 'TOY Credit', yot: 'I Owe (YOT)', yot_credit: 'YOT Credit' };
+const CURRENCIES = ['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'];
+const CURRENCY_SYMBOLS = { USD:'$', EUR:'€', GBP:'£', NGN:'₦', CAD:'C$', AUD:'A$', JPY:'¥', KES:'KSh', ZAR:'R', GHS:'₵', INR:'₹', CNY:'¥', BRL:'R$', MXN:'$', AED:'د.إ', SAR:'﷼', QAR:'﷼', KWD:'د.ك', EGP:'E£', MAD:'MAD', TZS:'TSh', UGX:'USh', ETB:'Br', XOF:'CFA' };
+function fmtMoney(val, currency) {
+  const sym = CURRENCY_SYMBOLS[currency] || currency || '$';
+  return sym + Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function currencySelectHtml(selected) {
+  return CURRENCIES.map(c => `<option value="${c}" ${(selected||'USD')===c?'selected':''}>${c}</option>`).join('');
+}
 
 // ── Template Builder ──────────────────────────────────────────────
 window._tplFields = [];
@@ -2400,13 +2424,20 @@ function _tplModalHtml(title, idPrefix, tpl = {}) {
   return `
     <h3 style="margin-bottom:16px;">${title}</h3>
     <div class="form-group"><label>Name *</label><input type="text" id="${idPrefix}-name" value="${esc(tpl.name || '')}" placeholder="Invoice Template"></div>
-    <div class="form-group"><label>Description</label><textarea id="${idPrefix}-desc" rows="2">${esc(tpl.description || '')}</textarea></div>
+    <div class="form-group"><label>Description <span style="font-size:11px;color:var(--muted);">— shown to users when they pick this template</span></label><textarea id="${idPrefix}-desc" rows="2" placeholder="e.g. Standard service invoice with tax and discount">${esc(tpl.description || '')}</textarea></div>
     <div class="form-row">
       <div class="form-group"><label>Default Type</label><select id="${idPrefix}-type">
         <option value="">None</option>
         ${Object.entries(TX_LABELS).map(([k,v]) => `<option value="${k}" ${tpl.tx_type===k?'selected':''}>${v}</option>`).join('')}
       </select></div>
       <div class="form-group"><label>Invoice Prefix</label><input type="text" id="${idPrefix}-prefix" value="${esc(tpl.invoice_prefix || 'INV-')}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Default Currency</label><select id="${idPrefix}-currency">${currencySelectHtml(tpl.currency || currentProfile?.default_currency)}</select></div>
+      <div class="form-group" style="display:flex;align-items:center;gap:8px;padding-top:28px;">
+        <input type="checkbox" id="${idPrefix}-public" ${tpl.is_public?'checked':''} style="width:auto;accent-color:var(--accent);">
+        <label for="${idPrefix}-public" style="cursor:pointer;font-size:13px;font-weight:500;">Add to Public Template DB</label>
+      </div>
     </div>
     <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px;">
       <label style="font-weight:700;font-size:14px;display:block;margin-bottom:12px;">Fields (<span id="tpl-fields-count">${window._tplFields.length}</span>)</label>
@@ -2417,9 +2448,9 @@ function _tplModalHtml(title, idPrefix, tpl = {}) {
 window.openNewTemplateModal = function() {
   window._tplFields = [];
   openModal(_tplModalHtml('New Template', 'nt') + `
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
       <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="doCreateTemplate()">Create Template</button>
+      <button class="btn btn-primary btn-sm" onclick="doCreateTemplate()">💾 Create Template</button>
     </div>
   `, { maxWidth: '600px' });
   renderFieldList();
@@ -2462,6 +2493,17 @@ function _saveFieldInputs() {
     card.querySelectorAll('input[data-ckey]').forEach(inp => {
       const [ci, key] = inp.dataset.ckey.split(':');
       if (window._tplFields[i].calculators[ci]) window._tplFields[i].calculators[ci][key] = inp.value;
+    });
+    // Explicitly capture calc row selects (operation, targetFieldId, operand) from DOM
+    card.querySelectorAll('[data-calc-row]').forEach(row => {
+      const ci = parseInt(row.dataset.calcRow);
+      if (!window._tplFields[i].calculators[ci]) return;
+      const opSel = row.querySelector('select:not(.calc-target)');
+      if (opSel) window._tplFields[i].calculators[ci].operation = opSel.value;
+      const targSel = row.querySelector('.calc-target');
+      if (targSel) window._tplFields[i].calculators[ci].targetFieldId = targSel.value || '';
+      const factorInp = row.querySelector('.calc-factor');
+      if (factorInp) window._tplFields[i].calculators[ci].operand = factorInp.value;
     });
   });
 }
@@ -2626,10 +2668,14 @@ function _collectFields() {
     id: f.id, label: f.label, type: f.type, required: f.required,
     options: f.type === 'select' ? (f.options || '').split(',').map(o => o.trim()).filter(Boolean) : undefined,
     calculators: (f.calculators || []).filter(c => c.operation).map(c => ({
-      operation: c.operation, operand: c.operand || undefined,
-      targetFieldId: c.targetFieldId || undefined, targetFieldIds: c.targetFieldIds || undefined,
+      operation: c.operation,
+      operand: c.operand !== '' ? c.operand : undefined,
+      targetFieldId: c.targetFieldId || undefined,
+      targetFieldIds: c.targetFieldIds || undefined,
       resultVisible: c.resultVisible !== false
     })),
+    defaultValue: f.defaultValue || undefined,
+    currency: f.currency || undefined,
     ledgerEffect: f.ledgerEffect || undefined,
     isFinalTotal: f.isFinalTotal || undefined,
     excludeFromAggregate: f.excludeFromAggregate || undefined,
@@ -2648,7 +2694,9 @@ window.doCreateTemplate = async function() {
     name, description: document.getElementById('nt-desc').value.trim(),
     txType: document.getElementById('nt-type').value || null,
     fields,
-    invoicePrefix: document.getElementById('nt-prefix').value.trim()
+    invoicePrefix: document.getElementById('nt-prefix').value.trim(),
+    currency: document.getElementById('nt-currency')?.value || 'USD',
+    isPublic: document.getElementById('nt-public')?.checked || false
   });
   closeModal(); toast('Template created!', 'success'); navTo('templates');
 };
@@ -2667,9 +2715,9 @@ window.openEditTemplate = async function(id) {
   }));
   closeModal();
   openModal(_tplModalHtml('Edit Template', 'et', tpl) + `
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
       <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="doSaveTemplate('${id}')">Save</button>
+      <button class="btn btn-primary btn-sm" onclick="doSaveTemplate('${id}')">💾 Save Template</button>
     </div>
   `, { maxWidth: '600px' });
   renderFieldList();
@@ -2682,7 +2730,9 @@ window.doSaveTemplate = async function(id) {
     description: document.getElementById('et-desc').value.trim(),
     tx_type: document.getElementById('et-type').value || null,
     fields,
-    invoice_prefix: document.getElementById('et-prefix').value.trim()
+    invoice_prefix: document.getElementById('et-prefix').value.trim(),
+    currency: document.getElementById('et-currency')?.value || 'USD',
+    is_public: document.getElementById('et-public')?.checked || false
   });
   closeModal(); toast('Template saved!', 'success'); navTo('templates');
 };
@@ -2694,6 +2744,7 @@ window.useTemplateForEntry = async function(templateId) {
   const t = tpl.data;
   // Store for calculator engine
   window._activeTpl = t;
+  window._activeTplCurrency = t.currency || currentProfile?.default_currency || 'USD';
   const contacts = await listContacts(currentUser.id);
   const contactOpts = contacts.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
   const fields = t.fields || [];
@@ -2706,13 +2757,13 @@ window.useTemplateForEntry = async function(templateId) {
     if (f.type === 'number' || f.type === 'currency') {
       const _hasCalcs = (f.calculators||[]).length > 0;
       // Fields with calculators render as computed display divs so they auto-update
-      if (_hasCalcs) return `<div class="form-group"><label>${esc(f.label)} <span style="font-size:10px;color:#60a5fa;font-weight:600;">⚡ auto</span></label><div id="tf-${f.id}" class="tpl-field" style="padding:10px 14px;background:#0d1f3c;border:1px solid #2563eb;border-radius:10px;font-weight:700;font-size:16px;color:#93c5fd;" data-computed="0">$0.00</div></div>`;
+      if (_hasCalcs) return `<div class="form-group"><label>${esc(f.label)} <span style="font-size:10px;color:#60a5fa;font-weight:600;">⚡ auto</span></label><div id="tf-${f.id}" class="tpl-field" style="padding:10px 14px;background:#0d1f3c;border:1px solid #2563eb;border-radius:10px;font-weight:700;font-size:16px;color:#93c5fd;" data-computed="0">${fmtMoney(0,window._activeTplCurrency)}</div></div>`;
       return `<div class="form-group"><label>${esc(f.label)}${f.required?' *':''}</label><input type="number" id="tf-${f.id}" step="0.01" class="tpl-field" value="${esc(String(f.defaultValue||''))}" oninput="recalcTemplateFields()"></div>`;
     }
     if (f.type === 'date') return `<div class="form-group"><label>${esc(f.label)}</label><input type="date" id="tf-${f.id}" class="tpl-field" value="${new Date().toISOString().slice(0,10)}"></div>`;
     if (f.type === 'textarea') return `<div class="form-group"><label>${esc(f.label)}</label><textarea id="tf-${f.id}" rows="2" class="tpl-field"></textarea></div>`;
     if (f.type === 'select') return `<div class="form-group"><label>${esc(f.label)}</label><select id="tf-${f.id}" class="tpl-field" onchange="recalcTemplateFields()">${(f.options||[]).map(o => `<option>${esc(o)}</option>`).join('')}</select></div>`;
-    if (f.type === 'computed') return `<div class="form-group"><label>${esc(f.label)}</label><div id="tf-${f.id}" class="tpl-field" style="padding:10px 14px;background:var(--bg3);border-radius:10px;font-weight:700;font-size:16px;" data-computed="0">$0.00</div></div>`;
+    if (f.type === 'computed') return `<div class="form-group"><label>${esc(f.label)}</label><div id="tf-${f.id}" class="tpl-field" style="padding:10px 14px;background:var(--bg3);border-radius:10px;font-weight:700;font-size:16px;" data-computed="0">${fmtMoney(0,window._activeTplCurrency)}</div></div>`;
     if (f.type === 'paired') return `<div class="form-group"><label>${esc(f.label)} (${esc(f.textLabel||'Item')} + ${esc(f.numericLabel||'Amount')})</label>
       <div id="tf-${f.id}-rows" class="paired-rows"></div>
       <button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="addPairedRow('${f.id}')">+ Add Row</button>
@@ -2729,7 +2780,13 @@ window.useTemplateForEntry = async function(templateId) {
     </select></div>
     <div class="form-row">
       <div class="form-group"><label>Date</label><input type="date" id="tfe-date" value="${new Date().toISOString().slice(0,10)}"></div>
-      <div class="form-group"><label>Amount</label><input type="number" id="tfe-amount" step="0.01" placeholder="Auto-calculated or manual" oninput="this._userEdited = this.value !== ''"></div>
+      <div class="form-group">
+        <label>Currency &amp; Amount</label>
+        <div style="display:flex;gap:6px;">
+          <select id="tfe-currency" style="flex:0 0 86px;padding:10px 4px;" onchange="window._activeTplCurrency=this.value;recalcTemplateFields()">${currencySelectHtml(t.currency || currentProfile?.default_currency)}</select>
+          <input type="number" id="tfe-amount" step="0.01" placeholder="Auto-calculated" style="flex:1;" oninput="this._userEdited = this.value !== ''">
+        </div>
+      </div>
     </div>
     ${fieldsHtml}
     <div class="form-group"><label>Note</label><textarea id="tfe-note" rows="2"></textarea></div>
@@ -2773,7 +2830,7 @@ window.recalcTemplateFields = function() {
     });
     document.querySelectorAll('.tpl-field[data-computed]').forEach(el => {
       el.dataset.computed = total;
-      el.textContent = '$' + total.toFixed(2);
+      el.textContent = fmtMoney(total, window._activeTplCurrency);
     });
     const amtField = document.getElementById('tfe-amount');
     if (amtField && !amtField._userEdited) amtField.value = total > 0 ? total.toFixed(2) : '';
@@ -2873,10 +2930,10 @@ window.recalcTemplateFields = function() {
     if (f.isFinalTotal) {
       el.style.border = '2px solid var(--green)';
       el.style.fontSize = '20px';
-      el.textContent = '$' + displayVal.toFixed(2);
+      el.textContent = fmtMoney(displayVal, window._activeTplCurrency);
       finalTotalVal = displayVal;
     } else {
-      el.textContent = '$' + displayVal.toFixed(2);
+      el.textContent = fmtMoney(displayVal, window._activeTplCurrency);
     }
   });
 
