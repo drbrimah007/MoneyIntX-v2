@@ -152,6 +152,7 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th { text-align: left; color: var(--muted); font-size: 12px; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: .04em; }
 td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; word-break: break-word; }
 tr:last-child td { border-bottom: none; }
+tr.row-selected td { background: rgba(108,99,255,.1) !important; }
 @media(max-width:640px) { .hide-mobile { display: none; } }
 .mobile-label { display: none; }
 @media(max-width:640px) { .mobile-label { display: block; } }
@@ -946,23 +947,43 @@ async function renderEntries(el) {
   el.innerHTML = '<div class="page-header"><h2>Entries</h2></div><p style="color:var(--muted);">Loading...</p>';
   const entries = await listEntries(currentUser.id);
 
+  const _sm = window._selectMode || false;
+  if (!window._selectedEntries) window._selectedEntries = new Set();
+
   let html = `<div class="page-header"><h2>Entries</h2>
-    <div style="display:flex;gap:8px;">
-      <button class="btn btn-primary btn-sm" onclick="openNewEntryModal()">+ Add Entry</button>
-      <button class="btn btn-secondary btn-sm" onclick="doExportEntries()">Export CSV</button>
-      <button class="btn btn-secondary btn-sm" onclick="doExportLedger()">Export Ledger</button>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button class="btn sm" onclick="openNewEntryModal()">+ Add Entry</button>
+      <button class="bs sm${_sm?' on':''}" onclick="toggleSelectMode()" style="${_sm?'background:var(--accent);color:#fff;border-color:var(--accent);':''}">☑ Select</button>
+      <button class="bs sm" onclick="doExportEntries()">📥 CSV</button>
+      <button class="bs sm" onclick="doExportLedger()">📥 Ledger</button>
     </div>
   </div>`;
 
   // Search
-  html += `<div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
+  html += `<div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
     <input type="search" id="entries-search" placeholder="Search entries..." oninput="filterEntryRows(this.value)" style="flex:1;min-width:180px;max-width:340px;">
+    ${_sm ? `<span style="font-size:12px;color:var(--muted);">${window._selectedEntries.size} selected</span>` : ''}
   </div>`;
+
+  // Bulk action bar
+  if (_sm && window._selectedEntries.size > 0) {
+    html += `<div style="background:var(--bg2);border:2px solid var(--accent);border-radius:10px;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span style="font-weight:700;font-size:13px;color:var(--accent);">${window._selectedEntries.size} selected</span>
+      <button class="bs sm" onclick="bulkAction('archive')">Archive</button>
+      <button class="bs sm" onclick="bulkAction('noledger')">Rm Ledger</button>
+      <button class="bs sm" onclick="bulkAction('restore')">Restore Ledger</button>
+      <button class="bs sm" style="color:var(--red);" onclick="bulkAction('delete')">Delete</button>
+      <button class="bs sm" style="margin-left:auto;" onclick="window._selectedEntries.clear();navTo('entries');">Cancel</button>
+    </div>`;
+  }
 
   if (entries.length === 0) {
     html += `<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No entries yet. Record your first transaction.</p></div>`;
   } else {
-    html += `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Contact</th><th>Amount</th><th>Type</th><th>Date</th><th>Status</th><th style="width:50px;">Action</th></tr></thead><tbody>`;
+    html += `<div class="card"><div class="tbl-wrap"><table><thead><tr>
+      ${_sm ? `<th style="width:36px;"><input type="checkbox" onclick="selectAllEntries(this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);"></th>` : ''}
+      <th>Contact</th><th>Amount</th><th class="hide-mobile">Type</th><th>Date</th><th>Status</th><th style="width:50px;">Action</th>
+    </tr></thead><tbody>`;
     entries.forEach(e => {
       const cName = e.contact?.name || '—';
       const txLabel = TX_LABELS[e.tx_type] || e.tx_type;
@@ -977,7 +998,9 @@ async function renderEntries(el) {
       const reminderHtml = e.reminder_count > 0 ? `<span class="badge badge-red" style="margin-left:4px;cursor:pointer;" onclick="openEntryDetail('${e.id}')">🚩${e.reminder_count}</span>` : '';
       const noLedgerHtml = e.no_ledger ? `<span class="badge badge-gray" style="margin-left:4px;" title="Excluded from ledger">⊘</span>` : '';
 
-      html += `<tr class="entry-row" data-search="${esc(cName + ' ' + txLabel + ' ' + e.invoice_number + ' ' + e.status).toLowerCase()}">
+      const _isSel = _sm && window._selectedEntries.has(e.id);
+      html += `<tr class="entry-row${_isSel?' row-selected':''}" data-search="${esc(cName + ' ' + txLabel + ' ' + e.invoice_number + ' ' + e.status).toLowerCase()}" data-eid="${e.id}">
+        ${_sm ? `<td style="width:36px;text-align:center;"><input type="checkbox" ${_isSel?'checked':''} onchange="toggleEntrySelect('${e.id}',this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);"></td>` : ''}
         <td><a style="font-weight:600;cursor:pointer;" onclick="openEntryDetail('${e.id}')">${esc(cName)}</a></td>
         <td style="font-weight:700;">${amtHtml}</td>
         <td><span style="font-weight:600;color:${txColor};">${esc(txLabel)}</span></td>
@@ -2853,6 +2876,53 @@ window.saveBranding = async function() {
 };
 
 // ── Action menu toggle (global) ───────────────────────────────────
+// ── Bulk Select Mode ──────────────────────────────────────────────
+window.toggleSelectMode = function() {
+  window._selectMode = !window._selectMode;
+  if (!window._selectMode) window._selectedEntries = new Set();
+  navTo('entries');
+};
+
+window.toggleEntrySelect = function(id, checked) {
+  if (checked) window._selectedEntries.add(id);
+  else window._selectedEntries.delete(id);
+  // Update row highlight
+  document.querySelectorAll(`[data-eid="${id}"]`).forEach(r => r.classList.toggle('row-selected', checked));
+  // Update count display
+  navTo('entries');
+};
+
+window.selectAllEntries = function(checked) {
+  document.querySelectorAll('.entry-row').forEach(r => {
+    const eid = r.dataset.eid;
+    if (eid) {
+      if (checked) window._selectedEntries.add(eid);
+      else window._selectedEntries.delete(eid);
+    }
+  });
+  navTo('entries');
+};
+
+window.bulkAction = async function(action) {
+  const ids = [...window._selectedEntries];
+  if (ids.length === 0) return toast('No entries selected.', 'error');
+  const { bulkArchive, bulkNoLedger } = await import('./js/bulk.js');
+  if (action === 'archive' || action === 'delete') {
+    if (!confirm(`${action === 'delete' ? 'Delete' : 'Archive'} ${ids.length} entries?`)) return;
+    await bulkArchive(ids);
+    toast(`${ids.length} entries ${action === 'delete' ? 'deleted' : 'archived'}.`, 'success');
+  } else if (action === 'noledger') {
+    await bulkNoLedger(ids, true);
+    toast(`${ids.length} entries removed from ledger.`, 'success');
+  } else if (action === 'restore') {
+    await bulkNoLedger(ids, false);
+    toast(`${ids.length} entries restored to ledger.`, 'success');
+  }
+  window._selectedEntries = new Set();
+  window._selectMode = false;
+  navTo('entries');
+};
+
 // ── No Ledger Toggle ──────────────────────────────────────────────
 window.toggleNoLedger = async function(id, noLedger) {
   await supabase.from('entries').update({ no_ledger: noLedger, updated_at: new Date().toISOString() }).eq('id', id);
