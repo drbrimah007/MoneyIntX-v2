@@ -1151,30 +1151,6 @@ async function renderDash(el) {
       <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="openNewEntryModal()">Create First Entry</button>
     </div>`;
   } else {
-    // ── I Owe / Owed to Me strip for dashboard Recent Entries ─────
-    const _OWED = ['owed_to_me','they_owe_you','invoice_sent','bill_sent','invoice','bill'];
-    const _IOWE = ['i_owe','you_owe_them','bill_received','invoice_received'];
-    const _TERM = ['paid','settled','voided','cancelled','fulfilled'];
-    let _dashOwed = 0, _dashIOwe = 0;
-    recent.forEach(e => {
-      if (_TERM.includes(e.status)) return;
-      const cat = e.category || e.tx_type;
-      const out = e.outstanding_amount != null ? e.outstanding_amount : e.amount;
-      if (_OWED.includes(cat)) _dashOwed += (out || 0);
-      else if (_IOWE.includes(cat)) _dashIOwe += (out || 0);
-    });
-    if (_dashOwed > 0 || _dashIOwe > 0) {
-      html += `<div style="display:flex;gap:8px;padding:12px 16px 4px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:110px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.28);border-radius:10px;padding:10px 12px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#16a34a;margin-bottom:2px;">Owed to Me</div>
-          <div style="font-size:18px;font-weight:800;color:#16a34a;line-height:1.2;">${fmtMoney(_dashOwed)}</div>
-        </div>
-        <div style="flex:1;min-width:110px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.22);border-radius:10px;padding:10px 12px;">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#dc2626;margin-bottom:2px;">I Owe</div>
-          <div style="font-size:18px;font-weight:800;color:#dc2626;line-height:1.2;">${fmtMoney(_dashIOwe)}</div>
-        </div>
-      </div>`;
-    }
     html += `<div class="tbl-wrap"><table><thead><tr>
       <th>Contact</th><th>Amount</th><th class="hide-mobile">Doc #</th><th class="hide-mobile">Type</th><th>Date</th><th>Status</th><th style="width:44px;"></th>
     </tr></thead><tbody>`;
@@ -1341,30 +1317,7 @@ function _cpEntriesTable(entries, page) {
     </div>`;
   }
 
-  // ── I Owe / Owed to Me summary strip (contact entries) ──────────
-  const OWED_CATS_CP = ['owed_to_me','they_owe_you','invoice_sent','bill_sent','invoice','bill'];
-  const IOWE_CATS_CP = ['i_owe','you_owe_them','bill_received','invoice_received'];
-  const TERMINAL_CP  = ['paid','settled','voided','cancelled','fulfilled'];
-  let cpOwed = 0, cpIOwe = 0;
-  entries.forEach(e => {
-    if (TERMINAL_CP.includes(e.status)) return;
-    const cat = e.category || e.tx_type;
-    const outstanding = e.outstanding_amount != null ? e.outstanding_amount : e.amount;
-    if (OWED_CATS_CP.includes(cat)) cpOwed += (outstanding || 0);
-    else if (IOWE_CATS_CP.includes(cat)) cpIOwe += (outstanding || 0);
-  });
-  const stripHtml = (cpOwed > 0 || cpIOwe > 0) ? `<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-    <div style="flex:1;min-width:110px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.28);border-radius:10px;padding:10px 12px;">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#16a34a;margin-bottom:2px;">Owed to Me</div>
-      <div style="font-size:18px;font-weight:800;color:#16a34a;line-height:1.2;">${fmtMoney(cpOwed)}</div>
-    </div>
-    <div style="flex:1;min-width:110px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.22);border-radius:10px;padding:10px 12px;">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#dc2626;margin-bottom:2px;">I Owe</div>
-      <div style="font-size:18px;font-weight:800;color:#dc2626;line-height:1.2;">${fmtMoney(cpIOwe)}</div>
-    </div>
-  </div>` : '';
-
-  return `${stripHtml}<div class="tbl-wrap" style="margin-top:0;">
+  return `<div class="tbl-wrap" style="margin-top:0;">
     <table style="font-size:13px;">
       <thead><tr><th>Amount</th><th>Doc #</th><th>Type</th><th>Date</th><th>Status</th><th style="width:44px;"></th></tr></thead>
       <tbody>${rows}</tbody>
@@ -1671,33 +1624,6 @@ async function renderEntries(el, page, forceRefresh) {
       <button class="bs sm" onclick="doExportEntries()" title="Export CSV">📥</button>
     </div>
   </div>`;
-
-  // ── I Owe / Owed to Me summary strip ─────────────────────────────
-  {
-    const OWED_CATS = ['owed_to_me','they_owe_you','invoice_sent','bill_sent','invoice','bill'];
-    const IOWE_CATS = ['i_owe','you_owe_them','bill_received','invoice_received'];
-    const TERMINAL  = ['paid','settled','voided','cancelled','fulfilled'];
-    let owedTotal = 0, iOweTotal = 0;
-    filtered.forEach(e => {
-      if (TERMINAL.includes(e.status)) return;
-      const cat = e.category || e.tx_type;
-      const outstanding = e.outstanding_amount != null ? e.outstanding_amount : e.amount;
-      if (OWED_CATS.includes(cat)) owedTotal += (outstanding || 0);
-      else if (IOWE_CATS.includes(cat)) iOweTotal += (outstanding || 0);
-    });
-    if (owedTotal > 0 || iOweTotal > 0) {
-      html += `<div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:140px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.28);border-radius:12px;padding:12px 16px;">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#16a34a;margin-bottom:3px;">Owed to Me</div>
-          <div style="font-size:22px;font-weight:800;color:#16a34a;line-height:1.1;">${fmtMoney(owedTotal)}</div>
-        </div>
-        <div style="flex:1;min-width:140px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.22);border-radius:12px;padding:12px 16px;">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#dc2626;margin-bottom:3px;">I Owe</div>
-          <div style="font-size:22px;font-weight:800;color:#dc2626;line-height:1.1;">${fmtMoney(iOweTotal)}</div>
-        </div>
-      </div>`;
-    }
-  }
 
   // Bulk action bar
   if (_sm && window._selectedEntries.size > 0) {
