@@ -234,17 +234,50 @@ export async function getLedgerSummary(userId) {
 }
 
 // ── Currency ledger (dashboard currency cards) ────────────────────
-// Lean aggregate view — only 5 cols, one row per currency per user.
-// Replaces computing currency breakdown from raw entries client-side.
+// Queries entries directly — no dependency on the currency_ledger DB view
+// (view may not be deployed). Computes per-currency totals in JavaScript.
+// Returns ALL currencies the user has any entries in, even if balance is zero,
+// so the hero always shows the correct default currency (never hides it).
 export async function getCurrencyLedger(userId) {
+  const TERMINAL = new Set(['voided', 'cancelled', 'settled', 'fulfilled']);
+
+  // First try the fast DB view (if deployed)
+  try {
+    const { data: vData, error: vErr } = await supabase
+      .from('currency_ledger')
+      .select('currency, owed_to_me, i_owe, active_count')
+      .eq('user_id', userId);
+    // View exists and returned data — use it (no active_count filter so all currencies appear)
+    if (!vErr && Array.isArray(vData)) return vData;
+  } catch (_) { /* view not deployed — fall through */ }
+
+  // Fallback: query entries table directly and compute in JS
   const { data, error } = await supabase
-    .from('currency_ledger')
-    .select('currency, owed_to_me, i_owe, active_count')
+    .from('entries')
+    .select('currency, tx_type, amount, settled_amount, status, no_ledger')
     .eq('user_id', userId)
-    .gt('active_count', 0);  // only currencies with active entries
+    .is('archived_at', null);
+
   if (error) {
-    console.error('[getCurrencyLedger]', error.message);
+    console.error('[getCurrencyLedger fallback]', error.message);
     return [];
   }
-  return data || [];
+
+  const map = {};
+  for (const e of (data || [])) {
+    const cur = e.currency || 'USD';
+    if (!map[cur]) map[cur] = { currency: cur, owed_to_me: 0, i_owe: 0, active_count: 0 };
+    if (e.no_ledger) continue;
+    const remaining = Math.max((e.amount || 0) - (e.settled_amount || 0), 0);
+    if (!TERMINAL.has(e.status)) {
+      if (['they_owe_you', 'invoice', 'bill'].includes(e.tx_type)) {
+        map[cur].owed_to_me += remaining;
+        map[cur].active_count++;
+      } else if (e.tx_type === 'you_owe_them') {
+        map[cur].i_owe += remaining;
+        map[cur].active_count++;
+      }
+    }
+  }
+  return Object.values(map);
 }
