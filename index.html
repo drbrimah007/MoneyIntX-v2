@@ -2390,8 +2390,8 @@ window.openNewTemplateModal = function() {
 window.addTemplateField = function() {
   const id = 'f' + Math.random().toString(36).substr(2, 6);
   window._tplFields.push({ id, label: '', type: 'text', required: false, options: '',
-    calcType: '', calcFactor: '', ledgerEffect: '', isFinalTotal: false,
-    textLabel: 'Item', numericLabel: 'Amount' });
+    calculators: [], ledgerEffect: '', isFinalTotal: false,
+    excludeFromAggregate: false, textLabel: 'Item', numericLabel: 'Amount' });
   renderFieldList();
 };
 
@@ -2438,11 +2438,20 @@ function renderFieldList() {
         <input type="text" placeholder="Text label (e.g. Item)" value="${esc(f.textLabel || 'Item')}" onchange="window._tplFields[${i}].textLabel=this.value" style="flex:1;padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
         <input type="text" placeholder="Number label (e.g. Amount)" value="${esc(f.numericLabel || 'Amount')}" onchange="window._tplFields[${i}].numericLabel=this.value" style="flex:1;padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
       </div>` : ''}
-      ${showCalc ? `<div style="display:flex;gap:6px;margin-bottom:6px;">
-        <select onchange="window._tplFields[${i}].calcType=this.value" style="flex:1;padding:5px 6px;border:1px solid var(--border);border-radius:6px;font-size:11px;">
-          ${Object.entries(CALC_TYPES).map(([k,v]) => `<option value="${k}" ${f.calcType===k?'selected':''}>${v}</option>`).join('')}
-        </select>
-        ${f.calcType === 'multiply' ? `<input type="number" placeholder="Factor" value="${f.calcFactor||''}" onchange="window._tplFields[${i}].calcFactor=this.value" style="width:80px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">` : ''}
+      ${showCalc ? `<div style="margin-bottom:6px;">
+        <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:4px;">Calculators</div>
+        ${(f.calculators||[]).map((c, ci) => `<div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;">
+          <select onchange="window._tplFields[${i}].calculators[${ci}].operation=this.value;renderFieldList();" style="flex:1;padding:4px;border:1px solid var(--border);border-radius:4px;font-size:11px;">
+            ${Object.entries(CALC_TYPES).map(([k,v]) => `<option value="${k}" ${c.operation===k?'selected':''}>${v}</option>`).join('')}
+          </select>
+          ${c.operation === 'multiply' ? `<input type="number" placeholder="Factor" value="${c.operand||''}" onchange="window._tplFields[${i}].calculators[${ci}].operand=this.value" style="width:60px;padding:4px;border:1px solid var(--border);border-radius:4px;font-size:11px;">` : ''}
+          ${['multiply','add','subtract'].includes(c.operation) ? `<select onchange="window._tplFields[${i}].calculators[${ci}].targetFieldId=this.value" style="flex:1;padding:4px;border:1px solid var(--border);border-radius:4px;font-size:11px;">
+            <option value="">— target field —</option>
+            ${window._tplFields.filter(tf => tf.id !== f.id).map(tf => `<option value="${tf.id}" ${c.targetFieldId===tf.id?'selected':''}>${esc(tf.label||'?')}</option>`).join('')}
+          </select>` : ''}
+          <button onclick="window._tplFields[${i}].calculators.splice(${ci},1);renderFieldList();" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;">✕</button>
+        </div>`).join('')}
+        <button onclick="if(!window._tplFields[${i}].calculators)window._tplFields[${i}].calculators=[];window._tplFields[${i}].calculators.push({operation:'aggregate',operand:'',targetFieldId:''});renderFieldList();" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;font-weight:600;">+ Add Calculator</button>
       </div>` : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
         <select onchange="window._tplFields[${i}].ledgerEffect=this.value" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:11px;">
@@ -2470,8 +2479,13 @@ function _collectFields() {
   return window._tplFields.filter(f => f.label).map(f => ({
     id: f.id, label: f.label, type: f.type, required: f.required,
     options: f.type === 'select' ? (f.options || '').split(',').map(o => o.trim()).filter(Boolean) : undefined,
-    calcType: f.calcType || undefined, calcFactor: f.calcFactor || undefined,
+    calculators: (f.calculators || []).filter(c => c.operation).map(c => ({
+      operation: c.operation, operand: c.operand || undefined,
+      targetFieldId: c.targetFieldId || undefined, targetFieldIds: c.targetFieldIds || undefined,
+      resultVisible: c.resultVisible !== false
+    })),
     ledgerEffect: f.ledgerEffect || undefined, isFinalTotal: f.isFinalTotal || undefined,
+    excludeFromAggregate: f.excludeFromAggregate || undefined,
     textLabel: f.type === 'paired' ? (f.textLabel || 'Item') : undefined,
     numericLabel: f.type === 'paired' ? (f.numericLabel || 'Amount') : undefined
   }));
@@ -2529,6 +2543,8 @@ window.useTemplateForEntry = async function(templateId) {
   const tpl = await supabase.from('templates').select('*').eq('id', templateId).single();
   if (!tpl.data) return;
   const t = tpl.data;
+  // Store for calculator engine
+  window._activeTpl = t;
   const contacts = await listContacts(currentUser.id);
   const contactOpts = contacts.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
   const fields = t.fields || [];
@@ -2588,21 +2604,152 @@ window.addPairedRow = function(fieldId) {
   container.appendChild(row);
 };
 
+// ── Full Calculator Engine (matches v1) ───────────────────────────
+// Runs on every numeric input change in template entry form.
+// Uses multi-pass convergence to handle cross-field references.
 window.recalcTemplateFields = function() {
-  // Sum all paired rows and numeric fields for computed fields
-  let total = 0;
-  document.querySelectorAll('.paired-row').forEach(row => {
-    const qty = parseFloat(row.querySelector('.pr-qty')?.value) || 1;
-    const num = parseFloat(row.querySelector('.pr-num')?.value) || 0;
-    total += qty * num;
+  const tpl = window._activeTpl;
+  if (!tpl || !tpl.fields) {
+    // Fallback: simple paired row sum
+    let total = 0;
+    document.querySelectorAll('.paired-row').forEach(row => {
+      const qty = parseFloat(row.querySelector('.pr-qty')?.value) || 1;
+      const num = parseFloat(row.querySelector('.pr-num')?.value) || 0;
+      total += qty * num;
+    });
+    document.querySelectorAll('.tpl-field[data-computed]').forEach(el => {
+      el.dataset.computed = total;
+      el.textContent = '$' + total.toFixed(2);
+    });
+    const amtField = document.getElementById('tfe-amount');
+    if (amtField && !amtField._userEdited) amtField.value = total > 0 ? total.toFixed(2) : '';
+    return;
+  }
+
+  const _isPaired = f => f.type === 'paired';
+  const _isNumeric = f => ['number','currency'].includes(f.type);
+
+  // Step 1: seed vals from user inputs
+  const vals = {};
+  tpl.fields.forEach(f => {
+    if (_isPaired(f)) {
+      const container = document.getElementById('tf-' + f.id + '-rows');
+      let total = 0;
+      if (container) container.querySelectorAll('.paired-row').forEach(row => {
+        const qty = parseFloat(row.querySelector('.pr-qty')?.value) || 1;
+        const price = parseFloat(row.querySelector('.pr-num')?.value) || 0;
+        total += qty * price;
+      });
+      vals[f.id] = total;
+      return;
+    }
+    const el = document.getElementById('tf-' + f.id);
+    if (!el || el.tagName === 'DIV') return; // skip computed display divs
+    vals[f.id] = parseFloat(el.value) || 0;
   });
-  document.querySelectorAll('.tpl-field[data-computed]').forEach(el => {
-    el.dataset.computed = total;
-    el.textContent = '$' + total.toFixed(2);
+
+  // Step 2: multi-pass computation (up to 4 passes, stop on convergence)
+  const _runOnePass = () => {
+    tpl.fields.forEach(f => {
+      const el = document.getElementById('tf-' + f.id);
+      if (!el || el.tagName !== 'DIV') return;
+      const calcs = f.calculators || [];
+      // Legacy: single calcType → convert to calculators format
+      if (calcs.length === 0 && f.calcType) {
+        calcs.push({ operation: f.calcType, operand: f.calcFactor || 0 });
+      }
+      if (!calcs.length) return;
+
+      calcs.forEach(c => {
+        let val = 0;
+        switch (c.operation) {
+          case 'multiply': {
+            const tv = c.targetFieldId ? (vals[c.targetFieldId] || 0) : (vals[f.id] || 0);
+            val = tv * (parseFloat(c.operand) || 0);
+            break;
+          }
+          case 'add': {
+            const tv = c.targetFieldId ? (vals[c.targetFieldId] || 0) : 0;
+            val = (vals[f.id] || 0) + tv;
+            break;
+          }
+          case 'subtract': {
+            const tv = c.targetFieldId ? (vals[c.targetFieldId] || 0) : 0;
+            val = tv - (vals[f.id] || 0);
+            break;
+          }
+          case 'aggregate':
+            val = 0;
+            tpl.fields.forEach(sf => {
+              if (sf.id === f.id) return;
+              if (sf.excludeFromAggregate) return;
+              if (_isNumeric(sf) || _isPaired(sf) || (sf.calculators||[]).length > 0 || sf.calcType)
+                val += vals[sf.id] || 0;
+            });
+            break;
+          case 'select_aggregate':
+            val = (c.targetFieldIds || []).reduce((s, fid) => {
+              if (fid === f.id) return s;
+              return s + (vals[fid] || 0);
+            }, 0);
+            break;
+        }
+        vals[f.id] = val;
+      });
+    });
+  };
+
+  // Run passes until convergence
+  let prev = '';
+  for (let pass = 0; pass < 4; pass++) {
+    const snap = JSON.stringify(vals);
+    if (pass > 0 && snap === prev) break;
+    prev = snap;
+    _runOnePass();
+  }
+
+  // Step 3: write converged vals to DOM
+  let finalTotalVal = null;
+  tpl.fields.forEach(f => {
+    const el = document.getElementById('tf-' + f.id);
+    if (!el || el.tagName !== 'DIV') return;
+    const displayVal = vals[f.id] || 0;
+    el.dataset.computed = displayVal;
+
+    if (f.isFinalTotal) {
+      el.style.border = '2px solid var(--green)';
+      el.style.fontSize = '20px';
+      el.textContent = '$' + displayVal.toFixed(2);
+      finalTotalVal = displayVal;
+    } else {
+      el.textContent = '$' + displayVal.toFixed(2);
+    }
   });
-  // Auto-fill amount if empty
+
+  // Step 4: auto-fill amount field
+  // Priority: isFinalTotal field → last aggregate → sum all computed
+  if (finalTotalVal === null) {
+    // Find last aggregate computed field
+    for (let i = tpl.fields.length - 1; i >= 0; i--) {
+      const f = tpl.fields[i];
+      const calcs = f.calculators || [];
+      if (calcs.some(c => c.operation === 'aggregate' || c.operation === 'select_aggregate') || f.calcType === 'aggregate') {
+        finalTotalVal = vals[f.id] || 0;
+        break;
+      }
+    }
+  }
+  if (finalTotalVal === null) {
+    // Sum all computed vals
+    finalTotalVal = 0;
+    tpl.fields.forEach(f => {
+      const el = document.getElementById('tf-' + f.id);
+      if (el?.tagName === 'DIV') finalTotalVal += vals[f.id] || 0;
+    });
+  }
+
   const amtField = document.getElementById('tfe-amount');
-  if (amtField && !amtField._userEdited) amtField.value = total > 0 ? total.toFixed(2) : '';
+  if (amtField && !amtField._userEdited) amtField.value = finalTotalVal > 0 ? finalTotalVal.toFixed(2) : '';
 };
 
 window.saveTemplateEntry = async function(templateId, invNum) {
