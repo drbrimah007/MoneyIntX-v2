@@ -8,21 +8,29 @@ export async function signUp({ email, password, displayName }) {
     email,
     password,
     options: {
-      data: { display_name: displayName }
+      data: { display_name: displayName },
+      // emailRedirectTo only used when email confirmation is ON in Supabase dashboard
+      emailRedirectTo: window.location.origin + '/'
     }
   });
   if (error) {
     toast(error.message, 'error');
     return null;
   }
+  // If email_confirmed_at is already set, confirmation is disabled — user can log in now
+  const isAutoConfirmed = data.user && !!data.user.email_confirmed_at;
   // Update the users table with display name
   if (data.user) {
     await supabase.from('users').update({
       display_name: displayName,
-      verified_email: !!data.user.email_confirmed_at
-    }).eq('id', data.user.id);
+      verified_email: isAutoConfirmed
+    }).eq('id', data.user.id).select();
   }
-  toast('Account created! Check your email to verify.', 'success');
+  if (isAutoConfirmed) {
+    toast('Account created! You can now log in.', 'success');
+  } else {
+    toast('Account created! A verification email has been sent — please check your inbox.', 'info');
+  }
   return data.user;
 }
 

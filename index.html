@@ -288,7 +288,9 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
 
 <!-- Auth-loading overlay: shown immediately, hidden once session is known -->
 <div id="auth-loader" style="position:fixed;inset:0;background:#0f1117;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:16px;">
-  <div style="font-size:44px;">💰</div>
+  <img src="money.png" style="width:56px;height:56px;border-radius:14px;object-fit:cover;" onerror="this.style.display='none';document.getElementById('auth-loader-icon').style.display='block'">
+  <div id="auth-loader-icon" style="font-size:44px;display:none;">💰</div>
+  <div style="font-size:15px;font-weight:700;color:#a78bfa;letter-spacing:.04em;">Money IntX</div>
   <div style="width:36px;height:36px;border:3px solid #6c63ff33;border-top-color:#6c63ff;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
 </div>
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
@@ -301,7 +303,7 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
     <div style="position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(108,99,255,.18) 0%,transparent 70%);pointer-events:none;"></div>
     <!-- Logo -->
     <div style="margin-bottom:14px;">
-      <img src="../money.png" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" style="width:64px;height:64px;border-radius:16px;object-fit:cover;box-shadow:0 4px 20px rgba(108,99,255,.4);">
+      <img src="money.png" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" style="width:64px;height:64px;border-radius:16px;object-fit:cover;box-shadow:0 4px 20px rgba(108,99,255,.4);">
       <div style="display:none;font-size:52px;">💰</div>
     </div>
     <h1 style="font-size:clamp(30px,7vw,52px);font-weight:900;line-height:1.1;margin-bottom:14px;background:linear-gradient(135deg,#fff 20%,#a78bfa 60%,#6c63ff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Money IntX</h1>
@@ -444,8 +446,9 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
   <div id="topbar">
     <div id="topbar-left">
       <button class="hamburger" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
-      <div style="cursor:pointer;display:flex;align-items:baseline;gap:8px;" onclick="app.navigate('dash')">
-        <strong style="font-size:17px;letter-spacing:-.02em;">💰 Money IntX</strong>
+      <div style="cursor:pointer;display:flex;align-items:center;gap:8px;" onclick="app.navigate('dash')">
+        <img src="money.png" alt="Money IntX" style="width:28px;height:28px;border-radius:6px;object-fit:contain;" onerror="this.style.display='none'">
+        <strong style="font-size:17px;letter-spacing:-.02em;">Money IntX</strong>
         <span style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);opacity:.85;white-space:nowrap;" class="hide-mobile">Record · Manage · Grow</span>
       </div>
     </div>
@@ -583,19 +586,23 @@ let currentProfile = null;
 let notifChannel = null;
 
 // ── Contact color: deterministic per ID, stored in localStorage ───
+// Cache key includes version — bump to invalidate stale pale colors
+const _CC_KEY = 'mxi_cc_v3';
 function contactColor(id) {
   try {
-    const stored = JSON.parse(localStorage.getItem('mxi_cc') || '{}');
+    const stored = JSON.parse(localStorage.getItem(_CC_KEY) || '{}');
     if (stored[id]) return stored[id];
-    // Compute from UUID hash — spread across hue wheel, avoid near-white
+    // Strong HSL palette — 24 vivid distinct hues, never pale or near-white
+    const VIVID_HUES = [4,15,30,48,140,158,175,196,210,225,240,255,270,285,300,318,330,347,95,115,62,200,80,168];
     let h = 0;
     for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-    const hue = h % 360;
-    // Avoid yellow-white range (50-70) and very pale areas
-    const adjustedHue = (hue >= 50 && hue <= 70) ? hue + 80 : hue;
-    const color = `hsl(${adjustedHue % 360}, 68%, 52%)`;
+    const hue = VIVID_HUES[h % VIVID_HUES.length];
+    // Saturation 72–82%, Lightness 44–50% — vivid, dark enough for white text
+    const sat = 72 + (h % 10);
+    const lit = 44 + ((h >> 4) % 6);
+    const color = `hsl(${hue}, ${sat}%, ${lit}%)`;
     stored[id] = color;
-    localStorage.setItem('mxi_cc', JSON.stringify(stored));
+    localStorage.setItem(_CC_KEY, JSON.stringify(stored));
     return color;
   } catch (_) { return '#6c63ff'; }
 }
@@ -872,22 +879,25 @@ function navTo(page) {
 
 // ── Dashboard ─────────────────────────────────────────────────────
 async function renderDash(el) {
-  el.innerHTML = '<div class="page-header"><h2>Dashboard</h2></div><p style="color:var(--muted);">Loading...</p>';
-  const [totals, recent, contacts, unread, ledger, currencyRows] = await Promise.all([
+  el.innerHTML = '<div class="page-header"><h2>Dashboard</h2></div><p style="color:var(--muted);padding:20px;">Loading…</p>';
+  // Run critical queries first (top 4), then non-critical (ledger + currency) in parallel
+  // This paints the hero card faster even if ledger is slow
+  const [totals, recent, contacts, unread] = await Promise.all([
     getDashboardTotals(currentUser.id),
     recentEntries(currentUser.id, 15),
     listContacts(currentUser.id),
-    getUnreadCount(currentUser.id),
+    getUnreadCount(currentUser.id)
+  ]);
+  // Cache contacts for entry modal
+  window._allContacts = contacts;
+  const [ledger, currencyRows] = await Promise.all([
     getLedgerSummary(currentUser.id),
-    getCurrencyLedger(currentUser.id)   // lean DB aggregate — accurate across ALL entries
+    getCurrencyLedger(currentUser.id)
   ]);
   const toy = totals.total_they_owe_me || 0;
   const yot = totals.total_i_owe_them || 0;
   const net = totals.total_net || 0;
 
-  // ── Currency ledger data from DB view (replaces client-side computation) ──
-  // Only show the multi-currency section when there are 2+ distinct currencies
-  const allCurrencies = (currencyRows || []).map(r => r.currency);
   const userName = currentProfile?.display_name?.split(' ')[0] || 'there';
 
   let html = `<div class="page-header">
@@ -898,30 +908,61 @@ async function renderDash(el) {
     </div>
   </div>`;
 
-  // Net Balance hero — full-width gradient card
+  // ── Primary currency hero card ─────────────────────────────────
+  // Shows default currency net. Other currencies appear as sub-boxes inside the card.
+  const defaultCur = currentProfile?.default_currency || 'USD';
+  const primaryRow = (currencyRows || []).find(r => r.currency === defaultCur);
+  const otherRows = (currencyRows || []).filter(r => r.currency !== defaultCur);
+
   const netAbs = Math.abs(net);
   const netLabel = net > 0 ? 'You are owed' : net < 0 ? 'You owe' : 'All settled up';
   const netIcon = net > 0 ? '📈' : net < 0 ? '📉' : '✅';
   const heroGrad = net > 0 ? 'linear-gradient(135deg,#1d4ed8,#6c63ff)' : net < 0 ? 'linear-gradient(135deg,#b91c1c,#dc2626)' : 'linear-gradient(135deg,#065f46,#047857)';
+
+  const CURRENCY_ICONS = { USD:'🇺🇸', EUR:'🇪🇺', GBP:'🇬🇧', NGN:'🇳🇬', CAD:'🇨🇦', AUD:'🇦🇺', JPY:'🇯🇵', KES:'🇰🇪', ZAR:'🇿🇦', GHS:'🇬🇭', INR:'🇮🇳', AED:'🇦🇪', SAR:'🇸🇦', BRL:'🇧🇷', EGP:'🇪🇬', MAD:'🇲🇦' };
+  // Distinct hues for currency sub-boxes (not red/green — purely visual identity)
+  const CUR_HUES = { USD:220, EUR:260, GBP:280, NGN:30, CAD:195, AUD:170, JPY:340, KES:135, ZAR:0, GHS:45, INR:15, AED:200, SAR:90, BRL:145, EGP:55, MAD:310 };
+
+  // Other-currency sub-boxes (shown inside hero card if any)
+  const otherCurHtml = otherRows.length > 0 ? `
+    <div style="margin-top:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;">
+      ${otherRows.map(row => {
+        const cur = row.currency;
+        const owed = row.owed_to_me || 0;
+        const owing = row.i_owe || 0;
+        const netCur = owed - owing;
+        const hue = CUR_HUES[cur] ?? (Object.keys(CUR_HUES).indexOf(cur) * 37 + 180) % 360;
+        const icon = CURRENCY_ICONS[cur] || '💰';
+        return `<div style="background:rgba(0,0,0,.25);border:1px solid hsla(${hue},70%,60%,.4);border-radius:10px;padding:9px 10px;cursor:pointer;" onclick="navTo('entries')" title="${cur}: Owed ${_fmtAmt(owed/100,cur)} · Due ${_fmtAmt(owing/100,cur)}">
+          <div style="font-size:10px;font-weight:700;opacity:.8;margin-bottom:2px;">${icon} ${esc(cur)}</div>
+          <div style="font-size:15px;font-weight:900;color:hsl(${hue},80%,72%);">${netCur >= 0 ? '+' : ''}${_fmtAmt(Math.abs(netCur)/100, cur)}</div>
+          <div style="font-size:9px;opacity:.6;margin-top:1px;">${_fmtAmt(owed/100,cur)} · ${_fmtAmt(owing/100,cur)}</div>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
   html += `
-  <div style="background:${heroGrad};border-radius:18px;padding:24px;color:#fff;margin-bottom:14px;position:relative;overflow:hidden;">
-    <div style="position:absolute;right:-16px;top:-16px;font-size:110px;opacity:0.08;pointer-events:none;">${netIcon}</div>
-    <div style="font-size:11px;opacity:0.75;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">${netLabel}</div>
-    <div style="font-size:38px;font-weight:900;margin-top:2px;letter-spacing:-.02em;">${fmtMoney(netAbs)}</div>
-    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:14px;">
-      <div style="display:flex;gap:24px;font-size:13px;opacity:0.85;">
-        <div><span style="opacity:.7;">Owed to Me</span><div style="font-weight:800;font-size:16px;">${fmtMoney(toy)}</div></div>
-        <div><span style="opacity:.7;">I Owe</span><div style="font-weight:800;font-size:16px;">${fmtMoney(yot)}</div></div>
-      </div>
+  <div style="background:${heroGrad};border-radius:18px;padding:22px;color:#fff;margin-bottom:14px;position:relative;overflow:hidden;">
+    <div style="position:absolute;right:-16px;top:-16px;font-size:110px;opacity:0.07;pointer-events:none;">${netIcon}</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
       <div>
-        <div style="font-size:10px;opacity:.65;margin-bottom:3px;text-align:right;">Default Currency</div>
+        <div style="font-size:11px;opacity:0.75;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">${netLabel} · ${defaultCur}</div>
+        <div style="font-size:36px;font-weight:900;margin-top:2px;letter-spacing:-.02em;">${fmtMoney(netAbs)}</div>
+        <div style="display:flex;gap:20px;font-size:12px;opacity:0.85;margin-top:8px;">
+          <div><span style="opacity:.7;">Owed to Me</span><div style="font-weight:800;font-size:15px;">${fmtMoney(toy)}</div></div>
+          <div><span style="opacity:.7;">I Owe</span><div style="font-weight:800;font-size:15px;">${fmtMoney(yot)}</div></div>
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:10px;opacity:.65;margin-bottom:3px;">Default</div>
         <select onchange="setDefaultCurrency(this.value)" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:7px;padding:4px 8px;font-size:12px;font-weight:700;cursor:pointer;">
           ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','AED','SAR','BRL','EGP','MAD'].map(c =>
-            `<option value="${c}" ${(currentProfile?.default_currency||'USD')===c?'selected':''}>${c}</option>`
+            `<option value="${c}" ${defaultCur===c?'selected':''}>${c}</option>`
           ).join('')}
         </select>
       </div>
     </div>
+    ${otherCurHtml}
   </div>`;
 
   // Stat cards row
@@ -941,31 +982,7 @@ async function renderDash(el) {
     </div>` : ''}
   </div>`;
 
-  // ── Currency Ledgers (only show if multi-currency) ─────────────────
-  // Data comes from getCurrencyLedger() — a DB-side aggregate, accurate for all entries
-  if (allCurrencies.length > 1) {
-    const CURRENCY_ICONS = { USD:'🇺🇸', EUR:'🇪🇺', GBP:'🇬🇧', NGN:'🇳🇬', CAD:'🇨🇦', AUD:'🇦🇺', JPY:'🇯🇵', KES:'🇰🇪', ZAR:'🇿🇦', GHS:'🇬🇭', INR:'🇮🇳', AED:'🇦🇪', SAR:'🇸🇦', BRL:'🇧🇷', EGP:'🇪🇬', MAD:'🇲🇦' };
-    html += `<div class="card card-sm" style="margin-bottom:14px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <div class="section-title" style="margin:0;">💱 Currency Ledgers</div>
-        <span style="font-size:11px;color:var(--muted);">${allCurrencies.length} currencies</span>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;">`;
-    (currencyRows || []).forEach(row => {
-      const cur = row.currency;
-      const owed = row.owed_to_me || 0;   // cents
-      const owing = row.i_owe || 0;       // cents
-      const netCur = owed - owing;
-      const grad = netCur > 0 ? 'linear-gradient(135deg,#064e3b,#065f46)' : netCur < 0 ? 'linear-gradient(135deg,#7f1d1d,#991b1b)' : 'linear-gradient(135deg,#1e293b,#334155)';
-      const icon = CURRENCY_ICONS[cur] || '💰';
-      html += `<div style="background:${grad};border-radius:12px;padding:12px;color:#fff;cursor:pointer;" onclick="navTo('entries')">
-        <div style="font-size:11px;opacity:.75;font-weight:700;">${icon} ${esc(cur)}</div>
-        <div style="font-size:18px;font-weight:900;margin-top:2px;">${netCur >= 0 ? '+' : ''}${_fmtAmt(Math.abs(netCur)/100, cur)}</div>
-        <div style="font-size:10px;opacity:.65;margin-top:4px;">Owed ${_fmtAmt(owed/100, cur)} · Due ${_fmtAmt(owing/100, cur)}</div>
-      </div>`;
-    });
-    html += `</div></div>`;
-  }
+  // (Currency ledgers now embedded inside hero card — no separate section needed)
 
   // Quick Actions — colorful pill buttons
   html += `<div class="card card-sm" style="margin-bottom:14px;">
@@ -1179,7 +1196,7 @@ function _cpEntriesTable(entries, page) {
     const noLedgerHtml = e.no_ledger ? `<span class="badge badge-gray" style="margin-left:4px;" title="Not in ledger">⊘</span>` : '';
     return `<tr>
       <td style="font-weight:700;cursor:pointer;" onclick="openEntryDetail('${e.id}')">${amtHtml}</td>
-      <td style="max-width:90px;">${e.invoice_number ? `<span style="font-size:11px;font-family:monospace;color:var(--accent);font-weight:700;">${esc(e.invoice_number)}</span>` : '<span style="color:var(--bg3);">—</span>'}</td>
+      <td style="max-width:90px;">${e.invoice_number ? `<span style="font-size:11px;font-family:monospace;color:var(--accent);font-weight:700;">${esc(e.invoice_number)}</span>` : e.entry_number ? `<span style="font-size:11px;font-family:monospace;color:var(--muted);font-weight:700;">#${String(e.entry_number).padStart(4,'0')}</span>` : '<span style="color:var(--bg3);">—</span>'}</td>
       <td><span style="font-weight:600;font-size:12px;color:${txColor};">${esc(txLabel)}</span></td>
       <td style="color:var(--muted);font-size:12px;">${fmtDate(e.date)}</td>
       <td>${statusBadge(e.status)}${reminderHtml}${noLedgerHtml}</td>
@@ -1248,48 +1265,52 @@ window.openContactDetail = async function(id) {
   const netGrad = net > 0 ? 'linear-gradient(135deg,#064e3b,#065f46)' : net < 0 ? 'linear-gradient(135deg,#7f1d1d,#991b1b)' : 'linear-gradient(135deg,#1e293b,#334155)';
 
   openModal(`
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-      <span style="width:44px;height:44px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;">${esc(c.name.charAt(0).toUpperCase())}</span>
-      <div style="flex:1;min-width:0;">
-        <h3 style="margin:0;font-size:17px;">${esc(c.name)}</h3>
-        <p style="font-size:12px;color:var(--muted);margin:2px 0 0;">${esc(c.email || '')}${c.phone ? ' · ' + esc(c.phone) : ''}</p>
+    <!-- ── Contact Header ── -->
+    <div style="background:${netGrad};border-radius:16px;padding:18px;color:#fff;margin-bottom:0;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+        <span style="width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;flex-shrink:0;border:2px solid rgba(255,255,255,.3);">${esc(c.name.charAt(0).toUpperCase())}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:18px;font-weight:800;line-height:1.2;">${esc(c.name)}</div>
+          ${c.email ? `<div style="font-size:12px;opacity:.8;margin-top:1px;">${esc(c.email)}</div>` : ''}
+          ${c.phone ? `<div style="font-size:12px;opacity:.7;">${esc(c.phone)}</div>` : ''}
+        </div>
+        <button onclick="closeModal()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:8px;color:#fff;padding:5px 10px;cursor:pointer;font-size:16px;">✕</button>
       </div>
-      <button class="bs sm" onclick="closeModal()">✕</button>
+      <!-- Balance row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;background:rgba(0,0,0,.2);border-radius:12px;padding:12px;">
+        <div style="text-align:center;">
+          <div style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Net</div>
+          <div style="font-size:18px;font-weight:900;">${net >= 0 ? '+' : ''}${fmtMoney(net)}</div>
+        </div>
+        <div style="text-align:center;border-left:1px solid rgba(255,255,255,.2);border-right:1px solid rgba(255,255,255,.2);">
+          <div style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Owed to Me</div>
+          <div style="font-size:15px;font-weight:700;">${fmtMoney(toy)}</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">I Owe</div>
+          <div style="font-size:15px;font-weight:700;">${fmtMoney(yot)}</div>
+        </div>
+      </div>
     </div>
 
-    <!-- Balance hero -->
-    <div style="background:${netGrad};border-radius:14px;padding:14px 16px;color:#fff;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
-      <div>
-        <div style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.06em;">${net > 0 ? 'Owed to Me' : net < 0 ? 'I Owe' : 'Balanced'}</div>
-        <div style="font-size:26px;font-weight:900;">${fmtMoney(Math.abs(net))}</div>
-      </div>
-      <div style="text-align:right;font-size:12px;opacity:.85;">
-        <div>Owed to Me: <strong>${fmtMoney(toy)}</strong></div>
-        <div>I Owe: <strong>${fmtMoney(yot)}</strong></div>
-      </div>
+    <!-- ── Action buttons ── -->
+    <div style="display:flex;gap:6px;margin:10px 0;">
+      <button class="btn sm" onclick="closeModal();openNewEntryModal(null,'${id}')" style="flex:1;background:linear-gradient(135deg,var(--accent),#6c63ff);">+ Entry</button>
+      <button class="bs sm" onclick="openEditContactModal('${c.id}')" style="flex:1;">✏️ Edit</button>
+      <button class="bs sm" style="flex:1;color:var(--red);" onclick="confirmDeleteContact('${c.id}','${esc(c.name)}');closeModal();">🗑 Delete</button>
     </div>
 
-    <!-- Tabs -->
-    <div style="display:flex;gap:2px;border-bottom:2px solid var(--border);margin-bottom:12px;">
-      <button id="cptab-entries" class="tab on" onclick="showCPTab('entries','${id}')">Entries (${entries.length})</button>
-      <button id="cptab-ledger" class="tab" onclick="showCPTab('ledger','${id}')">Ledger</button>
-      <button id="cptab-info" class="tab" onclick="showCPTab('info','${id}')">Info</button>
+    <!-- ── Tabs ── -->
+    <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:12px;">
+      <button id="cptab-entries" onclick="showCPTab('entries','${id}')" style="flex:1;padding:9px 4px;font-size:13px;font-weight:700;border:none;border-bottom:3px solid var(--accent);background:none;color:var(--accent);cursor:pointer;">📋 Entries (${entries.length})</button>
+      <button id="cptab-ledger" onclick="showCPTab('ledger','${id}')" style="flex:1;padding:9px 4px;font-size:13px;font-weight:600;border:none;border-bottom:3px solid transparent;background:none;color:var(--muted);cursor:pointer;">📊 Ledger</button>
+      <button id="cptab-info" onclick="showCPTab('info','${id}')" style="flex:1;padding:9px 4px;font-size:13px;font-weight:600;border:none;border-bottom:3px solid transparent;background:none;color:var(--muted);cursor:pointer;">ℹ️ Info</button>
     </div>
 
     <div id="cp-tab-content">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <span style="font-size:12px;color:var(--muted);">${entries.length} entries total</span>
-        <button class="btn sm" onclick="closeModal();openNewEntryModal()" style="font-size:12px;">+ New</button>
-      </div>
       <div id="cp-entries-wrap">${_cpEntriesTable(entries, 1)}</div>
     </div>
-
-    <div style="display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
-      <button class="bs sm" onclick="openEditContactModal('${c.id}')">✏️ Edit</button>
-      <button class="bs sm" onclick="closeModal();openNewEntryModal()">+ Entry</button>
-      <button class="bs sm" style="margin-left:auto;color:var(--red);" onclick="confirmDeleteContact('${c.id}','${esc(c.name)}');closeModal();">🗑 Delete</button>
-    </div>
-  `, { maxWidth: '640px' });
+  `, { maxWidth: '580px' });
 };
 
 window.showCPTab = function(tab, contactId) {
@@ -1298,49 +1319,58 @@ window.showCPTab = function(tab, contactId) {
   const el = document.getElementById('cp-tab-content');
   if (!el) return;
 
+  // Update tab styles
   ['entries','ledger','info'].forEach(t => {
     const btn = document.getElementById('cptab-' + t);
-    if (btn) btn.classList.toggle('on', t === tab);
+    if (!btn) return;
+    const active = t === tab;
+    btn.style.borderBottomColor = active ? 'var(--accent)' : 'transparent';
+    btn.style.color = active ? 'var(--accent)' : 'var(--muted)';
+    btn.style.fontWeight = active ? '700' : '600';
   });
 
   if (tab === 'entries') {
-    el.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <span style="font-size:12px;color:var(--muted);">${d.entries.length} entries total</span>
-        <button class="btn sm" onclick="closeModal();openNewEntryModal()" style="font-size:12px;">+ New</button>
-      </div>
-      <div id="cp-entries-wrap">${_cpEntriesTable(d.entries, window._cpPage || 1)}</div>`;
+    el.innerHTML = `<div id="cp-entries-wrap">${_cpEntriesTable(d.entries, window._cpPage || 1)}</div>`;
   } else if (tab === 'ledger') {
     el.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-        <div class="stat-card"><div class="stat-lbl">Owed to Me</div><div class="stat-val" style="font-size:18px;color:var(--green);">${fmtMoney(d.toy)}</div></div>
-        <div class="stat-card"><div class="stat-lbl">I Owe</div><div class="stat-val" style="font-size:18px;color:var(--red);">${fmtMoney(d.yot)}</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+        <div style="background:linear-gradient(135deg,#064e3b,#065f46);border-radius:12px;padding:14px;color:#fff;text-align:center;">
+          <div style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Owed to Me</div>
+          <div style="font-size:22px;font-weight:900;">${fmtMoney(d.toy)}</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#7f1d1d,#991b1b);border-radius:12px;padding:14px;color:#fff;text-align:center;">
+          <div style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">I Owe</div>
+          <div style="font-size:22px;font-weight:900;">${fmtMoney(d.yot)}</div>
+        </div>
       </div>
-      <div style="font-size:13px;">
-        <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);">
-          <span style="color:var(--muted);">They Owe entries</span><span style="color:var(--green);font-weight:700;">${d.toyEntries.length}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);">
-          <span style="color:var(--muted);">I Owe entries</span><span style="color:var(--red);font-weight:700;">${d.yotEntries.length}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);">
-          <span style="color:var(--muted);">They Settled</span><span style="font-weight:600;">${d.toyCredits.length}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:7px 0;">
-          <span style="color:var(--muted);">I Settled</span><span style="font-weight:600;">${d.yotCredits.length}</span>
-        </div>
+      <div style="background:var(--bg2);border-radius:12px;overflow:hidden;">
+        ${[
+          ['Charges / Loans to them', d.toyEntries.length, 'var(--green)'],
+          ['Amounts I owe them', d.yotEntries.length, 'var(--red)'],
+          ['Payments received', d.toyCredits.length, 'var(--blue)'],
+          ['Payments I made', d.yotCredits.length, 'var(--muted)'],
+        ].map(([label, count, color]) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--border);">
+            <span style="font-size:13px;color:var(--text);">${label}</span>
+            <span style="font-weight:700;color:${color};font-size:14px;">${count}</span>
+          </div>`).join('')}
       </div>`;
   } else if (tab === 'info') {
     const c = d.c;
     el.innerHTML = `
-      <div style="font-size:14px;">
+      <div style="background:var(--bg2);border-radius:12px;overflow:hidden;">
         ${[['Name',c.name],['Email',c.email||'—'],['Phone',c.phone||'—'],['Address',c.address||'—'],['Notes',c.notes||'—']].map(([k,v])=>`
-        <div style="padding:8px 0;border-bottom:1px solid var(--border);">
-          <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;">${k}</div>
-          <div style="margin-top:2px;">${esc(v)}</div>
-        </div>`).join('')}
-        ${c.tags?.length ? `<div style="padding:8px 0;"><div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;">Tags</div><div style="margin-top:4px;">${c.tags.map(t=>`<span class="badge badge-blue">${esc(t)}</span>`).join(' ')}</div></div>` : ''}
-        <div style="padding:8px 0;color:var(--muted);font-size:12px;">Added ${fmtDate(c.created_at)}</div>
+          <div style="display:flex;justify-content:space-between;padding:11px 16px;border-bottom:1px solid var(--border);gap:12px;">
+            <span style="font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;min-width:60px;">${k}</span>
+            <span style="font-size:13px;text-align:right;">${esc(v)}</span>
+          </div>`).join('')}
+        ${c.tags?.length ? `<div style="padding:11px 16px;border-bottom:1px solid var(--border);">
+          <span style="font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;">Tags</span>
+          <div style="margin-top:6px;">${c.tags.map(t=>`<span class="badge badge-blue">${esc(t)}</span>`).join(' ')}</div></div>` : ''}
+        <div style="padding:10px 16px;font-size:12px;color:var(--muted);">Added ${fmtDate(c.created_at)}</div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;">
+        <button class="bs sm" onclick="openEditContactModal('${c.id}')" style="flex:1;">✏️ Edit Contact</button>
       </div>`;
   }
 };
@@ -1390,16 +1420,26 @@ window.openNewContactModal = function() {
   `);
 };
 
-window.saveNewContact = async function() {
+window.saveNewContact = async function(returnCallback) {
   const name = document.getElementById('nc-name').value.trim();
+  const email = document.getElementById('nc-email').value.trim().toLowerCase();
   if (!name) return toast('Name is required.', 'error');
-  await createContact(currentUser.id, {
-    name,
-    email: document.getElementById('nc-email').value.trim(),
+  // Block duplicate emails
+  if (email) {
+    const existing = (window._allContacts || []).find(c => (c.email||'').toLowerCase() === email);
+    if (existing) return toast(`Email already used by "${existing.name}".`, 'error');
+    // Also check DB in case contacts list is stale
+    const { data: dup } = await supabase.from('contacts')
+      .select('id,name').eq('user_id', currentUser.id).eq('email', email).maybeSingle();
+    if (dup) return toast(`Email already used by "${dup.name}".`, 'error');
+  }
+  const newContact = await createContact(currentUser.id, {
+    name, email,
     phone: document.getElementById('nc-phone').value.trim()
   });
   closeModal();
   toast('Contact added.', 'success');
+  if (typeof returnCallback === 'function') { returnCallback(newContact); return; }
   navTo('contacts');
 };
 
@@ -1495,7 +1535,7 @@ async function renderEntries(el, page, forceRefresh) {
           </span>` : `<span style="color:var(--muted);">${esc(cName)}</span>`}
         </td>
         <td style="font-weight:700;cursor:pointer;" onclick="openEntryDetail('${e.id}')">${amtHtml}</td>
-        <td class="hide-mobile" style="max-width:90px;">${e.invoice_number ? `<span style="font-size:11px;font-family:monospace;color:var(--accent);font-weight:700;">${esc(e.invoice_number)}</span>` : '<span style="color:var(--bg3);">—</span>'}</td>
+        <td class="hide-mobile" style="max-width:90px;">${e.invoice_number ? `<span style="font-size:11px;font-family:monospace;color:var(--accent);font-weight:700;">${esc(e.invoice_number)}</span>` : e.entry_number ? `<span style="font-size:11px;font-family:monospace;color:var(--muted);font-weight:700;">#${String(e.entry_number).padStart(4,'0')}</span>` : '<span style="color:var(--bg3);">—</span>'}</td>
         <td class="hide-mobile"><span style="font-weight:600;font-size:12px;color:${txColor};">${esc(txLabel)}</span></td>
         <td style="color:var(--muted);font-size:12px;">${fmtDate(e.date)}</td>
         <td>${statusBadge(e.status)}${reminderHtml}${noLedgerHtml}</td>
@@ -2291,32 +2331,59 @@ window.doSendReminder = async function(entryId) {
   _invalidateEntries(); navTo('entries');
 };
 
-window.openNewEntryModal = async function(defaultDirection) {
+window.openNewEntryModal = async function(defaultDirection, preselectedContactId) {
   const [contacts, templates] = await Promise.all([
     listContacts(currentUser.id),
     listTemplates(currentUser.id)
   ]);
-  const contactOpts = contacts.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  // Cache contacts for search
+  window._neContacts = contacts;
+  window._neSelectedContactId = preselectedContactId || (contacts.length === 1 ? contacts[0].id : '');
   const dir = defaultDirection || 'they_owe_you';
   const isToy = dir === 'they_owe_you';
+
+  const selectedContact = window._neSelectedContactId ? contacts.find(c => c.id === window._neSelectedContactId) : null;
+  const contactDisplayVal = selectedContact ? selectedContact.name : '';
 
   openModal(`
     <div class="modal-title">New Entry</div>
 
     <!-- Direction picker (v1 style) -->
-    <div class="entry-type-tabs" style="display:flex;gap:6px;margin-bottom:16px;">
-      <button class="entry-type-tab ${isToy ? 'active' : ''}" onclick="setEntryDirection('they_owe_you')" id="dir-toy"
+    <div style="display:flex;gap:6px;margin-bottom:16px;">
+      <button id="dir-toy" onclick="setEntryDirection('they_owe_you')"
         style="flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:600;border:2px solid ${isToy ? 'var(--green)' : 'var(--border)'};background:${isToy ? 'rgba(74,222,128,.12)' : 'var(--bg3)'};color:${isToy ? 'var(--green)' : 'var(--muted)'};cursor:pointer;text-align:center;">
-        They Owe Me
+        💚 They Owe Me
       </button>
-      <button class="entry-type-tab ${!isToy ? 'active' : ''}" onclick="setEntryDirection('you_owe_them')" id="dir-yot"
+      <button id="dir-yot" onclick="setEntryDirection('you_owe_them')"
         style="flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:600;border:2px solid ${!isToy ? 'var(--red)' : 'var(--border)'};background:${!isToy ? 'rgba(248,113,113,.12)' : 'var(--bg3)'};color:${!isToy ? 'var(--red)' : 'var(--muted)'};cursor:pointer;text-align:center;">
-        I Owe Them
+        ❤️ I Owe Them
       </button>
     </div>
 
-    <div class="form-group"><label>Contact *</label>
-      <select id="ne-contact">${contactOpts || '<option value="">No contacts — add one first</option>'}</select>
+    <!-- Contact search with Add New -->
+    <div class="form-group" style="position:relative;">
+      <label style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Contact *</span>
+        <button type="button" onclick="openNewContactFromEntry()" style="font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;font-weight:700;">+ Add New</button>
+      </label>
+      <div style="position:relative;">
+        <input type="text" id="ne-contact-search" placeholder="Search contacts…" autocomplete="off"
+          value="${esc(contactDisplayVal)}"
+          oninput="filterNeContacts(this.value)"
+          onfocus="showNeContactList()"
+          style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:14px;outline:none;box-sizing:border-box;">
+        <input type="hidden" id="ne-contact" value="${esc(window._neSelectedContactId)}">
+        <div id="ne-contact-list" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:999;max-height:200px;overflow-y:auto;margin-top:2px;">
+          ${contacts.map(c => {
+            const col = contactColor(c.id);
+            return `<div onclick="selectNeContact('${c.id}','${esc(c.name)}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);" onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background=''">
+              <span style="width:28px;height:28px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;">${esc(c.name.charAt(0).toUpperCase())}</span>
+              <div><div style="font-weight:600;font-size:13px;">${esc(c.name)}</div>${c.email ? `<div style="font-size:11px;color:var(--muted);">${esc(c.email)}</div>` : ''}</div>
+            </div>`;
+          }).join('')}
+          ${contacts.length === 0 ? '<div style="padding:12px;color:var(--muted);font-size:13px;text-align:center;">No contacts — click "Add New" above</div>' : ''}
+        </div>
+      </div>
     </div>
 
     <div class="form-group"><label>Transaction Type</label>
@@ -2334,13 +2401,12 @@ window.openNewEntryModal = async function(defaultDirection) {
     </div>
 
     <div class="form-row">
-      <div class="form-group"><label>Amount *</label><input type="number" id="ne-amount" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="form-group"><label>Amount *</label><input type="number" id="ne-amount" min="0" step="0.01" placeholder="0.00" autofocus></div>
       <div class="form-group"><label>Currency</label><select id="ne-currency">
         ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'].map(c => `<option value="${c}" ${(currentProfile?.default_currency||'USD')===c?'selected':''}>${c}</option>`).join('')}
       </select></div>
     </div>
     <div class="form-group"><label>Date</label><input type="date" id="ne-date" value="${new Date().toISOString().slice(0,10)}"></div>
-
     <div class="form-group"><label>Note</label><textarea id="ne-note" rows="2" placeholder="Optional note..."></textarea></div>
 
     ${templates.length > 0 ? `
@@ -2358,6 +2424,60 @@ window.openNewEntryModal = async function(defaultDirection) {
     </div>
   `, { maxWidth: '480px' });
   window._entryDirection = dir;
+
+  // Close contact dropdown when clicking outside
+  setTimeout(() => {
+    document.addEventListener('click', function _cls(e) {
+      const list = document.getElementById('ne-contact-list');
+      const inp = document.getElementById('ne-contact-search');
+      if (list && !list.contains(e.target) && e.target !== inp) list.style.display = 'none';
+      if (!document.getElementById('ne-contact-search')) document.removeEventListener('click', _cls);
+    });
+  }, 100);
+};
+
+window.showNeContactList = function() {
+  const list = document.getElementById('ne-contact-list');
+  if (list) list.style.display = 'block';
+};
+
+window.filterNeContacts = function(q) {
+  const contacts = window._neContacts || [];
+  const list = document.getElementById('ne-contact-list');
+  if (!list) return;
+  list.style.display = 'block';
+  const lower = q.toLowerCase();
+  const filtered = q ? contacts.filter(c => (c.name + ' ' + (c.email||'')).toLowerCase().includes(lower)) : contacts;
+  list.innerHTML = filtered.map(c => {
+    const col = contactColor(c.id);
+    return `<div onclick="selectNeContact('${c.id}','${esc(c.name)}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);" onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background=''">
+      <span style="width:28px;height:28px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;">${esc(c.name.charAt(0).toUpperCase())}</span>
+      <div><div style="font-weight:600;font-size:13px;">${esc(c.name)}</div>${c.email ? `<div style="font-size:11px;color:var(--muted);">${esc(c.email)}</div>` : ''}</div>
+    </div>`;
+  }).join('') || '<div style="padding:12px;color:var(--muted);font-size:13px;text-align:center;">No match — click "+ Add New" above</div>';
+};
+
+window.selectNeContact = function(id, name) {
+  window._neSelectedContactId = id;
+  const inp = document.getElementById('ne-contact-search');
+  const hidden = document.getElementById('ne-contact');
+  if (inp) inp.value = name;
+  if (hidden) hidden.value = id;
+  const list = document.getElementById('ne-contact-list');
+  if (list) list.style.display = 'none';
+};
+
+window.openNewContactFromEntry = function() {
+  openModal(`
+    <h3 style="margin-bottom:16px;">Add New Contact</h3>
+    <div class="form-group"><label>Name *</label><input type="text" id="nc-name" placeholder="Contact name"></div>
+    <div class="form-group"><label>Email</label><input type="email" id="nc-email" placeholder="email@example.com"></div>
+    <div class="form-group"><label>Phone</label><input type="tel" id="nc-phone" placeholder="+1 555 000 0000"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal();openNewEntryModal(window._entryDirection)">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveNewContact(function(c){if(c){window._neContacts=(window._neContacts||[]).concat(c);openNewEntryModal(window._entryDirection,c.id);}else{openNewEntryModal(window._entryDirection);}})">Save &amp; Select</button>
+    </div>
+  `);
 };
 
 window.setEntryDirection = function(dir) {
@@ -2378,13 +2498,13 @@ window.setEntryDirection = function(dir) {
 };
 
 window.saveNewEntry = async function() {
-  const contactId = document.getElementById('ne-contact').value;
+  const contactId = (document.getElementById('ne-contact')?.value || '').trim();
   const txType = document.getElementById('ne-type').value;
   const amount = document.getElementById('ne-amount').value;
   const currency = document.getElementById('ne-currency')?.value || currentProfile?.default_currency || 'USD';
   const date = document.getElementById('ne-date').value;
   const note = document.getElementById('ne-note').value.trim();
-  if (!contactId) return toast('Select a contact.', 'error');
+  if (!contactId) return toast('Please select a contact.', 'error');
   if (!amount || parseFloat(amount) <= 0) return toast('Enter a valid amount.', 'error');
   await createEntry(currentUser.id, { contactId, txType, amount: parseFloat(amount), currency, date, note });
   closeModal();

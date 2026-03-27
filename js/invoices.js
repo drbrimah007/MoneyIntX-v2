@@ -219,11 +219,12 @@ export function generateInvoiceHTML(entry, contact, profile, settlements = []) {
 
     <div class="inv-footer">
       <div class="logo-footer">
-        ${logoUrl ? `<img src="${escHtml(logoUrl)}" alt="Logo">` : ''}
-        <strong>${escHtml(company)}</strong>
+        <img src="money.png" alt="Money IntX" onerror="this.style.display='none'" style="width:18px;height:18px;border-radius:4px;">
+        <strong>Money IntX</strong>
+        <span style="opacity:.7;">— Record · Manage · Grow</span>
       </div>
       ${companyEmail ? `<div>${escHtml(companyEmail)}</div>` : ''}
-      <div style="margin-top:6px;color:#cbd5e1;">Generated with Money IntX &bull; moneyintx.com</div>
+      <div style="margin-top:6px;color:#cbd5e1;">moneyinteractions.com &bull; Financial Tracking, Not a Bank or Payment Processor</div>
     </div>
 
     <div class="no-print print-btn">
