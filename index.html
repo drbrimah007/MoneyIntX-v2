@@ -2418,51 +2418,100 @@ function renderFieldList() {
     return;
   }
   el.innerHTML = window._tplFields.map((f, i) => {
-    const showCalc = f.type === 'computed' || f.type === 'number' || f.type === 'currency';
     const showPaired = f.type === 'paired';
     const showOptions = f.type === 'select';
+    const showCalc = f.type === 'computed' || f.type === 'number' || f.type === 'currency';
     return `
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;" data-field-idx="${i}">
-      <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
-        <span style="font-size:11px;color:var(--muted);font-weight:700;min-width:24px;">#${i+1}</span>
-        <input type="text" placeholder="Field label" value="${esc(f.label)}" onchange="window._tplFields[${i}].label=this.value" style="flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
-        <select onchange="window._tplFields[${i}].type=this.value;renderFieldList();" style="padding:6px 6px;border:1px solid var(--border);border-radius:6px;font-size:11px;max-width:120px;">
-          ${Object.entries(FIELD_TYPES).map(([k,v]) => `<option value="${k}" ${f.type===k?'selected':''}>${v}</option>`).join('')}
-        </select>
-        <button onclick="moveFieldUp('${f.id}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px;" title="Move up">↑</button>
-        <button onclick="moveFieldDown('${f.id}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px;" title="Move down">↓</button>
-        <button onclick="removeTemplateField('${f.id}')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:13px;padding:2px;" title="Remove">✕</button>
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:10px;" data-field-idx="${i}">
+      <!-- Header: label + type + controls -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <strong style="font-size:14px;">Add Field</strong>
+        <div style="display:flex;gap:4px;">
+          <button onclick="moveFieldUp('${f.id}')" class="bs sm" style="padding:3px 8px;font-size:12px;">↑</button>
+          <button onclick="moveFieldDown('${f.id}')" class="bs sm" style="padding:3px 8px;font-size:12px;">↓</button>
+          <button onclick="removeTemplateField('${f.id}')" class="bs sm" style="padding:3px 8px;font-size:12px;color:var(--red);">✕</button>
+        </div>
       </div>
-      ${showOptions ? `<div style="margin-bottom:6px;"><input type="text" placeholder="Options (comma separated)" value="${esc(f.options || '')}" onchange="window._tplFields[${i}].options=this.value" style="width:100%;padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;"></div>` : ''}
-      ${showPaired ? `<div style="display:flex;gap:6px;margin-bottom:6px;">
-        <input type="text" placeholder="Text label (e.g. Item)" value="${esc(f.textLabel || 'Item')}" onchange="window._tplFields[${i}].textLabel=this.value" style="flex:1;padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
-        <input type="text" placeholder="Number label (e.g. Amount)" value="${esc(f.numericLabel || 'Amount')}" onchange="window._tplFields[${i}].numericLabel=this.value" style="flex:1;padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
-      </div>` : ''}
-      ${showCalc ? `<div style="margin-bottom:6px;">
-        <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:4px;">Calculators</div>
-        ${(f.calculators||[]).map((c, ci) => `<div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;">
-          <select onchange="window._tplFields[${i}].calculators[${ci}].operation=this.value;renderFieldList();" style="flex:1;padding:4px;border:1px solid var(--border);border-radius:4px;font-size:11px;">
-            ${Object.entries(CALC_TYPES).map(([k,v]) => `<option value="${k}" ${c.operation===k?'selected':''}>${v}</option>`).join('')}
+
+      <!-- Row 1: Field Label + Field Type -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div>
+          <label style="font-size:12px;">Field Label *</label>
+          <input type="text" placeholder="e.g. Items / Cost / Notes" value="${esc(f.label)}" onchange="window._tplFields[${i}].label=this.value" style="margin-top:4px;">
+        </div>
+        <div>
+          <label style="font-size:12px;">Field Type</label>
+          <select onchange="window._tplFields[${i}].type=this.value;renderFieldList();" style="margin-top:4px;">
+            ${Object.entries(FIELD_TYPES).map(([k,v]) => `<option value="${k}" ${f.type===k?'selected':''}>${v}</option>`).join('')}
           </select>
-          ${c.operation === 'multiply' ? `<input type="number" placeholder="Factor" value="${c.operand||''}" onchange="window._tplFields[${i}].calculators[${ci}].operand=this.value" style="width:60px;padding:4px;border:1px solid var(--border);border-radius:4px;font-size:11px;">` : ''}
-          ${['multiply','add','subtract'].includes(c.operation) ? `<select onchange="window._tplFields[${i}].calculators[${ci}].targetFieldId=this.value" style="flex:1;padding:4px;border:1px solid var(--border);border-radius:4px;font-size:11px;">
-            <option value="">— target field —</option>
-            ${window._tplFields.filter(tf => tf.id !== f.id).map(tf => `<option value="${tf.id}" ${c.targetFieldId===tf.id?'selected':''}>${esc(tf.label||'?')}</option>`).join('')}
-          </select>` : ''}
-          <button onclick="window._tplFields[${i}].calculators.splice(${ci},1);renderFieldList();" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;">✕</button>
-        </div>`).join('')}
-        <button onclick="if(!window._tplFields[${i}].calculators)window._tplFields[${i}].calculators=[];window._tplFields[${i}].calculators.push({operation:'aggregate',operand:'',targetFieldId:''});renderFieldList();" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;font-weight:600;">+ Add Calculator</button>
-      </div>` : ''}
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
-        <select onchange="window._tplFields[${i}].ledgerEffect=this.value" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:11px;">
+        </div>
+      </div>
+
+      ${showPaired ? `
+        <!-- Paired: description + labels -->
+        <p style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5;">Paired fields create structured rows: each row has a text description and a numeric value. They render as a table on the invoice.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div>
+            <label style="font-size:12px;">Text Column Label</label>
+            <input type="text" value="${esc(f.textLabel || 'Item')}" onchange="window._tplFields[${i}].textLabel=this.value" style="margin-top:4px;">
+          </div>
+          <div>
+            <label style="font-size:12px;">Numeric Column Label</label>
+            <input type="text" value="${esc(f.numericLabel || 'Amount')}" onchange="window._tplFields[${i}].numericLabel=this.value" style="margin-top:4px;">
+          </div>
+        </div>
+      ` : ''}
+
+      ${showOptions ? `
+        <div style="margin-bottom:10px;">
+          <label style="font-size:12px;">Options (comma separated)</label>
+          <input type="text" placeholder="Option 1, Option 2, Option 3" value="${esc(f.options || '')}" onchange="window._tplFields[${i}].options=this.value" style="margin-top:4px;">
+        </div>
+      ` : ''}
+
+      ${showCalc ? `
+        <!-- Calculators -->
+        <div style="margin-bottom:10px;">
+          <label style="font-size:12px;">Calculators</label>
+          ${(f.calculators||[]).map((c, ci) => `<div style="display:flex;gap:4px;margin-top:6px;align-items:center;">
+            <select onchange="window._tplFields[${i}].calculators[${ci}].operation=this.value;renderFieldList();" style="flex:1;">
+              ${Object.entries(CALC_TYPES).map(([k,v]) => `<option value="${k}" ${c.operation===k?'selected':''}>${v}</option>`).join('')}
+            </select>
+            ${c.operation === 'multiply' ? `<input type="number" placeholder="Factor" value="${c.operand||''}" onchange="window._tplFields[${i}].calculators[${ci}].operand=this.value" style="width:70px;">` : ''}
+            ${['multiply','add','subtract'].includes(c.operation) ? `<select onchange="window._tplFields[${i}].calculators[${ci}].targetFieldId=this.value" style="flex:1;">
+              <option value="">— target field —</option>
+              ${window._tplFields.filter(tf => tf.id !== f.id).map(tf => `<option value="${tf.id}" ${c.targetFieldId===tf.id?'selected':''}>${esc(tf.label||'?')}</option>`).join('')}
+            </select>` : ''}
+            <button onclick="window._tplFields[${i}].calculators.splice(${ci},1);renderFieldList();" style="background:none;border:none;color:var(--red);cursor:pointer;">✕</button>
+          </div>`).join('')}
+          <button onclick="if(!window._tplFields[${i}].calculators)window._tplFields[${i}].calculators=[];window._tplFields[${i}].calculators.push({operation:'aggregate',operand:'',targetFieldId:''});renderFieldList();" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;font-weight:600;margin-top:6px;">+ Add Calculator</button>
+        </div>
+      ` : ''}
+
+      <!-- Checkboxes row (matching v1 screenshot) -->
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;">
+        ${showPaired ? `<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;">
+          <input type="checkbox" ${f.repeatable?'checked':''} onchange="window._tplFields[${i}].repeatable=this.checked" style="width:auto;accent-color:var(--accent);"> Repeatable rows
+        </label>` : ''}
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;">
+          <input type="checkbox" ${f.visibleOnInvoice!==false?'checked':''} onchange="window._tplFields[${i}].visibleOnInvoice=this.checked" style="width:auto;accent-color:var(--accent);"> Visible on invoice
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;">
+          <input type="checkbox" ${f.excludeFromAggregate?'checked':''} onchange="window._tplFields[${i}].excludeFromAggregate=this.checked" style="width:auto;accent-color:var(--accent);"> Exclude from aggregate
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;">
+          <input type="checkbox" ${f.isFinalTotal?'checked':''} onchange="window._tplFields[${i}].isFinalTotal=this.checked" style="width:auto;accent-color:var(--accent);"> <span>Final Total</span>
+          ${f.isFinalTotal ? '<span style="font-size:10px;color:var(--accent);margin-left:2px;">invoice amount basis</span>' : ''}
+        </label>
+      </div>
+
+      <!-- Ledger effect dropdown -->
+      <div>
+        <label style="font-size:12px;">Add to Ledger (on numeric total)</label>
+        <select onchange="window._tplFields[${i}].ledgerEffect=this.value" style="margin-top:4px;">
           ${Object.entries(LEDGER_EFFECTS).map(([k,v]) => `<option value="${k}" ${f.ledgerEffect===k?'selected':''}>${v}</option>`).join('')}
         </select>
-        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);cursor:pointer;">
-          <input type="checkbox" ${f.required?'checked':''} onchange="window._tplFields[${i}].required=this.checked" style="width:auto;"> Required
-        </label>
-        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);cursor:pointer;">
-          <input type="checkbox" ${f.isFinalTotal?'checked':''} onchange="window._tplFields[${i}].isFinalTotal=this.checked" style="width:auto;"> Final Total
-        </label>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4;">When set, the sum of this field's rows posts a real balance-affecting record to the contact's ledger. Typically set only on the final total field.</p>
       </div>
     </div>`;
   }).join('');
@@ -2484,8 +2533,11 @@ function _collectFields() {
       targetFieldId: c.targetFieldId || undefined, targetFieldIds: c.targetFieldIds || undefined,
       resultVisible: c.resultVisible !== false
     })),
-    ledgerEffect: f.ledgerEffect || undefined, isFinalTotal: f.isFinalTotal || undefined,
+    ledgerEffect: f.ledgerEffect || undefined,
+    isFinalTotal: f.isFinalTotal || undefined,
     excludeFromAggregate: f.excludeFromAggregate || undefined,
+    visibleOnInvoice: f.visibleOnInvoice !== false,
+    repeatable: f.repeatable || undefined,
     textLabel: f.type === 'paired' ? (f.textLabel || 'Item') : undefined,
     numericLabel: f.type === 'paired' ? (f.numericLabel || 'Amount') : undefined
   }));
