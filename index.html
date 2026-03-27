@@ -2429,7 +2429,7 @@ window.addTemplateField = function() {
   const id = 'f' + Math.random().toString(36).substr(2, 6);
   window._tplFields.push({ id, label: '', type: 'text', required: false, options: '',
     calculators: [], ledgerEffect: '', isFinalTotal: false,
-    excludeFromAggregate: false, textLabel: 'Item', numericLabel: 'Amount' });
+    excludeFromAggregate: false, textLabel: 'Item', numericLabel: 'Amount', defaultValue: '' });
   renderFieldList(true);
 };
 
@@ -2519,19 +2519,6 @@ function renderFieldList(scrollToBottom) {
         </div>
       </div>
 
-      <!-- Calculator section — blue, inline above label/type -->
-      <div class="f-calc" style="margin-bottom:12px;${showCalc?'':'display:none'}">
-        <div style="background:#0d1f3c;border:1px solid #2563eb;border-radius:8px;padding:10px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <span style="font-size:11px;font-weight:700;color:#60a5fa;letter-spacing:.04em;">⚡ CALCULATORS</span>
-            <button type="button"
-              onclick="window._tplFields[${i}].calculators.push({operation:'aggregate',operand:'',targetFieldId:''});renderFieldList(true);"
-              style="background:#1d4ed8;border:none;color:#fff;border-radius:5px;padding:2px 10px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.02em;">+ Add</button>
-          </div>
-          <div class="f-calc-rows">${calcRows}</div>
-        </div>
-      </div>
-
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
         <div>
           <label style="font-size:12px;">Field Label *</label>
@@ -2572,6 +2559,28 @@ function renderFieldList(scrollToBottom) {
         <input type="text" placeholder="Option A, Option B, Option C"
           value="${esc(Array.isArray(f.options)?f.options.join(', '):(f.options||''))}"
           oninput="window._tplFields[${i}].options=this.value" style="margin-top:4px;">
+      </div>
+
+      <!-- Default Value -->
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12px;">Default Value</label>
+        <p style="font-size:11px;color:var(--muted);margin:3px 0 5px;line-height:1.4;">Pre-filled value shown when creating a new entry. Users can edit or leave it as-is.</p>
+        <input type="text" placeholder="e.g. 0, N/A, or a default label" value="${esc(f.defaultValue||'')}"
+          oninput="window._tplFields[${i}].defaultValue=this.value" style="margin-top:0;">
+      </div>
+
+      <!-- Calculator section — blue, below Default Value -->
+      <div class="f-calc" style="margin-bottom:12px;${showCalc?'':'display:none'}">
+        <div style="background:#0d1f3c;border:1px solid #2563eb;border-radius:8px;padding:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-size:11px;font-weight:700;color:#60a5fa;letter-spacing:.04em;">⚡ CALCULATORS</span>
+            <button type="button"
+              onclick="window._tplFields[${i}].calculators.push({operation:'aggregate',operand:'',targetFieldId:''});renderFieldList(true);"
+              style="background:#1d4ed8;border:none;color:#fff;border-radius:5px;padding:2px 10px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.02em;">+ Add</button>
+          </div>
+          <p style="font-size:11px;color:#93c5fd;margin:0 0 4px;line-height:1.4;opacity:.8;">Define how this field's value is calculated from other fields. Results update automatically.</p>
+          <div class="f-calc-rows">${calcRows}</div>
+        </div>
       </div>
 
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
