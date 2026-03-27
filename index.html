@@ -827,8 +827,8 @@ async function enterApp(user) {
   const trashLink = document.getElementById('trash-link');
   if (trashLink) trashLink.style.display = currentProfile?.role === 'platform_admin' ? '' : 'none';
 
-  // Apply optional module visibility
-  applyModuleVisibility(currentProfile);
+  // Apply optional module visibility (stored in localStorage)
+  applyModuleVisibility();
 
   // Init template engine
   initTplEngine(user.id, navTo, toast);
@@ -959,36 +959,39 @@ const OPTIONAL_MODULES = [
   { id:'nok',         label:'Trusted Access', icon:'🔐', desc:'Designate trusted contacts to receive your records.' },
 ];
 
+// Modules stored in localStorage — no DB column required
+function _modsKey() { return 'mxi_modules_' + (currentUser?.id || 'default'); }
+
+function _getModules() {
+  try {
+    const raw = localStorage.getItem(_modsKey());
+    return raw ? JSON.parse(raw) : {};
+  } catch(e) { return {}; }
+}
+
 function _modEnabled(mod) {
-  const mods = currentProfile?.enabled_modules;
-  if (!mods) return true; // default: all on
-  if (typeof mods[mod] === 'undefined') return true; // unknown key → on
+  const mods = _getModules();
+  if (typeof mods[mod] === 'undefined') return true; // not set → ON by default
   return !!mods[mod];
 }
 
-function applyModuleVisibility(profile) {
+function applyModuleVisibility() {
   OPTIONAL_MODULES.forEach(m => {
-    const on = !profile?.enabled_modules || profile.enabled_modules[m.id] !== false;
-    // Desktop nav
+    const on = _modEnabled(m.id);
     const navEl = document.getElementById('nav-' + m.id);
     if (navEl) navEl.style.display = on ? '' : 'none';
-    // Mobile more sheet
     const mobEl = document.getElementById('mob-' + m.id);
     if (mobEl) mobEl.style.display = on ? '' : 'none';
   });
 }
 
-window.saveModules = async function() {
+window.saveModules = function() {
   const mods = {};
   OPTIONAL_MODULES.forEach(m => {
-    mods[m.id] = document.getElementById('mod-' + m.id)?.checked !== false;
+    mods[m.id] = !!(document.getElementById('mod-' + m.id)?.checked);
   });
-  const { error } = await supabase.from('users')
-    .update({ enabled_modules: mods, updated_at: new Date().toISOString() })
-    .eq('id', currentUser.id);
-  if (error) return toast(error.message, 'error');
-  currentProfile = await getProfile(currentUser.id);
-  applyModuleVisibility(currentProfile);
+  try { localStorage.setItem(_modsKey(), JSON.stringify(mods)); } catch(e) {}
+  applyModuleVisibility();
   toast('Modules saved.', 'success');
 };
 
@@ -5636,13 +5639,13 @@ async function renderSettings(el) {
   </div>`;
 
   // ── Modules ────────────────────────────────────────────────────
-  const mods = p.enabled_modules || {};
+  const _savedMods = _getModules();
   html += `<div class="card" style="margin-top:12px;">
     <h3 style="font-size:16px;font-weight:700;margin-bottom:4px;">Optional Modules</h3>
     <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Turn modules on or off to keep your nav focused on what you use.</p>
     <div style="display:flex;flex-direction:column;gap:0;">
       ${OPTIONAL_MODULES.map(m => {
-        const checked = mods[m.id] !== false; // default on
+        const checked = _savedMods[m.id] !== false; // undefined → true (on by default)
         return `<label style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer;gap:12px;">
           <div style="display:flex;align-items:center;gap:12px;">
             <span style="font-size:22px;width:30px;text-align:center;">${m.icon}</span>

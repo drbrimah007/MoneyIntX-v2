@@ -139,8 +139,55 @@ function toast(msg, type) { if (_toastFn) _toastFn(msg, type); }
 // ─────────────────────────────────────────────────────────────────
 // PANEL LIST PAGE
 // ─────────────────────────────────────────────────────────────────
+const _SQL_SETUP = `create table if not exists business_panels (
+  id           uuid default gen_random_uuid() primary key,
+  user_id      uuid references auth.users(id) on delete cascade not null,
+  title        text not null,
+  currency     text not null default 'USD',
+  session_type text not null default 'monthly',
+  fields       jsonb not null default '[]',
+  archived     boolean not null default false,
+  created_at   timestamptz default now(),
+  updated_at   timestamptz default now()
+);
+alter table business_panels enable row level security;
+create policy "bp_owner_all" on business_panels for all using (auth.uid() = user_id);
+
+create table if not exists business_panel_rows (
+  id          uuid default gen_random_uuid() primary key,
+  panel_id    uuid references business_panels(id) on delete cascade not null,
+  user_id     uuid references auth.users(id) on delete cascade not null,
+  session_key text not null,
+  row_date    date not null default current_date,
+  values      jsonb not null default '{}',
+  archived    boolean not null default false,
+  created_at  timestamptz default now()
+);
+alter table business_panel_rows enable row level security;
+create policy "bpr_owner_all" on business_panel_rows for all using (auth.uid() = user_id);`;
+
 export async function renderBusinessPage(el) {
   el.innerHTML = '<p style="color:var(--muted);padding:24px;">Loading…</p>';
+
+  // ── Check if table exists ──────────────────────────────────────
+  const { error: chkErr } = await supabase.from('business_panels').select('id').limit(1);
+  if (chkErr && (chkErr.message?.includes('does not exist') || chkErr.code === '42P01' || chkErr.code === 'PGRST200')) {
+    el.innerHTML = `<div class="page-header"><h2 style="margin:0;">Business Panels</h2></div>
+    <div class="card" style="border:1px solid var(--amber);background:rgba(251,191,36,.07);">
+      <div style="font-size:20px;margin-bottom:8px;">⚙️ One-time setup required</div>
+      <p style="font-size:14px;color:var(--muted);margin-bottom:16px;">
+        The Business Panel tables don't exist in your database yet.<br>
+        Copy the SQL below and run it in your <strong style="color:var(--text);">Supabase SQL Editor</strong> → then refresh this page.
+      </p>
+      <details>
+        <summary style="cursor:pointer;font-weight:700;font-size:13px;color:var(--accent);margin-bottom:8px;">▶ Show SQL to copy</summary>
+        <pre style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:12px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;margin-top:8px;">${esc(_SQL_SETUP)}</pre>
+      </details>
+      <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="window.location.reload()">↺ Refresh after running SQL</button>
+    </div>`;
+    return;
+  }
+
   const panels = await listPanels(_userId);
 
   let html = `<div class="page-header">
