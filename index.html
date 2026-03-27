@@ -309,19 +309,36 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
 
   <!-- Feature strip -->
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:rgba(255,255,255,.05);border-top:1px solid rgba(255,255,255,.07);border-bottom:1px solid rgba(255,255,255,.07);max-width:100%;">
-    ${[
-      ['📋','Invoice Builder','Custom templates with auto-calculators'],
-      ['💳','Debt Tracker','Who owes you, who you owe — net balance'],
-      ['👥','Groups','Savings circles, ajo, chamas & ventures'],
-      ['📈','Investments','ROI tracking with multiple partners'],
-      ['🔔','Notifications','Reminders, alerts &amp; contact notifications'],
-      ['🔐','Trusted Access','Designate trusted contact for your records'],
-    ].map(([icon,title,desc]) => `
-      <div style="background:#0f1117;padding:22px 18px;text-align:center;">
-        <div style="font-size:26px;margin-bottom:8px;">${icon}</div>
-        <div style="font-size:13px;font-weight:700;margin-bottom:4px;">${title}</div>
-        <div style="font-size:11px;color:#6b7280;line-height:1.5;">${desc}</div>
-      </div>`).join('')}
+    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
+      <div style="font-size:26px;margin-bottom:8px;">📋</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Invoice Builder</div>
+      <div style="font-size:11px;color:#6b7280;line-height:1.5;">Custom templates with auto-calculators</div>
+    </div>
+    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
+      <div style="font-size:26px;margin-bottom:8px;">💳</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Debt Tracker</div>
+      <div style="font-size:11px;color:#6b7280;line-height:1.5;">Who owes you, who you owe — net balance</div>
+    </div>
+    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
+      <div style="font-size:26px;margin-bottom:8px;">👥</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Groups</div>
+      <div style="font-size:11px;color:#6b7280;line-height:1.5;">Savings circles, ajo, chamas &amp; ventures</div>
+    </div>
+    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
+      <div style="font-size:26px;margin-bottom:8px;">📈</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Investments</div>
+      <div style="font-size:11px;color:#6b7280;line-height:1.5;">ROI tracking with multiple partners</div>
+    </div>
+    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
+      <div style="font-size:26px;margin-bottom:8px;">🔔</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Notifications</div>
+      <div style="font-size:11px;color:#6b7280;line-height:1.5;">Reminders, alerts &amp; contact notifications</div>
+    </div>
+    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
+      <div style="font-size:26px;margin-bottom:8px;">🔐</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Trusted Access</div>
+      <div style="font-size:11px;color:#6b7280;line-height:1.5;">Designate trusted contact for your records</div>
+    </div>
   </div>
 
   <!-- How it works -->
