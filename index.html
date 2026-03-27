@@ -538,7 +538,7 @@ window.handleForgotPassword = window.handleForgotPassword || function() { alert(
 import { supabase, getCurrentUser, getProfile } from './js/supabase.js';
 import { signUp, logIn, logOut, onAuthChange } from './js/auth.js';
 import { listContacts, createContact, deleteContact } from './js/contacts.js';
-import { listEntries, recentEntries, createEntry, deleteEntry, updateEntry, getEntry, getDashboardTotals, getLedgerSummary, fmtMoney, toCents, toDollars, voidEntry, archiveEntry, unarchiveEntry, restoreEntry, listArchivedEntries, invalidateEntryCache } from './js/entries.js';
+import { listEntries, recentEntries, createEntry, deleteEntry, updateEntry, getEntry, getDashboardTotals, getLedgerSummary, getCurrencyLedger, fmtMoney, toCents, toDollars, voidEntry, archiveEntry, unarchiveEntry, restoreEntry, listArchivedEntries, invalidateEntryCache } from './js/entries.js';
 import { listSettlements, createSettlement, reviewSettlement, deleteSettlement } from './js/settlements.js';
 import { listNotifications, getUnreadCount, markAllRead, subscribeToNotifications } from './js/notifications.js';
 import { createShareToken, getShareByToken, listSentShares, listReceivedShares, confirmShare, dismissShare, expireShare, getShareUrl } from './js/sharing.js';
@@ -851,29 +851,21 @@ function navTo(page) {
 // ── Dashboard ─────────────────────────────────────────────────────
 async function renderDash(el) {
   el.innerHTML = '<div class="page-header"><h2>Dashboard</h2></div><p style="color:var(--muted);">Loading...</p>';
-  const [totals, recent, contacts, unread, ledger] = await Promise.all([
+  const [totals, recent, contacts, unread, ledger, currencyRows] = await Promise.all([
     getDashboardTotals(currentUser.id),
-    recentEntries(currentUser.id, 50),
+    recentEntries(currentUser.id, 15),
     listContacts(currentUser.id),
     getUnreadCount(currentUser.id),
-    getLedgerSummary(currentUser.id)
+    getLedgerSummary(currentUser.id),
+    getCurrencyLedger(currentUser.id)   // lean DB aggregate — accurate across ALL entries
   ]);
   const toy = totals.total_they_owe_me || 0;
   const yot = totals.total_i_owe_them || 0;
   const net = totals.total_net || 0;
 
-  // ── Build per-currency ledgers from recent entries (fast, no extra query) ──
-  const currencyMap = {};
-  (recent || []).filter(e => !e.no_ledger && !['voided','cancelled'].includes(e.status)).forEach(e => {
-    const cur = e.currency || 'USD';
-    if (!currencyMap[cur]) currencyMap[cur] = { owed: 0, owing: 0, count: 0 };
-    const rem = e.amount - (e.settled_amount || 0);
-    if (rem <= 0) return;
-    if (['they_owe_you','invoice'].includes(e.tx_type)) currencyMap[cur].owed += rem;
-    else if (['you_owe_them','bill'].includes(e.tx_type)) currencyMap[cur].owing += rem;
-    currencyMap[cur].count++;
-  });
-  const allCurrencies = Object.keys(currencyMap).filter(c => currencyMap[c].count > 0);
+  // ── Currency ledger data from DB view (replaces client-side computation) ──
+  // Only show the multi-currency section when there are 2+ distinct currencies
+  const allCurrencies = (currencyRows || []).map(r => r.currency);
   const userName = currentProfile?.display_name?.split(' ')[0] || 'there';
 
   let html = `<div class="page-header">
@@ -928,6 +920,7 @@ async function renderDash(el) {
   </div>`;
 
   // ── Currency Ledgers (only show if multi-currency) ─────────────────
+  // Data comes from getCurrencyLedger() — a DB-side aggregate, accurate for all entries
   if (allCurrencies.length > 1) {
     const CURRENCY_ICONS = { USD:'🇺🇸', EUR:'🇪🇺', GBP:'🇬🇧', NGN:'🇳🇬', CAD:'🇨🇦', AUD:'🇦🇺', JPY:'🇯🇵', KES:'🇰🇪', ZAR:'🇿🇦', GHS:'🇬🇭', INR:'🇮🇳', AED:'🇦🇪', SAR:'🇸🇦', BRL:'🇧🇷', EGP:'🇪🇬', MAD:'🇲🇦' };
     html += `<div class="card card-sm" style="margin-bottom:14px;">
@@ -936,15 +929,17 @@ async function renderDash(el) {
         <span style="font-size:11px;color:var(--muted);">${allCurrencies.length} currencies</span>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;">`;
-    allCurrencies.forEach(cur => {
-      const d = currencyMap[cur];
-      const net = d.owed - d.owing;
-      const grad = net > 0 ? 'linear-gradient(135deg,#064e3b,#065f46)' : net < 0 ? 'linear-gradient(135deg,#7f1d1d,#991b1b)' : 'linear-gradient(135deg,#1e293b,#334155)';
+    (currencyRows || []).forEach(row => {
+      const cur = row.currency;
+      const owed = row.owed_to_me || 0;   // cents
+      const owing = row.i_owe || 0;       // cents
+      const netCur = owed - owing;
+      const grad = netCur > 0 ? 'linear-gradient(135deg,#064e3b,#065f46)' : netCur < 0 ? 'linear-gradient(135deg,#7f1d1d,#991b1b)' : 'linear-gradient(135deg,#1e293b,#334155)';
       const icon = CURRENCY_ICONS[cur] || '💰';
-      html += `<div style="background:${grad};border-radius:12px;padding:12px;color:#fff;" onclick="navTo('entries')" style="cursor:pointer;">
+      html += `<div style="background:${grad};border-radius:12px;padding:12px;color:#fff;cursor:pointer;" onclick="navTo('entries')">
         <div style="font-size:11px;opacity:.75;font-weight:700;">${icon} ${esc(cur)}</div>
-        <div style="font-size:18px;font-weight:900;margin-top:2px;">${net >= 0 ? '+' : ''}${_fmtAmt(Math.abs(net)/100, cur)}</div>
-        <div style="font-size:10px;opacity:.65;margin-top:4px;">Owed ${_fmtAmt(d.owed/100, cur)} · Due ${_fmtAmt(d.owing/100, cur)}</div>
+        <div style="font-size:18px;font-weight:900;margin-top:2px;">${netCur >= 0 ? '+' : ''}${_fmtAmt(Math.abs(netCur)/100, cur)}</div>
+        <div style="font-size:10px;opacity:.65;margin-top:4px;">Owed ${_fmtAmt(owed/100, cur)} · Due ${_fmtAmt(owing/100, cur)}</div>
       </div>`;
     });
     html += `</div></div>`;
@@ -1190,16 +1185,29 @@ function _cpEntriesTable(entries, page) {
 }
 
 window.openContactDetail = async function(id) {
-  const [contact, entries, allLedger] = await Promise.all([
+  // 2 queries instead of 3 — balance computed client-side from entries
+  // using the same logic as the ledger_summary view (start_toy/start_yot + entry sums)
+  const [contact, entries] = await Promise.all([
     supabase.from('contacts').select('*').eq('id', id).single(),
-    listEntries(currentUser.id, { contactId: id }),
-    getLedgerSummary(currentUser.id)
+    listEntries(currentUser.id, { contactId: id })
   ]);
   if (!contact.data) return;
   const c = contact.data;
-  const ledger = allLedger.find(l => l.contact_id === id) || {};
-  const toy = ledger.they_owe_me || 0;
-  const yot = ledger.i_owe_them || 0;
+
+  // Mirror ledger_summary view logic:
+  //   they_owe_me = start_toy + SUM(they_owe / invoice / bill entries) - SUM(they_paid_you entries)
+  //   i_owe_them  = start_yot + SUM(you_owe_them entries) - SUM(you_paid_them entries)
+  const ACTIVE = e => !['voided','cancelled'].includes(e.status) && !e.no_ledger;
+  const toy = (c.start_toy || 0)
+    + entries.filter(e => ['they_owe_you','invoice','bill'].includes(e.tx_type) && ACTIVE(e))
+             .reduce((s, e) => s + e.amount, 0)
+    - entries.filter(e => e.tx_type === 'they_paid_you' && ACTIVE(e))
+             .reduce((s, e) => s + e.amount, 0);
+  const yot = (c.start_yot || 0)
+    + entries.filter(e => e.tx_type === 'you_owe_them' && ACTIVE(e))
+             .reduce((s, e) => s + e.amount, 0)
+    - entries.filter(e => e.tx_type === 'you_paid_them' && ACTIVE(e))
+             .reduce((s, e) => s + e.amount, 0);
   const net = toy - yot;
   const col = contactColor(id);
 

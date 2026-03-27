@@ -89,14 +89,18 @@ export async function createEntry(userId, {
   date, invoiceNumber = '', templateId = null, templateData = {},
   status = 'posted'
 }) {
-  // Increment entry counter
-  const { data: user } = await supabase
-    .from('users')
-    .select('entry_counter')
-    .eq('id', userId)
-    .single();
-  const nextNum = (user?.entry_counter || 0) + 1;
-  await supabase.from('users').update({ entry_counter: nextNum }).eq('id', userId);
+  // Atomically increment counter via RPC (1 round-trip instead of 2)
+  let nextNum = 1;
+  const { data: counterData, error: counterErr } = await supabase
+    .rpc('increment_entry_counter', { p_user_id: userId });
+  if (counterErr) {
+    // Fallback: two-step if RPC not yet deployed
+    const { data: u } = await supabase.from('users').select('entry_counter').eq('id', userId).single();
+    nextNum = (u?.entry_counter || 0) + 1;
+    await supabase.from('users').update({ entry_counter: nextNum }).eq('id', userId);
+  } else {
+    nextNum = counterData;
+  }
 
   const { data, error } = await supabase
     .from('entries')
@@ -226,5 +230,21 @@ export async function getLedgerSummary(userId) {
     .select('*')
     .eq('user_id', userId);
   if (error) console.error('[getLedgerSummary]', error.message);
+  return data || [];
+}
+
+// ── Currency ledger (dashboard currency cards) ────────────────────
+// Lean aggregate view — only 5 cols, one row per currency per user.
+// Replaces computing currency breakdown from raw entries client-side.
+export async function getCurrencyLedger(userId) {
+  const { data, error } = await supabase
+    .from('currency_ledger')
+    .select('currency, owed_to_me, i_owe, active_count')
+    .eq('user_id', userId)
+    .gt('active_count', 0);  // only currencies with active entries
+  if (error) {
+    console.error('[getCurrencyLedger]', error.message);
+    return [];
+  }
   return data || [];
 }
