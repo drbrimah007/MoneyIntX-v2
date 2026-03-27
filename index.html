@@ -86,6 +86,9 @@
   --sidebar-active: #1e293b;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* Hide scrollbars globally while keeping content scrollable */
+* { scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { display: none; }
 html, body { overflow-x: hidden; max-width: 100vw; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.5;
   padding-top: env(safe-area-inset-top); padding-left: env(safe-area-inset-left);
@@ -2454,57 +2457,108 @@ window.clearAllNotifs = async function() {
 
 // ── Investments ───────────────────────────────────────────────────
 async function renderInvestments(el) {
-  el.innerHTML = '<div class="page-header"><h2>Investments</h2></div><p style="color:var(--muted);">Loading...</p>';
-  const investments = await listInvestments(currentUser.id);
-  let totalInvested = 0, totalReturns = 0;
+  el.innerHTML = '<div class="page-header"><h2>📈 Investments</h2></div><p style="color:var(--muted);padding:20px;">Loading...</p>';
+  let investments = [];
+  try {
+    const { data, error } = await supabase
+      .from('investments')
+      .select('*, members:investment_members(*), transactions:investment_transactions(*)')
+      .eq('user_id', currentUser.id)
+      .is('archived_at', null)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    // Also get investments where user is a member
+    const { data: memberRows } = await supabase
+      .from('investment_members')
+      .select('investment_id')
+      .eq('user_id', currentUser.id);
+    const memberIds = (memberRows || []).map(r => r.investment_id).filter(id => !data?.find(d => d.id === id));
+    if (memberIds.length > 0) {
+      const { data: memberInvs } = await supabase
+        .from('investments')
+        .select('*, members:investment_members(*), transactions:investment_transactions(*)')
+        .in('id', memberIds)
+        .is('archived_at', null);
+      investments = [...(data || []), ...(memberInvs || [])];
+    } else {
+      investments = data || [];
+    }
+  } catch(err) {
+    el.innerHTML = `<div class="page-header"><h2>📈 Investments</h2><button class="btn btn-primary btn-sm" onclick="openNewInvestmentModal()">+ New</button></div>
+      <div class="card" style="color:var(--red);padding:20px;">Error loading investments: ${esc(err.message)}<br><small>Make sure the investments table exists (run SQL migration 001_foundation.sql).</small></div>`;
+    return;
+  }
 
-  let html = `<div class="page-header"><h2>Investments</h2>
+  let html = `<div class="page-header">
+    <div><h2 style="margin:0;">📈 Investments</h2><p style="font-size:13px;color:var(--muted);margin-top:2px;">${investments.length} investment${investments.length !== 1 ? 's' : ''}</p></div>
     <button class="btn btn-primary btn-sm" onclick="openNewInvestmentModal()">+ New Investment</button>
   </div>`;
 
   if (investments.length === 0) {
-    html += `<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No investments yet. Track your first one.</p></div>`;
+    html += `<div class="card" style="text-align:center;padding:48px 24px;">
+      <div style="font-size:48px;margin-bottom:12px;">📈</div>
+      <div style="font-size:17px;font-weight:700;margin-bottom:8px;">No investments yet</div>
+      <p style="color:var(--muted);font-size:13px;max-width:360px;margin:0 auto 20px;">Track personal or shared investments — stocks, real estate, business ventures, crypto, and more.</p>
+      <button class="btn btn-primary" onclick="openNewInvestmentModal()">+ Create First Investment</button>
+    </div>`;
   } else {
-    // Summary stats
-    investments.forEach(inv => {
-      const stats = calcInvestmentStats(inv);
-      totalInvested += stats.invested;
-      totalReturns += stats.returns;
-    });
-    html += `<div class="grid3" style="margin-bottom:16px;">
-      <div class="stat-card"><div class="stat-lbl">Total Invested</div><div class="stat-val">${fmtMoney(totalInvested)}</div></div>
-      <div class="stat-card"><div class="stat-lbl">Total Returns</div><div class="stat-val" style="color:var(--green)">${fmtMoney(totalReturns)}</div></div>
-      <div class="stat-card"><div class="stat-lbl">Net</div><div class="stat-val" style="color:${totalReturns - totalInvested >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtMoney(totalReturns - totalInvested)}</div></div>
+    let totalInvested = 0, totalReturns = 0;
+    investments.forEach(inv => { const s = calcInvestmentStats(inv); totalInvested += s.invested; totalReturns += s.currentVal; });
+    const totalGl = totalReturns - totalInvested;
+    html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px;">
+      <div class="stat-card"><div class="stat-lbl">Total Invested</div><div class="stat-val" style="font-size:17px;">${fmtMoney(totalInvested)}</div></div>
+      <div class="stat-card"><div class="stat-lbl">Current Value</div><div class="stat-val" style="font-size:17px;">${fmtMoney(totalReturns)}</div></div>
+      <div class="stat-card"><div class="stat-lbl">Overall G/L</div><div class="stat-val" style="font-size:17px;color:${totalGl>=0?'var(--green)':'var(--red)'};">${totalGl>=0?'+':''}${fmtMoney(totalGl)}</div></div>
     </div>`;
 
     investments.forEach(inv => {
       const stats = calcInvestmentStats(inv);
       const isOwner = inv.user_id === currentUser.id;
+      const partners = (inv.members || []).filter(m => m.role !== 'owner');
+      const statusColors = { active:'badge-green', matured:'badge-blue', closed:'badge-gray', lost:'badge-red' };
       html += `<div class="card" style="margin-bottom:12px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-          <div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <h3 style="font-size:17px;margin:0;cursor:pointer;" onclick="openInvestmentDetail('${inv.id}')">${esc(inv.name)}</h3>
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+              <h3 style="font-size:16px;margin:0;cursor:pointer;font-weight:700;" onclick="openInvestmentDetail('${inv.id}')">${esc(inv.name)}</h3>
               <span class="badge badge-gray">${esc(INV_TYPES[inv.type] || inv.type)}</span>
-              <span class="badge badge-${inv.status === 'active' ? 'green' : inv.status === 'matured' ? 'blue' : 'gray'}">${esc(INV_STATUSES[inv.status] || inv.status)}</span>
+              <span class="badge ${statusColors[inv.status]||'badge-gray'}">${esc(INV_STATUSES[inv.status] || inv.status)}</span>
+              ${partners.length > 0 ? `<span class="badge badge-blue">👥 ${partners.length} partner${partners.length!==1?'s':''}</span>` : ''}
             </div>
-            ${inv.description ? `<p style="font-size:13px;color:var(--muted);margin-top:4px;">${esc(inv.description)}</p>` : ''}
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;margin-top:10px;">
-              <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Invested</div><div style="font-size:16px;font-weight:800;">${fmtMoney(stats.invested, inv.currency)}</div></div>
-              <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Current</div><div style="font-size:16px;font-weight:800;">${fmtMoney(stats.currentVal, inv.currency)}</div></div>
-              <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">G/L</div><div style="font-size:16px;font-weight:800;color:${stats.gl >= 0 ? 'var(--green)' : 'var(--red)'};">${stats.gl >= 0 ? '+' : ''}${fmtMoney(stats.gl, inv.currency)}</div></div>
-              <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">ROI</div><div style="font-size:16px;font-weight:800;color:${parseFloat(stats.roi) >= 0 ? 'var(--green)' : 'var(--red)'};">${stats.roi}%</div></div>
+            ${inv.description ? `<p style="font-size:12px;color:var(--muted);margin-bottom:8px;">${esc(inv.description)}</p>` : ''}
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:8px;margin-top:8px;">
+              <div style="background:var(--bg3);border-radius:8px;padding:8px 10px;">
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">Invested</div>
+                <div style="font-size:15px;font-weight:800;margin-top:1px;">${fmtMoney(stats.invested, inv.currency)}</div>
+              </div>
+              <div style="background:var(--bg3);border-radius:8px;padding:8px 10px;">
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">Current</div>
+                <div style="font-size:15px;font-weight:800;margin-top:1px;">${fmtMoney(stats.currentVal, inv.currency)}</div>
+              </div>
+              <div style="background:${stats.gl>=0?'rgba(74,222,128,.08)':'rgba(248,113,113,.08)'};border-radius:8px;padding:8px 10px;">
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">G/L</div>
+                <div style="font-size:15px;font-weight:800;margin-top:1px;color:${stats.gl>=0?'var(--green)':'var(--red)'};">${stats.gl>=0?'+':''}${fmtMoney(stats.gl, inv.currency)}</div>
+              </div>
+              <div style="background:var(--bg3);border-radius:8px;padding:8px 10px;">
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">ROI</div>
+                <div style="font-size:15px;font-weight:800;margin-top:1px;color:${parseFloat(stats.roi)>=0?'var(--green)':'var(--red)'};">${stats.roi}%</div>
+              </div>
             </div>
-            ${stats.memberCount > 1 ? `<div style="margin-top:8px;font-size:12px;color:var(--muted);">${stats.memberCount} partners</div>` : ''}
           </div>
           <div class="action-menu">
             <button class="action-menu-btn" onclick="toggleActionMenu(this)">⋮</button>
             <div class="action-dropdown">
-              <button onclick="openInvestmentDetail('${inv.id}')">View</button>
-              ${isOwner ? `<button onclick="openAddInvTxModal('${inv.id}')">Add Transaction</button>` : ''}
+              <button onclick="openInvestmentDetail('${inv.id}')">👁 View</button>
+              ${isOwner ? `<button onclick="openAddInvTxModal('${inv.id}')">+ Transaction</button>` : ''}
+              ${isOwner ? `<button onclick="openAddInvPartnerModal('${inv.id}')">+ Partner</button>` : ''}
               ${isOwner ? `<button onclick="confirmDeleteInvestment('${inv.id}')" style="color:var(--red);">Delete</button>` : ''}
             </div>
           </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--border);margin-top:10px;">
+          <button class="btn btn-secondary btn-sm" onclick="openInvestmentDetail('${inv.id}')">View</button>
+          ${isOwner ? `<button class="btn btn-secondary btn-sm" onclick="openAddInvTxModal('${inv.id}')">+ Transaction</button>` : ''}
+          ${isOwner ? `<button class="btn btn-secondary btn-sm" onclick="openAddInvPartnerModal('${inv.id}')">+ Partner</button>` : ''}
         </div>
       </div>`;
     });
@@ -2512,80 +2566,198 @@ async function renderInvestments(el) {
   el.innerHTML = html;
 }
 
-window.openNewInvestmentModal = function() {
+// V1-style investment creation modal — name, type, amount, partners, access all at once
+window.openNewInvestmentModal = async function() {
+  const contacts = await listContacts(currentUser.id);
+  const contactOpts = contacts.map(c => `<option value="${c.id}" data-name="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+  window._newInvPartners = []; // [{contactId, name}]
+
   openModal(`
-    <h3 style="margin-bottom:16px;">New Investment</h3>
-    <div class="form-group"><label>Name *</label><input type="text" id="ni-name" placeholder="Investment name"></div>
-    <div class="form-group"><label>Description</label><textarea id="ni-desc" rows="2"></textarea></div>
+    <div class="modal-title">New Investment</div>
+
+    <div class="form-group"><label>Name *</label><input type="text" id="ni-name" placeholder="e.g. Property Lagos, Tech Portfolio"></div>
     <div class="form-row">
-      <div class="form-group"><label>Type</label><select id="ni-type">${Object.entries(INV_TYPES).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Type</label><select id="ni-type">${Object.entries(INV_TYPES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Status</label><select id="ni-status">
+        <option value="active">Active</option><option value="matured">Matured</option>
+        <option value="closed">Closed</option><option value="lost">Lost</option>
+      </select></div>
+    </div>
+    <div class="form-group"><label>Description</label><textarea id="ni-desc" rows="2" placeholder="What is this investment about?"></textarea></div>
+    <div class="form-row">
       <div class="form-group"><label>Initial Amount</label><input type="number" id="ni-amount" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="form-group"><label>Currency</label><select id="ni-currency">
+        ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','AED','SAR','BRL','EGP','MAD','TZS','UGX','ETB','XOF'].map(c=>`<option value="${c}" ${(currentProfile?.default_currency||'USD')===c?'selected':''}>${c}</option>`).join('')}
+      </select></div>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label>Venture Type</label><select id="ni-venture"><option value="personal">Personal</option><option value="shared">Shared</option></select></div>
-      <div class="form-group"><label>Expected Return %</label><input type="number" id="ni-return" step="0.1" placeholder="10.0"></div>
+    <div class="form-group"><label>Expected Return %</label><input type="number" id="ni-return" step="0.1" placeholder="e.g. 12.5"></div>
+
+    <!-- Venture type -->
+    <div class="form-group" style="margin-top:4px;">
+      <label>Venture Type</label>
+      <div style="display:flex;gap:8px;margin-top:6px;">
+        <label style="flex:1;display:flex;align-items:center;gap:6px;padding:10px;border-radius:8px;border:2px solid var(--accent);background:rgba(108,99,255,.08);cursor:pointer;font-size:13px;font-weight:600;">
+          <input type="radio" name="ni-venture" value="personal" checked style="accent-color:var(--accent);" onchange="document.getElementById('ni-partners-section').style.display='none'"> 👤 Personal
+        </label>
+        <label style="flex:1;display:flex;align-items:center;gap:6px;padding:10px;border-radius:8px;border:2px solid var(--border);cursor:pointer;font-size:13px;font-weight:500;">
+          <input type="radio" name="ni-venture" value="shared" style="accent-color:var(--accent);" onchange="document.getElementById('ni-partners-section').style.display=''"> 👥 Shared
+        </label>
+      </div>
     </div>
-    <div class="form-group"><label>Currency</label><select id="ni-currency">
-      ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'].map(c => `<option value="${c}" ${(currentProfile?.default_currency || 'USD')===c?'selected':''}>${c}</option>`).join('')}
-    </select></div>
+
+    <!-- Partners section (shown when shared) -->
+    <div id="ni-partners-section" style="display:none;">
+      <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Partners</div>
+      <div id="ni-partners-list" style="margin-bottom:8px;"></div>
+      <div style="display:flex;gap:6px;">
+        <select id="ni-partner-select" style="flex:1;">${contactOpts||'<option value="">No contacts</option>'}</select>
+        <button type="button" class="bs sm" onclick="_niAddPartner()">+ Add</button>
+      </div>
+    </div>
+
+    <!-- Access mode -->
+    <div class="form-group" style="margin-top:12px;">
+      <label>Access Mode</label>
+      <select id="ni-access">
+        <option value="private">Private — only you</option>
+        <option value="shared">Shared — partners can view</option>
+        <option value="open">Open — any linked contact</option>
+      </select>
+    </div>
+
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
-      <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="doCreateInvestment()">Create</button>
+      <button class="bs sm" onclick="closeModal()">Cancel</button>
+      <button class="btn sm" onclick="doCreateInvestment()">Create Investment</button>
     </div>
-  `, { maxWidth: '460px' });
+  `, { maxWidth: '500px' });
+};
+
+window._niAddPartner = function() {
+  const sel = document.getElementById('ni-partner-select');
+  const cId = sel.value;
+  const cName = sel.options[sel.selectedIndex]?.dataset?.name || 'Member';
+  if (!cId || window._newInvPartners.find(p => p.contactId === cId)) return;
+  window._newInvPartners.push({ contactId: cId, name: cName });
+  const list = document.getElementById('ni-partners-list');
+  if (list) {
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--bg3);border-radius:7px;margin-bottom:6px;font-size:13px;';
+    div.dataset.cid = cId;
+    div.innerHTML = `<span>👤 ${esc(cName)}</span><button type="button" class="bs sm" style="font-size:11px;color:var(--red);padding:2px 8px;" onclick="this.closest('[data-cid]').remove();window._newInvPartners=window._newInvPartners.filter(p=>p.contactId!=='${cId}')">✕</button>`;
+    list.appendChild(div);
+  }
 };
 
 window.doCreateInvestment = async function() {
   const name = document.getElementById('ni-name').value.trim();
   if (!name) return toast('Name required.', 'error');
-  await createInvestment(currentUser.id, {
-    name, description: document.getElementById('ni-desc').value.trim(),
+  const ventureType = document.querySelector('input[name="ni-venture"]:checked')?.value || 'personal';
+  const inv = await createInvestment(currentUser.id, {
+    name,
+    description: document.getElementById('ni-desc').value.trim(),
     type: document.getElementById('ni-type').value,
+    status: document.getElementById('ni-status').value,
     currency: document.getElementById('ni-currency').value || 'USD',
-    ventureType: document.getElementById('ni-venture').value,
+    ventureType,
+    accessMode: document.getElementById('ni-access').value,
     initialAmount: parseFloat(document.getElementById('ni-amount').value) || 0,
     expectedReturn: parseFloat(document.getElementById('ni-return').value) || null
   });
-  closeModal(); toast('Investment created!', 'success'); navTo('investments');
+  if (!inv) return toast('Failed to create investment. Check console.', 'error');
+  // Add partners
+  const partners = window._newInvPartners || [];
+  for (const p of partners) {
+    await addInvestmentMember(inv.id, { contactId: p.contactId, name: p.name, role: 'partner' });
+  }
+  closeModal();
+  toast(`Investment "${name}" created${partners.length > 0 ? ` with ${partners.length} partner${partners.length!==1?'s':''}` : ''}.`, 'success');
+  navTo('investments');
 };
 
 window.openInvestmentDetail = async function(id) {
   const inv = await getInvestment(id);
   if (!inv) return toast('Not found.', 'error');
   const stats = calcInvestmentStats(inv);
-  const txs = (inv.transactions || []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 10);
+  const txs = (inv.transactions || []).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
   const isOwner = inv.user_id === currentUser.id;
+  const members = inv.members || [];
+
+  const membersHtml = members.map(m => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
+      <div><span style="font-weight:600;">${esc(m.name)}</span> <span class="badge badge-gray" style="font-size:10px;">${esc(m.role)}</span></div>
+    </div>`).join('') || '<p style="color:var(--muted);font-size:13px;">No members.</p>';
+
+  const txHtml = txs.length === 0 ? '<p style="color:var(--muted);font-size:13px;">No transactions yet.</p>' :
+    txs.slice(0,10).map(t=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
+      <div><span style="font-weight:600;text-transform:capitalize;">${esc(t.type.replace(/_/g,' '))}</span>${t.note?` <span style="color:var(--muted);">— ${esc(t.note)}</span>`:''}
+      <div style="font-size:11px;color:var(--muted);">${fmtDate(t.created_at)}</div></div>
+      <div style="font-weight:700;color:${['deposit','capital_contribution','revenue','dividend','return'].includes(t.type)?'var(--green)':'var(--red)'};">${['deposit','capital_contribution','revenue','dividend','return'].includes(t.type)?'+':'−'}${fmtMoney(t.amount,inv.currency)}</div>
+    </div>`).join('');
 
   openModal(`
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
       <div>
         <h3 style="margin:0;">${esc(inv.name)}</h3>
         <div style="display:flex;gap:6px;margin-top:4px;">
-          <span class="badge badge-gray">${esc(INV_TYPES[inv.type])}</span>
-          <span class="badge badge-${inv.status === 'active' ? 'green' : 'gray'}">${esc(INV_STATUSES[inv.status])}</span>
+          <span class="badge badge-gray">${esc(INV_TYPES[inv.type]||inv.type)}</span>
+          <span class="badge badge-${inv.status==='active'?'green':inv.status==='matured'?'blue':'gray'}">${esc(INV_STATUSES[inv.status]||inv.status)}</span>
         </div>
       </div>
       <button class="btn btn-secondary btn-sm" onclick="closeModal()">Close</button>
     </div>
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;">
-      <div class="stat-card"><div class="stat-lbl">Invested</div><div class="stat-val" style="font-size:18px;">${fmtMoney(stats.invested, inv.currency)}</div></div>
-      <div class="stat-card"><div class="stat-lbl">Current Value</div><div class="stat-val" style="font-size:18px;">${fmtMoney(stats.currentVal, inv.currency)}</div></div>
-      <div class="stat-card"><div class="stat-lbl">Gain/Loss</div><div class="stat-val" style="font-size:18px;color:${stats.gl >= 0 ? 'var(--green)' : 'var(--red)'};">${stats.gl >= 0 ? '+' : ''}${fmtMoney(stats.gl, inv.currency)}</div></div>
-      <div class="stat-card"><div class="stat-lbl">ROI</div><div class="stat-val" style="font-size:18px;color:${parseFloat(stats.roi) >= 0 ? 'var(--green)' : 'var(--red)'};">${stats.roi}%</div></div>
+      <div class="stat-card"><div class="stat-lbl">Invested</div><div class="stat-val" style="font-size:17px;">${fmtMoney(stats.invested,inv.currency)}</div></div>
+      <div class="stat-card"><div class="stat-lbl">Current Value</div><div class="stat-val" style="font-size:17px;">${fmtMoney(stats.currentVal,inv.currency)}</div></div>
+      <div class="stat-card"><div class="stat-lbl" style="color:${stats.gl>=0?'var(--green)':'var(--red)'};">Gain/Loss</div><div class="stat-val" style="font-size:17px;color:${stats.gl>=0?'var(--green)':'var(--red)'};">${stats.gl>=0?'+':''}${fmtMoney(stats.gl,inv.currency)}</div></div>
+      <div class="stat-card"><div class="stat-lbl">ROI</div><div class="stat-val" style="font-size:17px;color:${parseFloat(stats.roi)>=0?'var(--green)':'var(--red)'};">${stats.roi}%</div></div>
     </div>
-    ${inv.description ? `<p style="color:var(--muted);font-size:14px;margin-bottom:16px;">${esc(inv.description)}</p>` : ''}
+    ${inv.description?`<p style="color:var(--muted);font-size:13px;margin-bottom:14px;">${esc(inv.description)}</p>`:''}
     <div style="margin-bottom:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <h4 style="font-size:14px;font-weight:700;">Transactions</h4>
-        ${isOwner ? `<button class="btn btn-primary btn-sm" onclick="closeModal();openAddInvTxModal('${inv.id}')">+ Add</button>` : ''}
+        <h4 style="font-size:14px;font-weight:700;">Partners (${members.length})</h4>
+        ${isOwner?`<button class="btn btn-primary btn-sm" style="font-size:11px;" onclick="closeModal();openAddInvPartnerModal('${inv.id}')">+ Partner</button>`:''}
       </div>
-      ${txs.length === 0 ? '<p style="color:var(--muted);font-size:13px;">No transactions yet.</p>' :
-        txs.map(t => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
-          <div><span style="font-weight:600;text-transform:capitalize;">${t.type.replace('_',' ')}</span>${t.note ? ` <span style="color:var(--muted);">— ${esc(t.note)}</span>` : ''}</div>
-          <div style="font-weight:700;color:${['deposit','capital_contribution','revenue','dividend','return'].includes(t.type) ? 'var(--green)' : 'var(--red)'};">${fmtMoney(t.amount, inv.currency)}</div>
-        </div>`).join('')}
+      ${membersHtml}
     </div>
-  `, { maxWidth: '560px' });
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h4 style="font-size:14px;font-weight:700;">Transactions</h4>
+        ${isOwner?`<button class="btn btn-primary btn-sm" style="font-size:11px;" onclick="closeModal();openAddInvTxModal('${inv.id}')">+ Add</button>`:''}
+      </div>
+      ${txHtml}
+    </div>
+  `, { maxWidth:'560px' });
+};
+
+window.openAddInvPartnerModal = async function(invId) {
+  const contacts = await listContacts(currentUser.id);
+  const opts = contacts.map(c=>`<option value="${c.id}" data-name="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+  openModal(`
+    <h3 style="margin-bottom:16px;">Add Partner</h3>
+    <div class="form-group"><label>Contact</label><select id="ipm-contact">${opts||'<option value="">No contacts</option>'}</select></div>
+    <div class="form-group"><label>Role</label><select id="ipm-role">
+      <option value="partner">Partner</option>
+      <option value="investor">Investor</option>
+      <option value="beneficiary">Beneficiary</option>
+      <option value="manager">Manager</option>
+    </select></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="bs sm" onclick="closeModal()">Cancel</button>
+      <button class="btn sm" onclick="doAddInvPartner('${invId}')">Add Partner</button>
+    </div>
+  `);
+};
+
+window.doAddInvPartner = async function(invId) {
+  const sel = document.getElementById('ipm-contact');
+  const cId = sel.value;
+  const cName = sel.options[sel.selectedIndex]?.dataset?.name || 'Partner';
+  const role = document.getElementById('ipm-role').value;
+  if (!cId) return toast('Select a contact.', 'error');
+  await addInvestmentMember(invId, { contactId: cId, name: cName, role });
+  closeModal();
+  toast('Partner added.', 'success');
+  navTo('investments');
 };
 
 window.openAddInvTxModal = function(invId) {
@@ -2598,78 +2770,212 @@ window.openAddInvTxModal = function(invId) {
       <option value="expense">Expense</option><option value="revenue">Revenue</option>
       <option value="profit_distribution">Profit Distribution</option>
     </select></div>
-    <div class="form-group"><label>Amount</label><input type="number" id="itx-amount" min="0" step="0.01"></div>
-    <div class="form-group"><label>Note</label><input type="text" id="itx-note" placeholder="Optional"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Amount *</label><input type="number" id="itx-amount" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="form-group"><label>Date</label><input type="date" id="itx-date" value="${new Date().toISOString().slice(0,10)}"></div>
+    </div>
+    <div class="form-group"><label>Note</label><input type="text" id="itx-note" placeholder="Optional description"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
-      <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="doAddInvTx('${invId}')">Add</button>
+      <button class="bs sm" onclick="closeModal()">Cancel</button>
+      <button class="btn sm" onclick="doAddInvTx('${invId}')">Add Transaction</button>
     </div>
   `);
 };
 
 window.doAddInvTx = async function(invId) {
   const amount = parseFloat(document.getElementById('itx-amount').value);
-  if (!amount || amount <= 0) return toast('Enter amount.', 'error');
-  await addInvestmentTransaction(invId, {
+  if (!amount || amount <= 0) return toast('Enter valid amount.', 'error');
+  const result = await addInvestmentTransaction(invId, {
     type: document.getElementById('itx-type').value,
-    amount, note: document.getElementById('itx-note').value.trim(),
+    amount,
+    note: document.getElementById('itx-note').value.trim(),
     recordedBy: currentUser.id
   });
-  closeModal(); toast('Transaction added.', 'success'); navTo('investments');
+  if (!result) return toast('Failed to add transaction.', 'error');
+  closeModal();
+  toast('Transaction added.', 'success');
+  navTo('investments');
 };
 
 window.confirmDeleteInvestment = async function(id) {
-  if (!confirm('Delete this investment?')) return;
+  if (!confirm('Delete this investment? This cannot be undone.')) return;
   await deleteInvestment(id);
-  toast('Deleted.', 'success'); navTo('investments');
+  toast('Investment deleted.', 'success');
+  navTo('investments');
 };
 
 // ── Groups ────────────────────────────────────────────────────────
 async function renderGroups(el) {
-  el.innerHTML = '<div class="page-header"><h2>Groups</h2></div><p style="color:var(--muted);">Loading...</p>';
-  const groups = await listGroups(currentUser.id);
+  el.innerHTML = '<div class="page-header"><h2>👥 Groups</h2></div><p style="color:var(--muted);padding:20px;">Loading...</p>';
+  let groups = [];
+  try {
+    const { data, error } = await supabase
+      .from('groups')
+      .select('*, members:group_members(*), rounds:group_rounds(*, contributions:group_contributions(*))')
+      .eq('user_id', currentUser.id)
+      .is('archived_at', null)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    // Also get groups where user is a member
+    const { data: memberRows } = await supabase
+      .from('group_members')
+      .select('group_id')
+      .eq('user_id', currentUser.id)
+      .eq('status', 'active');
+    const memberGroupIds = (memberRows || []).map(r => r.group_id).filter(id => !data?.find(d => d.id === id));
+    if (memberGroupIds.length > 0) {
+      const { data: memberGroups } = await supabase
+        .from('groups')
+        .select('*, members:group_members(*), rounds:group_rounds(*, contributions:group_contributions(*))')
+        .in('id', memberGroupIds)
+        .is('archived_at', null);
+      groups = [...(data || []), ...(memberGroups || [])];
+    } else {
+      groups = data || [];
+    }
+  } catch(err) {
+    el.innerHTML = `<div class="page-header"><h2>👥 Groups</h2><button class="btn btn-primary btn-sm" onclick="openNewGroupModal()">+ New Group</button></div>
+      <div class="card" style="color:var(--red);padding:20px;">Error loading groups: ${esc(err.message)}<br><small>Make sure the groups table exists (run SQL migration 001_foundation.sql).</small></div>`;
+    return;
+  }
 
-  let html = `<div class="page-header"><h2>Group Savings</h2>
+  let html = `<div class="page-header">
+    <div><h2 style="margin:0;">👥 Group Savings</h2><p style="font-size:13px;color:var(--muted);margin-top:2px;">${groups.length} group${groups.length!==1?'s':''}</p></div>
     <button class="btn btn-primary btn-sm" onclick="openNewGroupModal()">+ New Group</button>
   </div>`;
 
   if (groups.length === 0) {
-    html += `<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No groups yet. Create one to start tracking group savings.</p></div>`;
+    html += `<div class="card" style="text-align:center;padding:48px 24px;">
+      <div style="font-size:48px;margin-bottom:12px;">👥</div>
+      <div style="font-size:17px;font-weight:700;margin-bottom:8px;">No groups yet</div>
+      <p style="color:var(--muted);font-size:13px;max-width:360px;margin:0 auto 20px;">Create savings circles, ajo, susu, chamas, or any group contribution scheme.</p>
+      <button class="btn btn-primary" onclick="openNewGroupModal()">+ Create First Group</button>
+    </div>`;
   } else {
     groups.forEach(g => {
       const stats = calcGroupStats(g);
       const isOwner = g.user_id === currentUser.id;
+      const activeMembers = (g.members || []).filter(m => m.status === 'active');
+      const totalCollected = stats.totalCollected;
       html += `<div class="card" style="margin-bottom:12px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-          <div>
-            <h3 style="font-size:17px;margin-bottom:4px;cursor:pointer;" onclick="openGroupDetail('${g.id}')">${esc(g.name)}</h3>
-            ${g.description ? `<p style="font-size:13px;color:var(--muted);margin-bottom:8px;">${esc(g.description)}</p>` : ''}
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
-              <span class="badge badge-blue">${stats.memberCount} member${stats.memberCount !== 1 ? 's' : ''}</span>
-              <span class="badge badge-green">${fmtMoney(g.amount, g.currency)} / ${esc(g.frequency)}</span>
-              <span class="badge badge-gray">${stats.roundCount} round${stats.roundCount !== 1 ? 's' : ''}</span>
+          <div style="flex:1;">
+            <h3 style="font-size:16px;margin:0 0 4px;cursor:pointer;font-weight:700;" onclick="openGroupDetail('${g.id}')">${esc(g.name)}</h3>
+            ${g.description?`<p style="font-size:12px;color:var(--muted);margin-bottom:8px;">${esc(g.description)}</p>`:''}
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+              <span class="badge badge-blue">👥 ${activeMembers.length} member${activeMembers.length!==1?'s':''}</span>
+              <span class="badge badge-green">💰 ${fmtMoney(g.amount,g.currency)} / ${esc(g.frequency)}</span>
+              <span class="badge badge-gray">🔄 ${stats.roundCount} round${stats.roundCount!==1?'s':''}</span>
+              ${g.use_rotation?'<span class="badge badge-yellow">⟳ Rotation</span>':''}
             </div>
-            ${stats.currentRound ? `<p style="font-size:12px;color:var(--muted);">Current round: ${stats.paidInRound}/${stats.memberCount} paid</p>` : ''}
+            ${totalCollected > 0 ? `<div style="font-size:12px;color:var(--green);font-weight:700;">Total collected: ${fmtMoney(totalCollected,g.currency)}</div>` : ''}
+            ${stats.currentRound?`<p style="font-size:12px;color:var(--muted);margin-top:4px;">Round ${stats.currentRound.round_number}: ${stats.paidInRound}/${activeMembers.length} paid</p>`:''}
           </div>
           <div class="action-menu">
             <button class="action-menu-btn" onclick="toggleActionMenu(this)">⋮</button>
             <div class="action-dropdown">
-              <button onclick="openGroupDetail('${g.id}')">View</button>
-              ${isOwner ? `<button onclick="openAddMemberModal('${g.id}')">Add Member</button>` : ''}
-              ${isOwner ? `<button onclick="doCreateRound('${g.id}')">New Round</button>` : ''}
-              ${isOwner ? `<button onclick="confirmDeleteGroup('${g.id}')" style="color:var(--red);">Delete</button>` : ''}
+              <button onclick="openGroupDetail('${g.id}')">👁 View</button>
+              ${isOwner?`<button onclick="openAddMemberModal('${g.id}')">+ Add Member</button>`:''}
+              ${isOwner?`<button onclick="doCreateRound('${g.id}')">New Round</button>`:''}
+              ${isOwner?`<button onclick="confirmDeleteGroup('${g.id}')" style="color:var(--red);">Delete</button>`:''}
             </div>
           </div>
         </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--border);">
-          <button class="btn btn-secondary btn-sm" onclick="openGroupDetail('${g.id}')">View Group</button>
-          ${isOwner ? `<button class="btn btn-secondary btn-sm" onclick="openAddMemberModal('${g.id}')">+ Add Member</button>` : ''}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--border);margin-top:4px;">
+          <button class="btn btn-secondary btn-sm" onclick="openGroupDetail('${g.id}')">View</button>
+          ${isOwner?`<button class="btn btn-secondary btn-sm" onclick="openAddMemberModal('${g.id}')">+ Member</button>`:''}
+          ${isOwner?`<button class="btn btn-secondary btn-sm" onclick="doCreateRound('${g.id}')">+ Round</button>`:''}
         </div>
       </div>`;
     });
   }
   el.innerHTML = html;
 }
+
+// V1-style group creation — name, amount, frequency, initial members, rotation all at once
+window.openNewGroupModal = async function() {
+  const contacts = await listContacts(currentUser.id);
+  const contactOpts = contacts.map(c=>`<option value="${c.id}" data-name="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+  window._newGroupMembers = []; // [{contactId, name}]
+
+  openModal(`
+    <div class="modal-title">New Group</div>
+
+    <div class="form-group"><label>Group Name *</label><input type="text" id="ng-name" placeholder="e.g. Friday Savings, Lagos Ajo Club"></div>
+    <div class="form-group"><label>Description</label><textarea id="ng-desc" rows="2" placeholder="Purpose or rules of this group…"></textarea></div>
+
+    <div class="form-row">
+      <div class="form-group"><label>Contribution Amount</label><input type="number" id="ng-amount" min="0" step="0.01" placeholder="e.g. 5000"></div>
+      <div class="form-group"><label>Currency</label><select id="ng-currency">
+        ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','AED','SAR','BRL','EGP','MAD','TZS','UGX','ETB','XOF'].map(c=>`<option value="${c}" ${(currentProfile?.default_currency||'USD')===c?'selected':''}>${c}</option>`).join('')}
+      </select></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Frequency</label><select id="ng-freq">
+        <option value="weekly">Weekly</option><option value="biweekly">Bi-weekly</option>
+        <option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="custom">Custom</option>
+      </select></div>
+      <div class="form-group"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="ng-rotation" style="width:auto;accent-color:var(--accent);"> Rotation (Ajo/Susu)
+      </label>
+      <p style="font-size:11px;color:var(--muted);margin-top:4px;">Each member receives the pot in turn</p></div>
+    </div>
+
+    <!-- Initial members -->
+    <div style="margin-top:4px;">
+      <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Add Initial Members</div>
+      <div id="ng-members-list" style="margin-bottom:8px;"></div>
+      <div style="display:flex;gap:6px;">
+        <select id="ng-member-select" style="flex:1;">${contactOpts||'<option value="">No contacts — add some first</option>'}</select>
+        <button type="button" class="bs sm" onclick="_ngAddMember()">+ Add</button>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:6px;">You are automatically added as the owner.</p>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="bs sm" onclick="closeModal()">Cancel</button>
+      <button class="btn sm" onclick="doCreateGroup()">Create Group</button>
+    </div>
+  `, { maxWidth: '500px' });
+};
+
+window._ngAddMember = function() {
+  const sel = document.getElementById('ng-member-select');
+  const cId = sel.value;
+  const cName = sel.options[sel.selectedIndex]?.dataset?.name || 'Member';
+  if (!cId || window._newGroupMembers.find(m => m.contactId === cId)) return;
+  window._newGroupMembers.push({ contactId: cId, name: cName });
+  const list = document.getElementById('ng-members-list');
+  if (list) {
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--bg3);border-radius:7px;margin-bottom:6px;font-size:13px;';
+    div.dataset.cid = cId;
+    div.innerHTML = `<span>👤 ${esc(cName)}</span><button type="button" class="bs sm" style="font-size:11px;color:var(--red);padding:2px 8px;" onclick="this.closest('[data-cid]').remove();window._newGroupMembers=window._newGroupMembers.filter(m=>m.contactId!=='${cId}')">✕</button>`;
+    list.appendChild(div);
+  }
+};
+
+window.doCreateGroup = async function() {
+  const name = document.getElementById('ng-name').value.trim();
+  if (!name) return toast('Name required.', 'error');
+  const g = await createGroup(currentUser.id, {
+    name,
+    description: document.getElementById('ng-desc').value.trim(),
+    amount: parseFloat(document.getElementById('ng-amount').value) || 0,
+    currency: document.getElementById('ng-currency').value || (currentProfile?.default_currency || 'USD'),
+    frequency: document.getElementById('ng-freq').value,
+    useRotation: document.getElementById('ng-rotation').checked
+  });
+  if (!g) return toast('Failed to create group. Check console.', 'error');
+  // Add initial members
+  const members = window._newGroupMembers || [];
+  for (const m of members) {
+    await addGroupMember(g.id, { contactId: m.contactId, name: m.name, role: 'member' });
+  }
+  closeModal();
+  toast(`Group "${name}" created${members.length>0?` with ${members.length} member${members.length!==1?'s':''}`:''}. You are the owner.`, 'success');
+  navTo('groups');
+};
 
 // ── Group Detail ──────────────────────────────────────────────────
 window.openGroupDetail = async function(id) {
@@ -2681,120 +2987,93 @@ window.openGroupDetail = async function(id) {
   const notices = await getNoticeBoard(id);
   const isOwner = g.user_id === currentUser.id;
 
-  let membersHtml = members.map(m => `
+  const membersHtml = members.map(m => `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
       <div>
         <span style="font-weight:600;">${esc(m.name)}</span>
-        <span class="badge badge-gray" style="margin-left:6px;">${esc(m.role)}</span>
+        <span class="badge badge-gray" style="margin-left:6px;font-size:10px;">${esc(m.role)}</span>
       </div>
-      ${isOwner && m.role !== 'owner' ? `<button class="btn btn-secondary btn-sm" onclick="doRemoveMember('${m.id}','${esc(m.name)}')">Remove</button>` : ''}
-    </div>
-  `).join('');
+      ${isOwner && m.role !== 'owner' ? `<button class="bs sm" style="font-size:11px;color:var(--red);" onclick="doRemoveMember('${m.id}','${esc(m.name)}')">Remove</button>` : ''}
+    </div>`).join('') || '<p style="color:var(--muted);font-size:13px;">No members yet.</p>';
 
-  let roundsHtml = rounds.slice(-3).reverse().map(r => {
+  const recentRounds = rounds.slice(-3).reverse();
+  const roundsHtml = recentRounds.map(r => {
     const contribs = r.contributions || [];
     const paid = contribs.filter(c => c.paid).length;
-    return `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">
-      <div style="display:flex;justify-content:space-between;">
-        <span style="font-weight:600;">Round ${r.round_number}</span>
-        <span class="badge ${r.status === 'completed' ? 'badge-green' : 'badge-blue'}">${paid}/${contribs.length} paid</span>
+    return `<div style="background:var(--bg3);border-radius:8px;padding:10px;margin-bottom:8px;font-size:13px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+        <span style="font-weight:700;">Round ${r.round_number}</span>
+        <span class="badge ${r.status==='completed'?'badge-green':'badge-blue'}">${paid}/${contribs.length} paid</span>
       </div>
       ${contribs.map(c => {
         const mem = members.find(m => m.id === c.member_id);
-        return `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;">
-          <span>${esc(mem?.name || '—')}</span>
-          <span>${c.paid ? '<span style="color:var(--green);font-weight:600;">Paid</span>' : isOwner ? `<button class="btn btn-primary btn-sm" style="padding:2px 8px;font-size:11px;" onclick="doMarkPaid('${c.id}','${id}')">Mark Paid</button>` : '<span style="color:var(--amber);">Pending</span>'}</span>
+        return `<div style="display:flex;justify-content:space-between;padding:3px 0;">
+          <span style="color:var(--muted);">${esc(mem?.name||'—')}</span>
+          ${c.paid ? '<span style="color:var(--green);font-weight:600;">✓ Paid</span>' :
+            isOwner ? `<button class="btn btn-primary btn-sm" style="padding:2px 8px;font-size:11px;" onclick="doMarkPaid('${c.id}','${id}')">Mark Paid</button>` :
+            '<span style="color:var(--amber);">Pending</span>'}
         </div>`;
       }).join('')}
     </div>`;
-  }).join('');
+  }).join('') || '<p style="color:var(--muted);font-size:13px;">No rounds yet.</p>';
 
-  let noticesHtml = notices.slice(0, 5).map(n => `
+  const noticesHtml = notices.slice(0,5).map(n => `
     <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">
-      <span style="font-weight:600;">${esc(n.user_name)}</span>
-      <span style="color:var(--muted);font-size:12px;margin-left:8px;">${fmtDate(n.created_at)}</span>
-      <p style="margin-top:2px;">${esc(n.message)}</p>
-    </div>
-  `).join('');
+      <div style="display:flex;justify-content:space-between;"><span style="font-weight:600;">${esc(n.user_name)}</span><span style="color:var(--muted);font-size:11px;">${fmtDate(n.created_at)}</span></div>
+      <p style="margin-top:2px;color:var(--text);">${esc(n.message)}</p>
+    </div>`).join('') || '<p style="color:var(--muted);font-size:13px;">No messages yet.</p>';
 
   openModal(`
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
       <div>
         <h3 style="margin:0;">${esc(g.name)}</h3>
-        <p style="color:var(--muted);font-size:13px;margin-top:4px;">${esc(g.description || '')}</p>
+        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${esc(g.description||'')}${g.use_rotation?' · ⟳ Rotation':''}${g.frequency?' · '+esc(g.frequency):''}</p>
       </div>
       <button class="btn btn-secondary btn-sm" onclick="closeModal()">Close</button>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
       <div class="stat-card"><div class="stat-lbl">Members</div><div class="stat-val">${stats.memberCount}</div></div>
       <div class="stat-card"><div class="stat-lbl">Rounds</div><div class="stat-val">${stats.roundCount}</div></div>
-      <div class="stat-card"><div class="stat-lbl">Collected</div><div class="stat-val" style="font-size:16px;">${fmtMoney(stats.totalCollected, g.currency)}</div></div>
+      <div class="stat-card"><div class="stat-lbl">Collected</div><div class="stat-val" style="font-size:14px;">${fmtMoney(stats.totalCollected,g.currency)}</div></div>
     </div>
     <div style="margin-bottom:16px;">
-      <h4 style="font-size:14px;font-weight:700;margin-bottom:8px;">Members</h4>
-      ${membersHtml || '<p style="color:var(--muted);font-size:13px;">No members yet.</p>'}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h4 style="font-size:14px;font-weight:700;">Members</h4>
+        ${isOwner?`<button class="bs sm" style="font-size:11px;" onclick="closeModal();openAddMemberModal('${id}')">+ Add Member</button>`:''}
+      </div>
+      ${membersHtml}
     </div>
     <div style="margin-bottom:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
         <h4 style="font-size:14px;font-weight:700;">Recent Rounds</h4>
-        ${isOwner ? `<button class="btn btn-primary btn-sm" onclick="doCreateRound('${id}');closeModal();">+ New Round</button>` : ''}
+        ${isOwner?`<button class="bs sm" style="font-size:11px;" onclick="doCreateRound('${id}');closeModal();">+ New Round</button>`:''}
       </div>
-      ${roundsHtml || '<p style="color:var(--muted);font-size:13px;">No rounds yet.</p>'}
+      ${roundsHtml}
     </div>
     <div>
       <h4 style="font-size:14px;font-weight:700;margin-bottom:8px;">Notice Board</h4>
-      ${noticesHtml || '<p style="color:var(--muted);font-size:13px;">No messages yet.</p>'}
-      <div style="display:flex;gap:8px;margin-top:8px;">
-        <input type="text" id="notice-msg" placeholder="Write a message..." style="flex:1;">
+      <div style="max-height:200px;overflow-y:auto;">${noticesHtml}</div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <input type="text" id="notice-msg" placeholder="Write a message to the group…" style="flex:1;">
         <button class="btn btn-primary btn-sm" onclick="doPostNotice('${id}')">Post</button>
       </div>
     </div>
-  `, { maxWidth: '600px' });
-};
-
-// ── Group action handlers ─────────────────────────────────────────
-window.openNewGroupModal = function() {
-  openModal(`
-    <h3 style="margin-bottom:16px;">New Group</h3>
-    <div class="form-group"><label>Name *</label><input type="text" id="ng-name" placeholder="Friday Savings Club"></div>
-    <div class="form-group"><label>Description</label><textarea id="ng-desc" rows="2" placeholder="What's this group about?"></textarea></div>
-    <div class="form-row">
-      <div class="form-group"><label>Contribution Amount</label><input type="number" id="ng-amount" min="0" step="0.01" placeholder="100"></div>
-      <div class="form-group"><label>Frequency</label><select id="ng-freq">
-        <option value="weekly">Weekly</option><option value="biweekly">Bi-weekly</option>
-        <option value="monthly" selected>Monthly</option><option value="custom">Custom</option>
-      </select></div>
-    </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
-      <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="doCreateGroup()">Create Group</button>
-    </div>
-  `, { maxWidth: '460px' });
-};
-
-window.doCreateGroup = async function() {
-  const name = document.getElementById('ng-name').value.trim();
-  if (!name) return toast('Name required.', 'error');
-  await createGroup(currentUser.id, {
-    name,
-    description: document.getElementById('ng-desc').value.trim(),
-    amount: parseFloat(document.getElementById('ng-amount').value) || 0,
-    frequency: document.getElementById('ng-freq').value
-  });
-  closeModal();
-  toast('Group created!', 'success');
-  navTo('groups');
+  `, { maxWidth: '580px' });
 };
 
 window.openAddMemberModal = async function(groupId) {
   const contacts = await listContacts(currentUser.id);
-  const opts = contacts.map(c => `<option value="${c.id}" data-name="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+  const opts = contacts.map(c=>`<option value="${c.id}" data-name="${esc(c.name)}">${esc(c.name)}</option>`).join('');
   openModal(`
     <h3 style="margin-bottom:16px;">Add Member</h3>
-    <div class="form-group"><label>Contact</label><select id="am-contact">${opts || '<option value="">No contacts</option>'}</select></div>
+    <div class="form-group"><label>Contact</label><select id="am-contact">${opts||'<option value="">No contacts</option>'}</select></div>
+    <div class="form-group"><label>Role</label><select id="am-role">
+      <option value="member">Member</option>
+      <option value="admin">Admin</option>
+    </select></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
-      <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="doAddMember('${groupId}')">Add</button>
+      <button class="bs sm" onclick="closeModal()">Cancel</button>
+      <button class="btn sm" onclick="doAddMember('${groupId}')">Add Member</button>
     </div>
   `);
 };
@@ -2803,15 +3082,17 @@ window.doAddMember = async function(groupId) {
   const sel = document.getElementById('am-contact');
   const contactId = sel.value;
   const name = sel.options[sel.selectedIndex]?.dataset?.name || 'Member';
+  const role = document.getElementById('am-role')?.value || 'member';
   if (!contactId) return toast('Select a contact.', 'error');
-  await addGroupMember(groupId, { contactId, name });
+  const result = await addGroupMember(groupId, { contactId, name, role });
+  if (!result) return toast('Failed to add member.', 'error');
   closeModal();
   toast('Member added.', 'success');
   navTo('groups');
 };
 
 window.doRemoveMember = async function(memberId, name) {
-  if (!confirm(`Remove ${name}?`)) return;
+  if (!confirm(`Remove ${name} from the group?`)) return;
   await removeGroupMember(memberId);
   toast('Member removed.', 'success');
   closeModal();
@@ -2819,7 +3100,8 @@ window.doRemoveMember = async function(memberId, name) {
 };
 
 window.doCreateRound = async function(groupId) {
-  await createRound(groupId);
+  const round = await createRound(groupId);
+  if (!round) return toast('Failed to create round.', 'error');
   toast('New round created.', 'success');
   navTo('groups');
 };
@@ -2833,7 +3115,7 @@ window.doMarkPaid = async function(contributionId, groupId) {
 
 window.doPostNotice = async function(groupId) {
   const msg = document.getElementById('notice-msg').value.trim();
-  if (!msg) return;
+  if (!msg) return toast('Enter a message.', 'error');
   await postNotice(groupId, currentUser.id, currentProfile?.display_name || 'User', msg);
   document.getElementById('notice-msg').value = '';
   closeModal();
@@ -2841,12 +3123,11 @@ window.doPostNotice = async function(groupId) {
 };
 
 window.confirmDeleteGroup = async function(id) {
-  if (!confirm('Delete this group?')) return;
+  if (!confirm('Delete this group? All rounds and member data will be lost.')) return;
   await deleteGroup(id);
   toast('Group deleted.', 'success');
   navTo('groups');
 };
-
 // ── Trusted Access (NOK) ──────────────────────────────────────────
 const LOCKER_TYPES = ['physical','personal','digital','financial','legal','other'];
 
