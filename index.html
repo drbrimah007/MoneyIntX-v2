@@ -405,6 +405,7 @@ import { createScheduledReminder, listActiveReminders, cancelReminder, processDu
 import { listGroups, getGroup, createGroup, deleteGroup, archiveGroup, addGroupMember, removeGroupMember, createRound, markContributionPaid, completeRound, getNoticeBoard, postNotice, calcGroupStats } from './js/groups.js';
 import { listInvestments, getInvestment, createInvestment, deleteInvestment, addInvestmentMember, addInvestmentTransaction, calcInvestmentStats, INV_TYPES, INV_STATUSES } from './js/investments.js';
 import { listTemplates, listPublicTemplates, createTemplate, updateTemplate, deleteTemplate, copyPublicTemplate, togglePublic, archiveTemplate } from './js/templates.js';
+import { initEngine as initTplEngine, exposeToWindow as exposeTplEngine, openTemplateBuilder } from './js/template-engine.js';
 import { listAllUsers, updateUserRole, updateUserStatus, getAuditLog, logAudit, getPlatformStats } from './js/admin.js';
 import { globalSearch } from './js/search.js';
 import { exportEntriesToCSV, exportLedgerToCSV, exportContactsToCSV } from './js/export.js';
@@ -524,6 +525,10 @@ async function enterApp(user) {
   if (adminLink) adminLink.style.display = currentProfile?.role === 'platform_admin' ? '' : 'none';
   const trashLink = document.getElementById('trash-link');
   if (trashLink) trashLink.style.display = currentProfile?.role === 'platform_admin' ? '' : 'none';
+
+  // Init template engine
+  initTplEngine(user.id, navTo, toast);
+  exposeTplEngine();
 
   // Start realtime notifications
   notifChannel = subscribeToNotifications(user.id, (notif) => {
@@ -2319,7 +2324,7 @@ async function renderTemplatesPage(el) {
           <div class="action-menu">
             <button class="action-menu-btn" onclick="toggleActionMenu(this)">⋮</button>
             <div class="action-dropdown">
-              <button onclick="openEditTemplate('${t.id}')">Edit Fields</button>
+              <button onclick="window._tplEngine.openBuilder('${t.id}',document.getElementById('content'))">Edit Fields</button>
               <button onclick="toggleTemplatePublic('${t.id}',${!t.is_public})">${t.is_public ? 'Make Private' : 'Make Public'}</button>
               <button onclick="confirmDeleteTemplate('${t.id}')" style="color:var(--red);">Delete</button>
             </div>
@@ -2330,7 +2335,7 @@ async function renderTemplatesPage(el) {
         </div>` : ''}
         <div style="display:flex;gap:6px;margin-top:8px;">
           ${!t.archived_at ? `<button class="btn btn-primary btn-sm" onclick="useTemplateForEntry('${t.id}')">Use Template</button>` : ''}
-          <button class="btn btn-secondary btn-sm" onclick="openEditTemplate('${t.id}')">Edit Fields</button>
+          <button class="btn btn-secondary btn-sm" onclick="window._tplEngine.openBuilder('${t.id}',document.getElementById('content'))">Edit Fields</button>
         </div>
       </div>`;
     });
