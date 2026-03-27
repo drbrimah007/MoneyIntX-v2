@@ -639,9 +639,33 @@ function renderPagination(totalItems, currentPage, onClickFn) {
 // ── Set default currency from dashboard ───────────────────────────
 window.setDefaultCurrency = async function(cur) {
   if (!currentUser) return;
-  await supabase.from('profiles').update({ default_currency: cur }).eq('id', currentUser.id);
+  // Write to 'users' table — same table getProfile() reads from
+  await supabase.from('users').update({ default_currency: cur }).eq('id', currentUser.id);
   if (currentProfile) currentProfile.default_currency = cur;
   toast('Default currency set to ' + cur, 'success');
+  renderDash(); // re-render so hero reflects new currency immediately
+};
+
+// ── Mini currency picker (replaces native <select> in hero) ────────
+window.toggleCurPicker = function(el) {
+  const picker = document.getElementById('hero-cur-picker');
+  if (!picker) return;
+  const isOpen = picker.style.display !== 'none';
+  picker.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    // close on outside click
+    setTimeout(() => {
+      document.addEventListener('click', function _close(e) {
+        if (!picker.contains(e.target) && e.target !== el) picker.style.display = 'none';
+        document.removeEventListener('click', _close);
+      });
+    }, 0);
+  }
+};
+window.pickCurrency = async function(cur) {
+  const picker = document.getElementById('hero-cur-picker');
+  if (picker) picker.style.display = 'none';
+  await window.setDefaultCurrency(cur);
 };
 
 // ── Invalidate all entry caches (call after any create/update/delete) ─
@@ -960,13 +984,21 @@ async function renderDash(el) {
           <div><span style="opacity:.7;">Owed to Me</span><div style="font-weight:800;font-size:14px;">${fmtMoney(toy, defaultCur)}</div></div>
           <div><span style="opacity:.7;">I Owe</span><div style="font-weight:800;font-size:14px;">${fmtMoney(yot, defaultCur)}</div></div>
         </div>
-        <div style="margin-top:10px;">
-          <span style="font-size:10px;opacity:.55;display:block;margin-bottom:2px;">Default currency</span>
-          <select onchange="setDefaultCurrency(this.value)" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:7px;padding:4px 8px;font-size:12px;font-weight:700;cursor:pointer;">
-            ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','AED','SAR','BRL','EGP','MAD'].map(c =>
-              `<option value="${c}" ${defaultCur===c?'selected':''}>${c}</option>`
+        <!-- Compact currency tab at bottom-right of hero -->
+        <div style="position:relative;display:inline-block;margin-top:10px;">
+          <button onclick="toggleCurPicker(this)" title="Change default currency"
+            style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:5px;letter-spacing:.04em;">
+            ${defaultCur} <span style="font-size:9px;opacity:.7;">▼</span>
+          </button>
+          <!-- Custom dropdown — dark bg so options are always readable -->
+          <div id="hero-cur-picker" style="display:none;position:absolute;left:0;top:calc(100% + 4px);z-index:999;background:#1e2035;border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:6px;min-width:110px;box-shadow:0 8px 24px rgba(0,0,0,.5);max-height:220px;overflow-y:auto;">
+            ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','AED','SAR','BRL','EGP','MAD','TZS','UGX','ETB','XOF','MAD','QAR','KWD'].filter((v,i,a)=>a.indexOf(v)===i).map(c =>
+              `<div onclick="pickCurrency('${c}')" style="padding:5px 10px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:${defaultCur===c?'800':'500'};color:${defaultCur===c?'#a5b4fc':'#e2e8f0'};background:${defaultCur===c?'rgba(99,102,241,.25)':'transparent'};transition:background .1s;"
+                onmouseover="this.style.background='rgba(99,102,241,.15)'" onmouseout="this.style.background='${defaultCur===c?'rgba(99,102,241,.25)':'transparent'}'">
+                ${c}
+              </div>`
             ).join('')}
-          </select>
+          </div>
         </div>
       </div>
       <!-- Other currencies stretch panel (right side) -->
