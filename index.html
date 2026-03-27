@@ -2703,7 +2703,10 @@ window.useTemplateForEntry = async function(templateId) {
 
   let fieldsHtml = fields.map((f, i) => {
     if (f.type === 'text') return `<div class="form-group"><label>${esc(f.label)}${f.required?' *':''}</label><input type="text" id="tf-${f.id}" class="tpl-field"></div>`;
-    if (f.type === 'number' || f.type === 'currency') return `<div class="form-group"><label>${esc(f.label)}${f.required?' *':''}</label><input type="number" id="tf-${f.id}" step="0.01" class="tpl-field" oninput="recalcTemplateFields()"></div>`;
+    if (f.type === 'number' || f.type === 'currency') {
+      const _hasCalcs = (f.calculators||[]).length > 0;
+      return `<div class="form-group"><label>${esc(f.label)}${f.required&&!_hasCalcs?' *':''}</label><input type="number" id="tf-${f.id}" step="0.01" class="tpl-field" value="${esc(String(f.defaultValue||''))}"${_hasCalcs?' readonly style="background:var(--bg3);color:var(--muted);cursor:default;" title="Auto-computed"':' oninput="recalcTemplateFields()"'}></div>`;
+    }
     if (f.type === 'date') return `<div class="form-group"><label>${esc(f.label)}</label><input type="date" id="tf-${f.id}" class="tpl-field" value="${new Date().toISOString().slice(0,10)}"></div>`;
     if (f.type === 'textarea') return `<div class="form-group"><label>${esc(f.label)}</label><textarea id="tf-${f.id}" rows="2" class="tpl-field"></textarea></div>`;
     if (f.type === 'select') return `<div class="form-group"><label>${esc(f.label)}</label><select id="tf-${f.id}" class="tpl-field" onchange="recalcTemplateFields()">${(f.options||[]).map(o => `<option>${esc(o)}</option>`).join('')}</select></div>`;
@@ -2794,6 +2797,9 @@ window.recalcTemplateFields = function() {
     }
     const el = document.getElementById('tf-' + f.id);
     if (!el || el.tagName === 'DIV') return; // skip computed display divs
+    // Fields with calculators are computed — don't seed from their input
+    const hasCalcs = (f.calculators||[]).length > 0 || !!f.calcType;
+    if (hasCalcs && _isNumeric(f)) return;
     vals[f.id] = parseFloat(el.value) || 0;
   });
 
@@ -2801,13 +2807,13 @@ window.recalcTemplateFields = function() {
   const _runOnePass = () => {
     tpl.fields.forEach(f => {
       const el = document.getElementById('tf-' + f.id);
-      if (!el || el.tagName !== 'DIV') return;
+      if (!el) return;
       const calcs = f.calculators || [];
       // Legacy: single calcType → convert to calculators format
       if (calcs.length === 0 && f.calcType) {
         calcs.push({ operation: f.calcType, operand: f.calcFactor || 0 });
       }
-      if (!calcs.length) return;
+      if (!calcs.length) return; // only process fields that have calculators
 
       calcs.forEach(c => {
         let val = 0;
@@ -2861,17 +2867,24 @@ window.recalcTemplateFields = function() {
   let finalTotalVal = null;
   tpl.fields.forEach(f => {
     const el = document.getElementById('tf-' + f.id);
-    if (!el || el.tagName !== 'DIV') return;
+    if (!el) return;
+    const hasCalcs = (f.calculators||[]).length > 0 || !!f.calcType;
+    if (!hasCalcs) return;
     const displayVal = vals[f.id] || 0;
-    el.dataset.computed = displayVal;
 
-    if (f.isFinalTotal) {
-      el.style.border = '2px solid var(--green)';
-      el.style.fontSize = '20px';
+    if (el.tagName === 'DIV') {
+      // computed type field — rendered as display div
+      el.dataset.computed = displayVal;
+      if (f.isFinalTotal) {
+        el.style.border = '2px solid var(--green)';
+        el.style.fontSize = '20px';
+        finalTotalVal = displayVal;
+      }
       el.textContent = '$' + displayVal.toFixed(2);
-      finalTotalVal = displayVal;
-    } else {
-      el.textContent = '$' + displayVal.toFixed(2);
+    } else if (el.tagName === 'INPUT') {
+      // number/currency field with calculators — update its value
+      el.value = displayVal !== 0 ? displayVal.toFixed(2) : '';
+      if (f.isFinalTotal) finalTotalVal = displayVal;
     }
   });
 
