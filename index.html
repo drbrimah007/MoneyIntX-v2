@@ -2427,7 +2427,7 @@ window.openNewTemplateModal = function() {
 
 window.addTemplateField = function() {
   const id = 'f' + Math.random().toString(36).substr(2, 6);
-  window._tplFields.push({ id, label: '', type: 'text', required: false, options: '',
+  window._tplFields.push({ id, label: '', type: 'number', required: false, options: '',
     calculators: [], ledgerEffect: '', isFinalTotal: false,
     excludeFromAggregate: false, textLabel: 'Item', numericLabel: 'Amount', defaultValue: '' });
   renderFieldList(true);
@@ -2705,7 +2705,9 @@ window.useTemplateForEntry = async function(templateId) {
     if (f.type === 'text') return `<div class="form-group"><label>${esc(f.label)}${f.required?' *':''}</label><input type="text" id="tf-${f.id}" class="tpl-field"></div>`;
     if (f.type === 'number' || f.type === 'currency') {
       const _hasCalcs = (f.calculators||[]).length > 0;
-      return `<div class="form-group"><label>${esc(f.label)}${f.required&&!_hasCalcs?' *':''}</label><input type="number" id="tf-${f.id}" step="0.01" class="tpl-field" value="${esc(String(f.defaultValue||''))}"${_hasCalcs?' readonly style="background:var(--bg3);color:var(--muted);cursor:default;" title="Auto-computed"':' oninput="recalcTemplateFields()"'}></div>`;
+      // Fields with calculators render as computed display divs so they auto-update
+      if (_hasCalcs) return `<div class="form-group"><label>${esc(f.label)} <span style="font-size:10px;color:#60a5fa;font-weight:600;">⚡ auto</span></label><div id="tf-${f.id}" class="tpl-field" style="padding:10px 14px;background:#0d1f3c;border:1px solid #2563eb;border-radius:10px;font-weight:700;font-size:16px;color:#93c5fd;" data-computed="0">$0.00</div></div>`;
+      return `<div class="form-group"><label>${esc(f.label)}${f.required?' *':''}</label><input type="number" id="tf-${f.id}" step="0.01" class="tpl-field" value="${esc(String(f.defaultValue||''))}" oninput="recalcTemplateFields()"></div>`;
     }
     if (f.type === 'date') return `<div class="form-group"><label>${esc(f.label)}</label><input type="date" id="tf-${f.id}" class="tpl-field" value="${new Date().toISOString().slice(0,10)}"></div>`;
     if (f.type === 'textarea') return `<div class="form-group"><label>${esc(f.label)}</label><textarea id="tf-${f.id}" rows="2" class="tpl-field"></textarea></div>`;
@@ -2797,9 +2799,6 @@ window.recalcTemplateFields = function() {
     }
     const el = document.getElementById('tf-' + f.id);
     if (!el || el.tagName === 'DIV') return; // skip computed display divs
-    // Fields with calculators are computed — don't seed from their input
-    const hasCalcs = (f.calculators||[]).length > 0 || !!f.calcType;
-    if (hasCalcs && _isNumeric(f)) return;
     vals[f.id] = parseFloat(el.value) || 0;
   });
 
@@ -2867,24 +2866,17 @@ window.recalcTemplateFields = function() {
   let finalTotalVal = null;
   tpl.fields.forEach(f => {
     const el = document.getElementById('tf-' + f.id);
-    if (!el) return;
-    const hasCalcs = (f.calculators||[]).length > 0 || !!f.calcType;
-    if (!hasCalcs) return;
+    if (!el || el.tagName !== 'DIV') return;
     const displayVal = vals[f.id] || 0;
+    el.dataset.computed = displayVal;
 
-    if (el.tagName === 'DIV') {
-      // computed type field — rendered as display div
-      el.dataset.computed = displayVal;
-      if (f.isFinalTotal) {
-        el.style.border = '2px solid var(--green)';
-        el.style.fontSize = '20px';
-        finalTotalVal = displayVal;
-      }
+    if (f.isFinalTotal) {
+      el.style.border = '2px solid var(--green)';
+      el.style.fontSize = '20px';
       el.textContent = '$' + displayVal.toFixed(2);
-    } else if (el.tagName === 'INPUT') {
-      // number/currency field with calculators — update its value
-      el.value = displayVal !== 0 ? displayVal.toFixed(2) : '';
-      if (f.isFinalTotal) finalTotalVal = displayVal;
+      finalTotalVal = displayVal;
+    } else {
+      el.textContent = '$' + displayVal.toFixed(2);
     }
   });
 
