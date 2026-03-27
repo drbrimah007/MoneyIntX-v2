@@ -2363,7 +2363,7 @@ async function renderTemplatesPage(el) {
           <div class="action-menu">
             <button class="action-menu-btn" onclick="toggleActionMenu(this)">⋮</button>
             <div class="action-dropdown">
-              <button onclick="window._tplEngine.openBuilder('${t.id}',document.getElementById('content'))">Edit Fields</button>
+              <button onclick="openEditTemplate('${t.id}')">Edit Fields</button>
               <button onclick="toggleTemplatePublic('${t.id}',${!t.is_public})">${t.is_public ? 'Make Private' : 'Make Public'}</button>
               <button onclick="confirmDeleteTemplate('${t.id}')" style="color:var(--red);">Delete</button>
             </div>
@@ -2385,7 +2385,7 @@ async function renderTemplatesPage(el) {
         </div>` : ''}
         <div style="display:flex;gap:6px;margin-top:8px;">
           ${!t.archived_at ? `<button class="btn btn-primary btn-sm" onclick="useTemplateForEntry('${t.id}')">Use Template</button>` : ''}
-          <button class="btn btn-secondary btn-sm" onclick="window._tplEngine.openBuilder('${t.id}',document.getElementById('content'))">Edit Fields</button>
+          <button class="btn btn-secondary btn-sm" onclick="openEditTemplate('${t.id}')">Edit Fields</button>
         </div>
       </div>`;
     });
@@ -2757,7 +2757,10 @@ window.useTemplateForEntry = async function(templateId) {
     if (f.type === 'number' || f.type === 'currency') {
       const _hasCalcs = (f.calculators||[]).length > 0;
       // Fields with calculators render as computed display divs so they auto-update
-      if (_hasCalcs) return `<div class="form-group"><label>${esc(f.label)} <span style="font-size:10px;color:#60a5fa;font-weight:600;">⚡ auto</span></label><div id="tf-${f.id}" class="tpl-field" style="padding:10px 14px;background:#0d1f3c;border:1px solid #2563eb;border-radius:10px;font-weight:700;font-size:16px;color:#93c5fd;" data-computed="0">${fmtMoney(0,window._activeTplCurrency)}</div></div>`;
+      if (_hasCalcs) {
+        const _isFinal = f.isFinalTotal;
+        return `<div class="form-group"><label>${esc(f.label)} <span style="font-size:10px;color:${_isFinal?'#22c55e':'#60a5fa'};font-weight:600;">${_isFinal?'✓ TOTAL':'⚡ auto'}</span></label><div id="tf-${f.id}" class="tpl-field" style="padding:12px 16px;background:${_isFinal?'#052e16':'#0d1f3c'};border:2px solid ${_isFinal?'#22c55e':'#2563eb'};border-radius:10px;font-weight:800;font-size:${_isFinal?'22':'16'}px;color:${_isFinal?'#4ade80':'#93c5fd'};" data-computed="0">${fmtMoney(0,window._activeTplCurrency)}</div></div>`;
+      }
       return `<div class="form-group"><label>${esc(f.label)}${f.required?' *':''}</label><input type="number" id="tf-${f.id}" step="0.01" class="tpl-field" value="${esc(String(f.defaultValue||''))}" oninput="recalcTemplateFields()"></div>`;
     }
     if (f.type === 'date') return `<div class="form-group"><label>${esc(f.label)}</label><input type="date" id="tf-${f.id}" class="tpl-field" value="${new Date().toISOString().slice(0,10)}"></div>`;
@@ -2781,10 +2784,10 @@ window.useTemplateForEntry = async function(templateId) {
     <div class="form-row">
       <div class="form-group"><label>Date</label><input type="date" id="tfe-date" value="${new Date().toISOString().slice(0,10)}"></div>
       <div class="form-group">
-        <label>Currency &amp; Amount</label>
+        <label>Currency${fields.some(f=>f.isFinalTotal)?'':' &amp; Amount'}</label>
         <div style="display:flex;gap:6px;">
           <select id="tfe-currency" style="flex:0 0 86px;padding:10px 4px;" onchange="window._activeTplCurrency=this.value;recalcTemplateFields()">${currencySelectHtml(t.currency || currentProfile?.default_currency)}</select>
-          <input type="number" id="tfe-amount" step="0.01" placeholder="Auto-calculated" style="flex:1;" oninput="this._userEdited = this.value !== ''">
+          <input type="number" id="tfe-amount" step="0.01" placeholder="Set by Final Total field" style="flex:1;${fields.some(f=>f.isFinalTotal)?'display:none;':''}" oninput="this._userEdited = this.value !== ''">
         </div>
       </div>
     </div>
