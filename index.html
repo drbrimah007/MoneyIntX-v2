@@ -430,6 +430,7 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
       <div id="search-results" style="display:none;position:absolute;left:50%;transform:translateX(-50%);width:400px;max-width:90vw;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);z-index:200;max-height:300px;overflow-y:auto;margin-top:4px;"></div>
     </div>
     <div id="topbar-right">
+      <button class="btn btn-primary btn-sm hide-mobile" onclick="openNewEntryModal()" style="padding:6px 14px;font-size:13px;">+ Entry</button>
       <span id="sidebar-user-name" style="font-size:13px;font-weight:600;"></span>
       <button class="bs sm" onclick="app.logOut()">Sign Out</button>
     </div>
@@ -455,6 +456,21 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
 
   <!-- Main Content -->
   <div id="main"><div id="content"></div></div>
+
+  <!-- Floating Add Entry Button (visible on all pages) -->
+  <!-- FAB: shown on mobile only (desktop has topbar "+ Entry" button) -->
+  <button id="fab-add-entry" onclick="openNewEntryModal()" title="Add Entry"
+    style="position:fixed;bottom:calc(68px + env(safe-area-inset-bottom));right:16px;z-index:4000;
+           width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;
+           background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-size:26px;line-height:1;font-weight:400;
+           box-shadow:0 4px 18px rgba(99,102,241,.55);align-items:center;justify-content:center;
+           transition:transform .15s,box-shadow .15s;" aria-label="Add Entry"
+    onmouseover="this.style.transform='scale(1.1)';this.style.boxShadow='0 6px 24px rgba(99,102,241,.7)'"
+    onmouseout="this.style.transform='';this.style.boxShadow='0 4px 18px rgba(99,102,241,.55)'">+</button>
+  <style>
+    #fab-add-entry.fab-visible { display:flex; }
+    @media(min-width:641px){ #fab-add-entry.fab-visible { display:none!important; } }
+  </style>
 
   <!-- Mobile Bottom Tab Bar -->
   <div id="mobile-tab-bar">
@@ -769,6 +785,7 @@ async function handleLogOut() {
   currentProfile = null;
   document.getElementById('shell').classList.remove('active');
   document.getElementById('landing').style.display = '';
+  document.getElementById('fab-add-entry')?.classList.remove('fab-visible');
 }
 
 // ── Enter app after auth ──────────────────────────────────────────
@@ -787,6 +804,8 @@ async function enterApp(user) {
   document.getElementById('auth-loader').style.display = 'none';
   document.getElementById('landing').style.display = 'none';
   document.getElementById('shell').classList.add('active');
+  // Show FAB now that user is logged in (CSS hides it on desktop automatically)
+  document.getElementById('fab-add-entry')?.classList.add('fab-visible');
   document.getElementById('sidebar-user-name').textContent = currentProfile?.display_name || user.email;
   // sidebar-user-email removed in v1-style layout
   // Show admin link for admin users
@@ -2648,10 +2667,80 @@ window.saveNewEntry = async function() {
   const note = document.getElementById('ne-note').value.trim();
   if (!contactId) return toast('Please select a contact.', 'error');
   if (!amount || parseFloat(amount) <= 0) return toast('Enter a valid amount.', 'error');
-  await createEntry(currentUser.id, { contactId, txType, amount: parseFloat(amount), currency, date, note });
+
+  const entry = await createEntry(currentUser.id, { contactId, txType, amount: parseFloat(amount), currency, date, note });
   closeModal();
   toast('Entry created.', 'success');
   _invalidateEntries(); navTo('entries');
+
+  // ── Notify both parties ─────────────────────────────────────────
+  try {
+    const contactName = window._neContacts?.find(c => c.id === contactId)?.name || 'Contact';
+    const fromName    = currentProfile?.display_name || 'Someone';
+    const txLabel     = TX_LABELS[txType] || txType;
+    const amtLabel    = `${currency} ${parseFloat(amount).toLocaleString()}`;
+    const entryId     = entry?.id;
+
+    // 1) Self-notification (so user has a record in their own feed)
+    await supabase.from('notifications').insert({
+      user_id: currentUser.id,
+      type: 'notification',
+      message: `Entry added: ${txLabel} with ${contactName} — ${amtLabel}${note ? '. ' + note : ''}`,
+      amount: parseFloat(amount),
+      currency,
+      contact_name: contactName,
+      entry_id: entryId,
+      is_read: false
+    });
+
+    // 2) Notify the contact if they have a Money IntX account
+    const { data: contactUser } = await supabase
+      .from('contacts')
+      .select('email, linked_user_id')
+      .eq('id', contactId)
+      .single();
+
+    const linkedUserId = contactUser?.linked_user_id;
+    const contactEmail = contactUser?.email;
+
+    if (linkedUserId) {
+      // Contact has an account — create an in-app notification for them
+      const reverseType = {
+        they_owe_you: 'you_owe_them',
+        you_owe_them: 'they_owe_you',
+        they_paid_you: 'you_paid_them',
+        you_paid_them: 'they_paid_you',
+        invoice: 'invoice',
+        bill: 'bill'
+      }[txType] || txType;
+      const reverseLabel = TX_LABELS[reverseType] || reverseType;
+      await supabase.from('notifications').insert({
+        user_id: linkedUserId,
+        type: 'notification',
+        message: `${fromName} added a record: ${reverseLabel} — ${amtLabel}${note ? '. ' + note : ''}`,
+        amount: parseFloat(amount),
+        currency,
+        contact_name: fromName,
+        entry_id: entryId,
+        is_read: false
+      });
+    }
+
+    // 3) Send email to contact if they have an email on file
+    if (contactEmail) {
+      await sendNotificationEmail(currentUser.id, {
+        to: contactEmail,
+        fromName,
+        txType,
+        amount: parseFloat(amount),
+        currency,
+        message: note,
+        entryId
+      });
+    }
+  } catch (notifErr) {
+    console.warn('Post-entry notify error:', notifErr);
+  }
 };
 
 window.confirmDeleteEntry = async function(id) {
@@ -3566,22 +3655,17 @@ window._lockLockers = function() {
 window.requestLockerOtp = async function() {
   const email = currentUser.email;
   if (!email) return toast('No email on account.', 'error');
-  const code = String(Math.floor(100000 + Math.random() * 900000));
-  window._lockerOtp       = code;
-  window._lockerOtpExpiry = Date.now() + 30 * 60 * 1000; // 30 min
 
-  // Send OTP via branded email only — never show the code in in-app notifications
-  try {
-    await sendOtpEmail(currentUser.id, { to: email, otp: code, lockerName: 'Asset Locker' });
-  } catch (_) {}
+  // Remove any existing dialog
+  document.getElementById('lockerOtpBg')?.remove();
 
+  // Show dialog with "sending…" state immediately
   document.body.insertAdjacentHTML('beforeend', `<div class="modal-bg" id="lockerOtpBg" onclick="if(event.target===this)this.remove()">
     <div class="modal" style="max-width:380px;text-align:center;" onclick="event.stopPropagation()">
       <div style="font-size:36px;margin-bottom:12px;">📧</div>
       <div style="font-size:17px;font-weight:800;margin-bottom:6px;">Check Your Email</div>
-      <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6;">
-        A 6-digit access code has been sent to <strong>${esc(email)}</strong>.<br>
-        Enter it below to unlock your Asset Lockers.
+      <div id="locker-otp-status" style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6;">
+        Sending access code to <strong>${esc(email)}</strong>…
       </div>
       <input id="lockerOtpInput" type="text" inputmode="numeric" maxlength="6"
         placeholder="000000"
@@ -3589,13 +3673,50 @@ window.requestLockerOtp = async function() {
         onkeydown="if(event.key==='Enter')verifyLockerOtp()">
       <div style="display:flex;flex-direction:column;gap:8px;align-items:center;">
         <button class="btn" onclick="verifyLockerOtp()" style="min-width:160px;">🔓 Unlock</button>
+        <button class="bs sm" id="locker-resend-btn" onclick="resendLockerOtp()" style="display:none;">↩ Resend Code</button>
         <button class="bs sm" onclick="document.getElementById('lockerOtpBg').remove()">Cancel</button>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:14px;">Code expires in 30 minutes.</div>
     </div>
   </div>`);
   setTimeout(() => document.getElementById('lockerOtpInput')?.focus(), 100);
-  toast('Access code sent to ' + email);
+
+  await _doSendLockerOtp(email);
+};
+
+window._doSendLockerOtp = async function(email) {
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  window._lockerOtp       = code;
+  window._lockerOtpExpiry = Date.now() + 30 * 60 * 1000; // 30 min
+
+  const statusEl  = document.getElementById('locker-otp-status');
+  const resendBtn = document.getElementById('locker-resend-btn');
+
+  try {
+    const result = await sendOtpEmail(currentUser.id, { to: email, otp: code, lockerName: 'Asset Locker' });
+    if (statusEl) {
+      if (result?.ok) {
+        statusEl.innerHTML = `✅ Code sent to <strong>${esc(email)}</strong>.<br>Enter it below to unlock your Asset Lockers.<br><span style="font-size:11px;color:var(--muted);">Check spam if you don't see it.</span>`;
+      } else {
+        statusEl.innerHTML = `⚠️ Couldn't send email — check your Vercel <code>RESEND_API_KEY</code> env var.<br><span style="font-size:11px;">Contact: ${esc(email)}</span>`;
+        if (resendBtn) resendBtn.style.display = '';
+      }
+    }
+  } catch (err) {
+    if (statusEl) {
+      statusEl.innerHTML = `⚠️ Email error: ${esc(err?.message || 'Unknown')}.<br>Try again or contact support.`;
+      if (resendBtn) resendBtn.style.display = '';
+    }
+  }
+};
+
+window.resendLockerOtp = async function() {
+  const email = currentUser.email;
+  const statusEl  = document.getElementById('locker-otp-status');
+  const resendBtn = document.getElementById('locker-resend-btn');
+  if (statusEl) statusEl.innerHTML = `Resending to <strong>${esc(email)}</strong>…`;
+  if (resendBtn) resendBtn.style.display = 'none';
+  await _doSendLockerOtp(email);
 };
 
 window.verifyLockerOtp = function() {
@@ -4633,29 +4754,97 @@ window.saveTemplateEntry = async function(templateId, invNum) {
   closeModal(); toast('Entry created from template!', 'success'); _invalidateEntries(); navTo('entries');
 };
 
+window._publicTemplatesCache = null;
+
 window.openPublicTemplateDB = async function() {
   const el = document.getElementById('content');
-  el.innerHTML = '<p style="color:var(--muted);">Loading public templates...</p>';
+  el.innerHTML = '<p style="padding:20px;color:var(--muted);">Loading public templates…</p>';
+
   const templates = await listPublicTemplates();
-  let html = `<div class="page-header"><h2>Public Template DB</h2>
-    <button class="btn btn-secondary btn-sm" onclick="navTo('templates')">Back</button>
-  </div>`;
+  window._publicTemplatesCache = templates;
+
+  el.innerHTML = `<div class="page-header">
+    <h2>Public Template DB</h2>
+    <button class="btn btn-secondary btn-sm" onclick="navTo('templates')">← Back</button>
+  </div>
+  <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+    <input id="tpl-search" type="text" placeholder="Search templates…" oninput="filterPublicTemplates(this.value)"
+      style="flex:1;min-width:180px;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:14px;">
+    <select id="tpl-type-filter" onchange="filterPublicTemplates(document.getElementById('tpl-search').value)"
+      style="padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;">
+      <option value="">All types</option>
+      ${Object.entries(TX_LABELS).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}
+    </select>
+  </div>
+  <div id="tpl-db-list"></div>`;
+
+  renderPublicTemplateList(templates);
+};
+
+function renderPublicTemplateList(templates) {
+  const list = document.getElementById('tpl-db-list');
+  if (!list) return;
   if (templates.length === 0) {
-    html += `<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No public templates yet.</p></div>`;
-  } else {
-    templates.forEach(t => {
-      html += `<div class="card" style="margin-bottom:12px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <div>
-            <h3 style="font-size:16px;font-weight:700;">${esc(t.name)}</h3>
-            <p style="font-size:13px;color:var(--muted);">${esc(t.description || '')} ${t.creator?.display_name ? '— by ' + esc(t.creator.display_name) : ''}</p>
-          </div>
-          <button class="btn btn-primary btn-sm" onclick="doCopyTemplate('${t.id}')">Copy</button>
-        </div>
-      </div>`;
-    });
+    list.innerHTML = `<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No templates match your search.</p></div>`;
+    return;
   }
-  el.innerHTML = html;
+  list.innerHTML = templates.map(t => {
+    const fCount = (t.fields || []).length;
+    const creator = t.creator?.display_name ? `<span style="color:var(--muted);">by ${esc(t.creator.display_name)}</span>` : '';
+    const typeLabel = t.tx_type ? `<span class="badge badge-gray" style="font-size:11px;">${esc(TX_LABELS[t.tx_type] || t.tx_type)}</span>` : '';
+    return `<div class="card" style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+            <span style="font-size:15px;font-weight:700;">${esc(t.name)}</span>
+            ${typeLabel}
+            <span class="badge badge-blue" style="font-size:11px;">${fCount} field${fCount !== 1 ? 's' : ''}</span>
+          </div>
+          ${t.description ? `<p style="font-size:13px;color:var(--muted);margin:0 0 4px;">${esc(t.description)}</p>` : ''}
+          <p style="font-size:12px;color:var(--muted);margin:0;">${creator}</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+          <button class="btn btn-primary btn-sm" onclick="doCopyTemplate('${t.id}')">📋 Copy</button>
+          <button class="btn btn-secondary btn-sm" onclick="previewPublicTemplate('${t.id}')">👁 Preview</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.filterPublicTemplates = function(query) {
+  const typeFilter = document.getElementById('tpl-type-filter')?.value || '';
+  const q = (query || '').toLowerCase();
+  const all = window._publicTemplatesCache || [];
+  const filtered = all.filter(t => {
+    const matchesText = !q ||
+      (t.name || '').toLowerCase().includes(q) ||
+      (t.description || '').toLowerCase().includes(q) ||
+      (t.creator?.display_name || '').toLowerCase().includes(q) ||
+      (t.fields || []).some(f => (f.label || '').toLowerCase().includes(q));
+    const matchesType = !typeFilter || t.tx_type === typeFilter;
+    return matchesText && matchesType;
+  });
+  renderPublicTemplateList(filtered);
+};
+
+window.previewPublicTemplate = function(id) {
+  const t = (window._publicTemplatesCache || []).find(x => x.id === id);
+  if (!t) return;
+  const fields = (t.fields || []).map(f =>
+    `<li style="padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;"><strong>${esc(f.label)}</strong> <span style="color:var(--muted);">[${f.type}]</span>${f.value ? ` = ${f.value}` : ''}</li>`
+  ).join('');
+  openModal(`
+    <div style="max-width:480px;">
+      <h3 style="margin-bottom:4px;">${esc(t.name)}</h3>
+      ${t.description ? `<p style="color:var(--muted);font-size:13px;margin-bottom:12px;">${esc(t.description)}</p>` : ''}
+      <ul style="list-style:none;padding:0;margin:0 0 16px;">${fields || '<li style="color:var(--muted);">No fields defined.</li>'}</ul>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary btn-sm" onclick="doCopyTemplate('${id}');closeModal()">📋 Copy to My Templates</button>
+        <button class="bs sm" onclick="closeModal()">Close</button>
+      </div>
+    </div>
+  `);
 };
 
 window.doCopyTemplate = async function(id) {
