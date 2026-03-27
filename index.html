@@ -2652,7 +2652,7 @@ window.useTemplateForEntry = async function(templateId) {
     </select></div>
     <div class="form-row">
       <div class="form-group"><label>Date</label><input type="date" id="tfe-date" value="${new Date().toISOString().slice(0,10)}"></div>
-      <div class="form-group"><label>Amount</label><input type="number" id="tfe-amount" step="0.01" placeholder="Auto-calculated or manual"></div>
+      <div class="form-group"><label>Amount</label><input type="number" id="tfe-amount" step="0.01" placeholder="Auto-calculated or manual" oninput="this._userEdited = this.value !== ''"></div>
     </div>
     ${fieldsHtml}
     <div class="form-group"><label>Note</label><textarea id="tfe-note" rows="2"></textarea></div>
@@ -2817,11 +2817,10 @@ window.recalcTemplateFields = function() {
     }
   }
   if (finalTotalVal === null) {
-    // Sum all computed vals
+    // No computed/aggregate field — sum all numeric and paired input values directly
     finalTotalVal = 0;
     tpl.fields.forEach(f => {
-      const el = document.getElementById('tf-' + f.id);
-      if (el?.tagName === 'DIV') finalTotalVal += vals[f.id] || 0;
+      if (_isNumeric(f) || _isPaired(f)) finalTotalVal += vals[f.id] || 0;
     });
   }
 
