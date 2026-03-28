@@ -3050,12 +3050,14 @@ window.doShareEntry = async function(entryId) {
   const url = getShareUrl(token.token);
 
   // Notify linked recipient if email provided
+  // NOTE: We use an RPC (find_user_id_by_email) instead of a direct table
+  // query because RLS on `users` prevents one user from reading another's row.
   if (email) {
-    const { data: recipientUser } = await supabase.from('users').select('id').eq('email', email).single();
-    if (recipientUser) {
-      await supabase.from('share_tokens').update({ recipient_id: recipientUser.id, status: 'sent' }).eq('id', token.id);
+    const { data: recipientId } = await supabase.rpc('find_user_id_by_email', { p_email: email });
+    if (recipientId) {
+      await supabase.from('share_tokens').update({ recipient_id: recipientId, status: 'sent' }).eq('id', token.id);
       await supabase.from('notifications').insert({
-        user_id: recipientUser.id,
+        user_id: recipientId,
         type: 'shared_record',
         message: `${currentProfile?.display_name || 'Someone'} shared a record with you: ${fmtMoney(entry.amount, entry.currency)}`,
         entry_id: entryId,
