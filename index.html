@@ -983,7 +983,8 @@ window.pickCurrency = async function(cur) {
 // ── Invalidate all entry caches (call after any create/update/delete) ─
 function _invalidateEntries() {
   invalidateEntryCache(currentUser?.id);
-  _entriesAll = [];   // force re-fetch next renderEntries call
+  _entriesAll = [];         // force re-fetch next renderEntries call
+  _pendingSharesAll = null; // force re-fetch pending received shares
 }
 
 // ── Currency amount formatter (dollars, not cents) ─────────────────
@@ -1041,10 +1042,34 @@ window.handleForgotPassword = function() {
 window.doSendResetEmail = async function() {
   const email = document.getElementById('forgot-email')?.value.trim();
   if (!email) return toast('Enter your email address.', 'error');
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin + (window.location.pathname || '/') + '#reset'
-  });
-  if (error) return toast(error.message, 'error');
+  // Use our Resend-based endpoint so the email comes from Money IntX <hello@moneyintx.com>
+  let resetOk = false;
+  try {
+    const resp = await fetch('/api/send-reset-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const result = await resp.json();
+    resetOk = result.ok !== false;
+    if (!resetOk && result.error) {
+      // If our endpoint fails (e.g. missing service key env var), fall back to Supabase default
+      console.warn('[doSendResetEmail] custom endpoint failed, falling back:', result.error);
+      const { error: sbErr } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/'
+      });
+      if (sbErr) return toast(sbErr.message, 'error');
+      resetOk = true;
+    }
+  } catch(e) {
+    // Network error — fall back to Supabase
+    const { error: sbErr } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/'
+    });
+    if (sbErr) return toast(sbErr.message, 'error');
+    resetOk = true;
+  }
+  if (!resetOk) return;
   const forms = document.getElementById('auth-forms');
   if (forms) forms.innerHTML = `
     <div style="text-align:center;padding:20px 0;">
@@ -1056,39 +1081,43 @@ window.doSendResetEmail = async function() {
 };
 
 // Handle password reset from email link
+// NOTE: This is a module script — DOMContentLoaded has already fired when this runs.
+// We inject the reset form directly (no listener needed).
 if (window.location.hash.includes('type=recovery') || window.location.hash.includes('#reset')) {
   window._isRecovery = true;
-  // Supabase puts the token in the URL hash
-  const hashParams = new URLSearchParams(window.location.hash.substring(1));
-  if (hashParams.get('type') === 'recovery' || hashParams.get('access_token')) {
-    document.addEventListener('DOMContentLoaded', () => {
-      const landing = document.getElementById('landing');
-      if (landing) {
-        landing.style.display = '';
-        // Find the auth card inner div
-        const authCard = landing.querySelector('#auth-forms') || landing.querySelector('.landing-card');
-        const target = authCard || landing.querySelector('div[style*="border-radius:16px"]');
-        if (target) {
-          const parent = target.closest('div[style*="border-radius:16px"]') || target;
-          parent.innerHTML = `
-            <div style="text-align:center;margin-bottom:20px;">
-              <div style="font-size:40px;margin-bottom:10px;">🔐</div>
-              <h2 style="font-size:22px;font-weight:800;margin-bottom:6px;">Set New Password</h2>
-              <p style="color:#8892a4;font-size:13px;">Choose a strong password for your account</p>
-            </div>
-            <div class="form-group">
-              <label>New Password</label>
-              <input type="password" id="reset-pass" placeholder="Min 6 characters" style="font-size:15px;padding:12px 14px;">
-            </div>
-            <div class="form-group">
-              <label>Confirm Password</label>
-              <input type="password" id="reset-pass2" placeholder="Confirm new password" style="font-size:15px;padding:12px 14px;">
-            </div>
-            <button class="btn btn-primary" style="width:100%;margin-top:8px;padding:14px;font-size:15px;" onclick="doResetPassword()">Update Password</button>
-          `;
-        }
-      }
-    });
+  const _hashParams = new URLSearchParams(window.location.hash.substring(1));
+  if (_hashParams.get('type') === 'recovery' || _hashParams.get('access_token')) {
+    // DOM is ready — inject the reset form immediately
+    const _authLoader = document.getElementById('auth-loader');
+    const _landing = document.getElementById('landing');
+    const _authForms = document.getElementById('auth-forms');
+    const _loginForm = document.getElementById('login-form');
+    const _signupForm = document.getElementById('signup-form');
+    if (_authLoader) _authLoader.style.display = 'none';
+    if (_landing) _landing.style.display = '';
+    if (_loginForm) _loginForm.style.display = 'none';
+    if (_signupForm) _signupForm.style.display = 'none';
+    if (_authForms && !document.getElementById('reset-pass')) {
+      const _rf = document.createElement('div');
+      _rf.id = 'reset-form-pw';
+      _rf.innerHTML = `
+        <div style="text-align:center;margin-bottom:20px;">
+          <div style="font-size:40px;margin-bottom:10px;">🔐</div>
+          <h2 style="font-size:22px;font-weight:800;margin-bottom:6px;">Set New Password</h2>
+          <p style="color:#8892a4;font-size:13px;">Choose a strong password for your account</p>
+        </div>
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="password" id="reset-pass" placeholder="Min 6 characters" style="font-size:15px;padding:12px 14px;">
+        </div>
+        <div class="form-group">
+          <label>Confirm Password</label>
+          <input type="password" id="reset-pass2" placeholder="Confirm new password" style="font-size:15px;padding:12px 14px;">
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-top:8px;padding:14px;font-size:15px;" onclick="doResetPassword()">Update Password</button>
+      `;
+      _authForms.appendChild(_rf);
+    }
   }
 }
 
@@ -2048,6 +2077,7 @@ window.confirmDeleteContact = async function(id, name) {
 
 // ── Entries ───────────────────────────────────────────────────────
 let _entriesAll = [];
+let _pendingSharesAll = null; // null = not yet loaded; [] = loaded but empty
 let _entriesPage = 1;
 let _entriesFilter = '';
 
@@ -2063,6 +2093,16 @@ async function renderEntries(el, page, forceRefresh) {
       _entriesAll = window._impersonatedData.entries || [];
     } else {
       _entriesAll = await listEntries(currentUser.id);
+    }
+  }
+
+  // Load pending received shares (from other users) — shown inline at top
+  if (_pendingSharesAll === null || forceRefresh) {
+    try {
+      const allShares = await listReceivedShares(currentUser.id);
+      _pendingSharesAll = (allShares || []).filter(s => s.status !== 'confirmed' && s.status !== 'dismissed');
+    } catch(e) {
+      _pendingSharesAll = [];
     }
   }
 
@@ -2089,6 +2129,37 @@ async function renderEntries(el, page, forceRefresh) {
       <button class="bs sm" onclick="doExportEntries()" title="Export CSV">📥</button>
     </div>
   </div>`;
+
+  // ── Pending Shared Records banner (from other users, awaiting confirm/reject) ──
+  if (_pendingSharesAll && _pendingSharesAll.length > 0) {
+    html += `<div class="card" style="padding:0;overflow:hidden;border:2px solid rgba(245,158,11,.5);margin-bottom:14px;">
+      <div style="background:rgba(245,158,11,.1);padding:10px 16px;border-bottom:1px solid rgba(245,158,11,.2);display:flex;align-items:center;gap:8px;">
+        <span style="font-size:15px;">⏳</span>
+        <span style="font-weight:700;font-size:13px;color:#f59e0b;">Pending — Records Shared With You (${_pendingSharesAll.length})</span>
+        <span style="color:var(--muted);font-size:12px;">Confirm to add to your ledger, or reject to dismiss</span>
+      </div>
+      <div class="tbl-wrap"><table><thead><tr>
+        <th>From</th><th>Amount</th><th class="hide-mobile">Type</th><th class="hide-mobile">Date</th><th>Action</th>
+      </tr></thead><tbody>`;
+    _pendingSharesAll.forEach(s => {
+      const snap = s.entry_snapshot || {};
+      const fromName = snap.from_name || 'Someone';
+      const amt = snap.amount || 0;
+      const cur = snap.currency || 'USD';
+      const txLabel = TX_LABELS[snap.tx_type] || snap.tx_type || '—';
+      html += `<tr>
+        <td style="font-weight:700;">${esc(fromName)}</td>
+        <td style="font-weight:700;color:#f59e0b;">${fmtMoney(amt, cur)}</td>
+        <td class="hide-mobile" style="font-size:12px;color:var(--muted);">${esc(txLabel)}</td>
+        <td class="hide-mobile" style="font-size:12px;color:var(--muted);">${fmtDate(snap.date)}</td>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-primary btn-sm" onclick="doPendingConfirm('${s.id}')" style="padding:5px 12px;font-size:12px;">✓ Confirm</button>
+          <button class="bs sm" onclick="doPendingReject('${s.id}')" style="margin-left:4px;padding:5px 10px;font-size:12px;color:var(--red);">✕ Reject</button>
+        </td>
+      </tr>`;
+    });
+    html += `</tbody></table></div></div>`;
+  }
 
   // Bulk action bar
   if (_sm && window._selectedEntries.size > 0) {
@@ -3151,18 +3222,50 @@ window.doConfirmShare = async function(tokenId) {
     return;
   }
   if (data?.entry_id) {
-    toast('Record confirmed and tracked!', 'success');
+    toast('Record confirmed and added to your ledger!', 'success');
     _invalidateEntries();
-    openSharedWithMe();
+    navTo('entries');
   } else {
     toast('Failed to confirm — please try again.', 'error');
   }
 };
 
+// Inline confirm/reject from entries list pending section
+window.doPendingConfirm = async function(tokenId) {
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  const { data, error } = await supabase.rpc('confirm_share_for_recipient', {
+    p_token_id: tokenId,
+    p_recipient_id: currentUser.id
+  });
+  if (error) {
+    console.error('[doPendingConfirm]', error.message);
+    toast('Failed to confirm: ' + error.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '✓ Confirm'; }
+    return;
+  }
+  if (data?.entry_id) {
+    toast('Record confirmed and added to your ledger!', 'success');
+    _invalidateEntries();
+    navTo('entries');
+  } else {
+    toast('Could not confirm — please try again.', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '✓ Confirm'; }
+  }
+};
+
+window.doPendingReject = async function(tokenId) {
+  await dismissShare(tokenId);
+  toast('Record rejected.', 'success');
+  _invalidateEntries();
+  navTo('entries');
+};
+
 window.doDismissShare = async function(tokenId) {
   await dismissShare(tokenId);
   toast('Record dismissed.', 'success');
-  openSharedWithMe();
+  _invalidateEntries();
+  navTo('entries');
 };
 
 // ── Enhanced Send Reminder with scheduling ────────────────────────
@@ -4075,13 +4178,16 @@ async function renderNotifications(el) {
       <th>Contact</th><th>Amount</th><th class="hide-mobile">Message</th><th>Date</th><th>Event</th><th></th>
     </tr></thead><tbody>`;
     notifs.forEach(n => {
+      const actionBtn = n.type === 'shared_record'
+        ? `<button onclick="navTo('entries');deleteNotif('${n.id}')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View →</button>`
+        : '';
       html += `<tr>
         <td style="font-weight:600;font-size:13px;">${esc(n.contact_name || '—')}</td>
         <td style="font-weight:700;font-size:13px;">${n.amount ? fmtMoney(n.amount, n.currency || 'USD') : '—'}</td>
         <td class="hide-mobile" style="font-size:13px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(n.message)}">${esc(n.message)}</td>
         <td style="font-size:12px;color:var(--muted);">${fmtRelative(n.created_at)}</td>
         <td>${typeBadge(n.type)}</td>
-        <td><button onclick="deleteNotif('${n.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;">✕</button></td>
+        <td style="white-space:nowrap;">${actionBtn}<button onclick="deleteNotif('${n.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;">✕</button></td>
       </tr>`;
     });
     html += `</tbody></table></div></div>`;
@@ -7229,17 +7335,34 @@ onAuthChange(async (event, session) => {
     }
   } else if (event === 'PASSWORD_RECOVERY') {
     window._isRecovery = true;
+    document.getElementById('auth-loader').style.display = 'none';
     document.getElementById('shell').classList.remove('active');
     document.getElementById('landing').style.display = '';
     if (!document.getElementById('reset-pass')) {
-      document.getElementById('login-form').style.display = 'none';
+      const _lf = document.getElementById('login-form');
       const _sf = document.getElementById('signup-form');
+      if (_lf) _lf.style.display = 'none';
       if (_sf) _sf.style.display = 'none';
       const _af = document.getElementById('auth-forms');
       if (_af) {
         const _rf = document.createElement('div');
         _rf.id = 'reset-form-pw';
-        _rf.innerHTML = '<h2 style="margin:0 0 1rem">Set New Password</h2><div class="form-group"><label>New Password</label><input id="reset-pass" type="password" class="form-control" placeholder="Min 6 characters" style="width:100%"></div><div class="form-group" style="margin-top:.5rem"><label>Confirm Password</label><input id="reset-pass2" type="password" class="form-control" placeholder="Confirm password" style="width:100%"></div><button class="btn btn-primary btn-block" style="margin-top:1rem;width:100%" onclick="doResetPassword()">Update Password</button>';
+        _rf.innerHTML = `
+          <div style="text-align:center;margin-bottom:20px;">
+            <div style="font-size:40px;margin-bottom:10px;">🔐</div>
+            <h2 style="font-size:22px;font-weight:800;margin-bottom:6px;">Set New Password</h2>
+            <p style="color:#8892a4;font-size:13px;">Choose a strong password for your account</p>
+          </div>
+          <div class="form-group">
+            <label>New Password</label>
+            <input id="reset-pass" type="password" placeholder="Min 6 characters" style="font-size:15px;padding:12px 14px;">
+          </div>
+          <div class="form-group">
+            <label>Confirm Password</label>
+            <input id="reset-pass2" type="password" placeholder="Confirm password" style="font-size:15px;padding:12px 14px;">
+          </div>
+          <button class="btn btn-primary" style="width:100%;margin-top:8px;padding:14px;font-size:15px;" onclick="doResetPassword()">Update Password</button>
+        `;
         _af.appendChild(_rf);
       }
     }
