@@ -101,28 +101,54 @@ function isCurrentSession(key, type) {
   return key === getSessionKey(type, todayStr());
 }
 
+// ── Calculator operation types ──────────────────────────────────────
+const BP_CALC_OPS = {
+  add:              'Add  (+)',
+  subtract:         'Subtract  (−)',
+  multiply:         'Multiply  (×)',
+  divide:           'Divide  (÷)',
+  aggregate:        'Sum all fields',
+  select_aggregate: 'Sum selected fields',
+};
+const BP_BINARY_OPS = ['add','subtract','multiply','divide'];
+const BP_OP_SYMBOL   = { add:'+', subtract:'−', multiply:'×', divide:'÷' };
+
 // ── Computation ────────────────────────────────────────────────────
+function _resolveOperand(type, fieldId, constant, colValues) {
+  if (type === 'constant') return parseFloat(constant) || 0;
+  const v = colValues[fieldId];
+  return typeof v === 'object' ? (parseFloat(v?.num) || 0) : (parseFloat(v) || 0);
+}
+
 function computeRowFields(fields, rowValues) {
   const result = {};
   const rowFields = fields.filter(f => f.direction === 'row');
   const colValues = { ...rowValues };
   rowFields.forEach(f => {
-    let val = parseFloat(colValues[f.id]) || 0;
+    let val = 0;
     (f.calculators || []).forEach(calc => {
       const op = calc.operation;
-      if (op === 'multiply') {
-        const base = parseFloat(colValues[calc.targetFieldId] ?? 0) || 0;
-        val = base * (parseFloat(calc.operand) || 1);
-      } else if (op === 'add') {
-        val += parseFloat(colValues[calc.targetFieldId] ?? 0) || 0;
-      } else if (op === 'subtract') {
-        val -= parseFloat(colValues[calc.targetFieldId] ?? 0) || 0;
+      if (BP_BINARY_OPS.includes(op)) {
+        // New two-operand format
+        if ('leftFieldId' in calc || 'leftType' in calc) {
+          const L = _resolveOperand(calc.leftType  || 'field', calc.leftFieldId,  calc.leftConstant,  colValues);
+          const R = _resolveOperand(calc.rightType || 'field', calc.rightFieldId, calc.rightConstant, colValues);
+          val = op === 'add'      ? L + R
+              : op === 'subtract' ? L - R
+              : op === 'multiply' ? L * R
+              : R !== 0 ? L / R : 0;
+        } else {
+          // Legacy single-target format (backward compat)
+          if (op === 'multiply') val = (_resolveOperand('field', calc.targetFieldId, 0, colValues)) * (parseFloat(calc.operand) || 1);
+          else if (op === 'add')      val += _resolveOperand('field', calc.targetFieldId, 0, colValues);
+          else if (op === 'subtract') val -= _resolveOperand('field', calc.targetFieldId, 0, colValues);
+        }
       } else if (op === 'aggregate') {
         val = fields.filter(ff => ff.direction !== 'row' && !ff.excludeFromAggregate && ff.id !== f.id)
-                    .reduce((s, ff) => s + (parseFloat(colValues[ff.id]) || 0), 0);
+                    .reduce((s, ff) => s + _resolveOperand('field', ff.id, 0, colValues), 0);
       } else if (op === 'select_aggregate') {
         val = (calc.targetFieldIds || [])
-          .reduce((s, fid) => s + (parseFloat(colValues[fid]) || 0), 0);
+          .reduce((s, fid) => s + _resolveOperand('field', fid, 0, colValues), 0);
       }
       if (calc.resultVisible !== false) colValues[f.id] = val;
     });
@@ -1064,62 +1090,116 @@ function _bpTypeChange(val) {
 // Re-renders #bpfl-calc-list in-place from _bpFldCalcs (no modal close/reopen)
 function _bpRenderCalcList() {
   const p = _curPanel;
-  const fid = document.getElementById('bpfl-fid')?.value || '';
+  const selfFid = document.getElementById('bpfl-fid')?.value || '';
 
-  const _tOpts = (selfFid) => {
-    const cands = (p?.fields || []).filter(ff => ff.id !== selfFid && ff.direction !== 'row');
-    if (!cands.length) return '<option value="">— no numeric fields yet —</option>';
-    return '<option value="">— none —</option>' + cands.map(ff =>
-      `<option value="${ff.id}">${esc(ff.label)}</option>`
-    ).join('');
+  // All column fields the user can pick as operands
+  const cands = (p?.fields || []).filter(ff => ff.id !== selfFid && ff.direction !== 'row');
+
+  const _fieldOpts = (selectedId) => {
+    if (!cands.length) return '<option value="">— add column fields first —</option>';
+    return '<option value="">— choose field —</option>' +
+      cands.map(ff => `<option value="${ff.id}" ${selectedId===ff.id?'selected':''}>${esc(ff.label)}</option>`).join('');
   };
-  const _sagg = (selfFid, selIds) => {
-    const cands = (p?.fields || []).filter(ff => ff.id !== selfFid && ff.direction !== 'row');
+
+  const _saggChecks = (selIds) => {
     if (!cands.length) return '<p style="color:var(--muted);font-size:12px;">No column fields yet.</p>';
     return cands.map(ff => `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;cursor:pointer;">
       <input type="checkbox" class="bp-sagg-check" value="${ff.id}" ${(selIds||[]).includes(ff.id)?'checked':''}> ${esc(ff.label)}
     </label>`).join('');
   };
 
-  const html = _bpFldCalcs.map((c, i) => {
-    const isAgg  = c.operation === 'aggregate';
-    const isSAgg = c.operation === 'select_aggregate';
-    return `<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;" id="bpfc_${i}">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div class="fg"><label>Result Name *</label>
-          <input value="${esc(c.name||'')}" oninput="window._bpEngine._bpUpdCalc(${i},'name',this.value)" placeholder="e.g. Total"></div>
-        <div class="fg"><label>Operation</label>
-          <select onchange="window._bpEngine._bpUpdCalc(${i},'operation',this.value);window._bpEngine._bpCalcOpChange(${i})">
-            ${Object.entries(CALC_OPS).map(([k,v])=>`<option value="${k}" ${c.operation===k?'selected':''}>${v}</option>`).join('')}
-          </select></div>
-        <div class="fg" id="bpcoper_${i}" style="${isAgg||isSAgg?'display:none':''}">
-          <label>Factor / Operand</label>
-          <input type="number" value="${c.operand||''}" oninput="window._bpEngine._bpUpdCalc(${i},'operand',this.value)" step="any"></div>
-        <div class="fg" id="bpctarg_${i}" style="${isAgg||isSAgg?'display:none':''}">
-          <label>Apply To Field</label>
-          <select onchange="window._bpEngine._bpUpdCalc(${i},'targetFieldId',this.value)">
-            ${_tOpts(fid)}
-          </select></div>
-        <div class="fg" id="bpcsagg_${i}" style="${isSAgg?'':'display:none'};grid-column:1/-1;">
-          <label>Fields to Include</label>
-          <div style="border:1px solid var(--border);border-radius:6px;padding:10px;background:var(--bg3);max-height:150px;overflow-y:auto;">
-            ${_sagg(fid, c.targetFieldIds||[])}</div></div>
-        <div class="fg" style="grid-column:1/-1;"><label>Show Result</label>
-          <select onchange="window._bpEngine._bpUpdCalc(${i},'resultVisible',this.value==='yes')">
-            <option value="yes" ${c.resultVisible!==false?'selected':''}>Yes — visible in row</option>
-            <option value="no" ${c.resultVisible===false?'selected':''}>No — hidden (usable in later calcs)</option>
-          </select></div>
+  const _operandPicker = (i, side, c) => {
+    const type   = side === 'left' ? (c.leftType  || 'field') : (c.rightType  || 'field');
+    const fldId  = side === 'left' ? (c.leftFieldId  || '')   : (c.rightFieldId  || '');
+    const cstVal = side === 'left' ? (c.leftConstant || 0)    : (c.rightConstant || 0);
+    const isConst = type === 'constant';
+    return `<div style="display:flex;flex-direction:column;gap:6px;">
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;width:fit-content;">
+        <button onclick="window._bpEngine._bpSetSide(${i},'${side}','field')"
+          style="padding:3px 10px;font-size:11px;font-weight:600;border:none;cursor:pointer;background:${!isConst?'var(--accent)':'var(--bg3)'};color:${!isConst?'#fff':'var(--muted)'};">
+          Field</button>
+        <button onclick="window._bpEngine._bpSetSide(${i},'${side}','constant')"
+          style="padding:3px 10px;font-size:11px;font-weight:600;border:none;cursor:pointer;background:${isConst?'var(--accent)':'var(--bg3)'};color:${isConst?'#fff':'var(--muted)'};">
+          #</button>
       </div>
-      <button class="bs sm" style="color:var(--red);margin-top:6px;" onclick="window._bpEngine._bpRemCalc(${i})">✕ Remove</button>
+      <select id="bpc${side[0]}f_${i}" style="${isConst?'display:none':''}"
+        onchange="window._bpEngine._bpUpdCalc(${i},'${side}FieldId',this.value)">
+        ${_fieldOpts(fldId)}
+      </select>
+      <input id="bpc${side[0]}c_${i}" type="number" step="any" placeholder="0"
+        value="${cstVal||''}" style="${isConst?'':'display:none'}"
+        oninput="window._bpEngine._bpUpdCalc(${i},'${side}Constant',parseFloat(this.value)||0)">
+    </div>`;
+  };
+
+  const html = _bpFldCalcs.map((c, i) => {
+    const op     = c.operation || 'subtract';
+    const isBin  = BP_BINARY_OPS.includes(op);
+    const isSAgg = op === 'select_aggregate';
+    const sym    = BP_OP_SYMBOL[op] || '';
+
+    return `<div style="border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;background:var(--bg2);" id="bpfc_${i}">
+      <!-- Top row: name + op + remove -->
+      <div style="display:grid;grid-template-columns:1fr 200px auto;gap:10px;align-items:flex-end;margin-bottom:12px;">
+        <div class="fg" style="margin:0;">
+          <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Result Name *</label>
+          <input value="${esc(c.name||'')}" oninput="window._bpEngine._bpUpdCalc(${i},'name',this.value)" placeholder="e.g. Profit" style="margin-top:4px;">
+        </div>
+        <div class="fg" style="margin:0;">
+          <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Operation</label>
+          <select style="margin-top:4px;" onchange="window._bpEngine._bpUpdCalc(${i},'operation',this.value);window._bpEngine._bpCalcOpChange(${i})">
+            ${Object.entries(BP_CALC_OPS).map(([k,v])=>`<option value="${k}" ${op===k?'selected':''}>${v}</option>`).join('')}
+          </select>
+        </div>
+        <button class="bs sm" style="color:var(--red);margin-bottom:1px;" onclick="window._bpEngine._bpRemCalc(${i})">✕ Remove</button>
+      </div>
+
+      <!-- Binary expression: [Left] OP [Right] -->
+      <div id="bpc-expr-${i}" style="${isBin?'':'display:none'}">
+        <div style="display:grid;grid-template-columns:1fr 32px 1fr;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;">
+          <div>
+            <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px;">LEFT</div>
+            ${_operandPicker(i, 'left', c)}
+          </div>
+          <div style="font-size:22px;font-weight:800;color:var(--accent);text-align:center;" id="bpc-sym-${i}">${sym}</div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px;">RIGHT</div>
+            ${_operandPicker(i, 'right', c)}
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center;">Result = LEFT ${sym} RIGHT</div>
+      </div>
+
+      <!-- select_aggregate checkboxes -->
+      <div id="bpcsagg_${i}" style="${isSAgg?'':'display:none'}">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Fields to sum:</div>
+        <div style="border:1px solid var(--border);border-radius:6px;padding:10px;background:var(--bg3);max-height:160px;overflow-y:auto;">
+          ${_saggChecks(c.targetFieldIds||[])}
+        </div>
+      </div>
+
+      <!-- Visibility -->
+      <div class="fg" style="margin-top:12px;margin-bottom:0;">
+        <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Show result in row</label>
+        <select style="margin-top:4px;" onchange="window._bpEngine._bpUpdCalc(${i},'resultVisible',this.value==='yes')">
+          <option value="yes" ${c.resultVisible!==false?'selected':''}>Yes — visible column</option>
+          <option value="no"  ${c.resultVisible===false?'selected':''}>No — hidden (use in next calc)</option>
+        </select>
+      </div>
     </div>`;
   }).join('');
 
   const listEl = document.getElementById('bpfl-calc-list');
-  if (listEl) listEl.innerHTML = html;
+  if (listEl) listEl.innerHTML = html || '<p style="color:var(--muted);font-size:13px;margin-bottom:8px;">No calculators yet.</p>';
 }
 
 function _bpAddCalc() {
-  _bpFldCalcs.push({ name:'', operation:'multiply', operand:1, targetFieldId:'', targetFieldIds:[], resultVisible:true });
+  _bpFldCalcs.push({
+    name:'', operation:'subtract',
+    leftType:'field',  leftFieldId:'',  leftConstant:0,
+    rightType:'field', rightFieldId:'', rightConstant:0,
+    targetFieldIds:[], resultVisible:true
+  });
   _bpRenderCalcList();
 }
 function _bpUpdCalc(i, key, val) { if (_bpFldCalcs[i]) _bpFldCalcs[i][key] = val; }
@@ -1128,14 +1208,38 @@ function _bpRemCalc(i) {
   _bpRenderCalcList();
 }
 function _bpCalcOpChange(i) {
-  const op = _bpFldCalcs[i]?.operation;
-  const isAgg = op === 'aggregate', isSAgg = op === 'select_aggregate';
-  const oper = document.getElementById('bpcoper_' + i);
-  const targ = document.getElementById('bpctarg_' + i);
-  const sagg = document.getElementById('bpcsagg_' + i);
-  if (oper) oper.style.display = (isAgg||isSAgg) ? 'none' : '';
-  if (targ) targ.style.display = (isAgg||isSAgg) ? 'none' : '';
+  const op = _bpFldCalcs[i]?.operation || 'subtract';
+  const isBin  = BP_BINARY_OPS.includes(op);
+  const isSAgg = op === 'select_aggregate';
+  const expr = document.getElementById('bpc-expr-' + i);
+  const sagg = document.getElementById('bpcsagg_'  + i);
+  const sym  = document.getElementById('bpc-sym-'  + i);
+  if (expr) expr.style.display = isBin  ? '' : 'none';
   if (sagg) sagg.style.display = isSAgg ? '' : 'none';
+  if (sym)  sym.textContent    = BP_OP_SYMBOL[op] || '';
+}
+
+// Toggle an operand side between Field picker and constant input
+function _bpSetSide(i, side, type) {
+  const c = _bpFldCalcs[i];
+  if (!c) return;
+  if (side === 'left')  c.leftType  = type;
+  else                  c.rightType = type;
+  // show/hide field select vs number input
+  const letter = side[0]; // 'l' or 'r'
+  const fSel = document.getElementById(`bpc${letter}f_${i}`);
+  const cInp = document.getElementById(`bpc${letter}c_${i}`);
+  if (fSel) fSel.style.display = type === 'field'    ? '' : 'none';
+  if (cInp) cInp.style.display = type === 'constant' ? '' : 'none';
+  // update the two toggle buttons' colours
+  const expr = document.getElementById(`bpc-expr-${i}`);
+  if (!expr) return;
+  const btns = expr.querySelectorAll(`[onclick*="_bpSetSide(${i},'${side}"]`);
+  btns.forEach(b => {
+    const isActive = b.textContent.trim() === (type === 'field' ? 'Field' : '#');
+    b.style.background = isActive ? 'var(--accent)' : 'var(--bg3)';
+    b.style.color      = isActive ? '#fff'           : 'var(--muted)';
+  });
 }
 
 async function _bpSaveField(fid) {
@@ -1147,18 +1251,12 @@ async function _bpSaveField(fid) {
   const isRow = _bpFldDir === 'row';
   const type  = isRow ? 'numeric' : (document.getElementById('bpfl-type')?.value || 'numeric');
 
-  // Sync calc DOM
-  document.querySelectorAll('[id^=bpfc_]').forEach((row, i) => {
-    if (!_bpFldCalcs[i]) return;
-    const inputs  = row.querySelectorAll('input:not([type=checkbox])');
-    const selects = row.querySelectorAll('select');
-    if (inputs[0])  _bpFldCalcs[i].name = inputs[0].value.trim();
-    if (inputs[1])  _bpFldCalcs[i].operand = parseFloat(inputs[1].value) || 0;
-    if (selects[0]) _bpFldCalcs[i].operation = selects[0].value;
-    if (selects[1]) _bpFldCalcs[i].targetFieldId = selects[1].value || '';
-    if (selects[2]) _bpFldCalcs[i].resultVisible = selects[2].value !== 'no';
-    if (_bpFldCalcs[i].operation === 'select_aggregate')
-      _bpFldCalcs[i].targetFieldIds = Array.from(row.querySelectorAll('.bp-sagg-check:checked')).map(cb => cb.value);
+  // Sync select_aggregate checkboxes (all other fields self-sync via oninput/onchange)
+  _bpFldCalcs.forEach((c, i) => {
+    if (c.operation === 'select_aggregate') {
+      const row = document.getElementById('bpfc_' + i);
+      if (row) c.targetFieldIds = Array.from(row.querySelectorAll('.bp-sagg-check:checked')).map(cb => cb.value);
+    }
   });
 
   let field;
@@ -1245,7 +1343,7 @@ export function exposeBpEngine() {
     openCreateModal, _doCreate,
     openPanel, backToList,
     openFieldBuilder, openAddFieldChoice,
-    _bpOpenFieldModal, _bpTypeChange, _bpUnitTypeChange, _bpUnitTypeChangeP, _bpRenderCalcList, _bpAddCalc, _bpUpdCalc, _bpRemCalc, _bpCalcOpChange, _bpSaveField,
+    _bpOpenFieldModal, _bpTypeChange, _bpUnitTypeChange, _bpUnitTypeChangeP, _bpRenderCalcList, _bpAddCalc, _bpUpdCalc, _bpRemCalc, _bpCalcOpChange, _bpSetSide, _bpSaveField,
     _bpMoveField, _bpDeleteField,
     openAddRowModal, _previewRow, _doAddRow,
     openEditRowModal, _doSaveRow, _doDeleteRow,
