@@ -6696,10 +6696,10 @@ async function renderSettings(el) {
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);">
       <div style="position:relative;flex-shrink:0;">
         <div id="s-avatar-ring" style="width:72px;height:72px;border-radius:50%;background:var(--bg3);border:2px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;">
-          ${p.photo_url
-            ? `<img id="s-avatar-img" src="${esc(p.photo_url)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';document.getElementById('s-avatar-initials').style.display='flex';">`
+          ${p.avatar_url
+            ? `<img id="s-avatar-img" src="${esc(p.avatar_url)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';document.getElementById('s-avatar-initials').style.display='flex';">`
             : ''}
-          <div id="s-avatar-initials" style="width:100%;height:100%;display:${p.photo_url ? 'none' : 'flex'};align-items:center;justify-content:center;font-size:26px;font-weight:800;color:var(--accent);">${(p.display_name || p.email || '?').charAt(0).toUpperCase()}</div>
+          <div id="s-avatar-initials" style="width:100%;height:100%;display:${p.avatar_url ? 'none' : 'flex'};align-items:center;justify-content:center;font-size:26px;font-weight:800;color:var(--accent);">${(p.display_name || p.email || '?').charAt(0).toUpperCase()}</div>
         </div>
       </div>
       <div style="flex:1;min-width:0;">
@@ -6709,11 +6709,11 @@ async function renderSettings(el) {
             📷 Upload Photo
             <input type="file" id="s-photo-file" accept="image/*" style="display:none;" onchange="uploadProfilePhoto(this)">
           </label>
-          ${p.photo_url ? `<button class="bs sm" onclick="clearProfilePhoto()" style="color:var(--red);font-size:12px;">✕ Remove</button>` : ''}
+          ${p.avatar_url ? `<button class="bs sm" onclick="clearProfilePhoto()" style="color:var(--red);font-size:12px;">✕ Remove</button>` : ''}
         </div>
         <div id="s-photo-upload-status" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px;">Max 2 MB · JPG, PNG, WebP</div>
-        <input type="hidden" id="s-photourl" value="${esc(p.photo_url || '')}">
+        <input type="hidden" id="s-photourl" value="${esc(p.avatar_url || '')}">
       </div>
     </div>
 
@@ -6944,7 +6944,7 @@ window.saveSettings = async function() {
     is_searchable: document.getElementById('s-searchable').checked,
     updated_at:    new Date().toISOString()
   };
-  if (photoUrl !== undefined) updates.photo_url = photoUrl;
+  if (photoUrl !== undefined) updates.avatar_url = photoUrl;
   const { error } = await supabase.from('users').update(updates).eq('id', currentUser.id);
   if (error) return toast(error.message, 'error');
   currentProfile = await getProfile(currentUser.id);
