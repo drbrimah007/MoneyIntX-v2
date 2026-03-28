@@ -13,12 +13,9 @@ export default async function handler(req, res) {
   }
 
   const apiKey = process.env.RESEND_API_KEY;
-  // Allow caller to supply a branded from address (e.g. "Acme <hello@moneyinteractions.com>")
-  // Fallback to the verified domain sender. Strip anything suspicious (must contain @moneyinteractions.com or @moneyintx.com).
-  const ALLOWED_DOMAINS = ['moneyinteractions.com', 'moneyintx.com'];
-  const safeFrom = (fromOverride && ALLOWED_DOMAINS.some(d => fromOverride.includes(d)))
-    ? fromOverride
-    : 'Money IntX <hello@moneyinteractions.com>';
+  // Only moneyintx.com is verified in Resend — use that as the fixed sender.
+  // moneyinteractions.com must be verified in Resend before it can be used as a sender.
+  const safeFrom = 'Money IntX <hello@moneyintx.com>';
 
   if (!apiKey) {
     console.error('[send-email] RESEND_API_KEY is not set in environment variables');
