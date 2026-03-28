@@ -2348,7 +2348,7 @@ window.openNotifyInvoiceModal = async function(id) {
     <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">${esc(cName)}${invLabel} — ${amtLabel}</p>
     <div class="form-group">
       <label>Message to contact</label>
-      <textarea id="notif-msg" rows="4" placeholder="Hi, please find attached your invoice...">${currentProfile?.display_name ? `Hi, this is ${esc(currentProfile.display_name)}. ` : ''}Please find your invoice${invLabel} for ${amtLabel} attached for your attention.</textarea>
+      <textarea id="notif-msg" rows="4" placeholder="Add a note or message (optional)..."></textarea>
     </div>
     <div class="form-group">
       <label>Mark as</label>
@@ -2695,7 +2695,7 @@ window.openSendReminderModal = async function(id) {
       <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Record</div>
       <div style="font-weight:700;margin-top:4px;">${esc(cName)} — ${fmtMoney(remaining, entry.currency)}</div>
     </div>
-    <div class="form-group"><label>Message</label><textarea id="rem-msg" rows="3">For your attention.</textarea></div>
+    <div class="form-group"><label>Message</label><textarea id="rem-msg" rows="3" placeholder="Add a message (optional)..."></textarea></div>
     <div class="form-group">
       <label>Notify</label>
       <div style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;">

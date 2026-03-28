@@ -25,7 +25,7 @@ const TX_LABELS = {
 // ── Brand constants ────────────────────────────────────────────────────────────
 const BRAND = {
   name: 'Money IntX',
-  color: '#1a1d6e',       // Money IntX navy blue (from logo)
+  color: '#080b53',       // Money IntX navy blue (from logo)
   colorDark: '#14186a',
   bg: '#f8fafc',
   cardBg: '#ffffff',
@@ -48,17 +48,17 @@ function _richEmail({ logoUrl, siteName = 'Money IntX', siteUrl = 'https://money
   const validLogo = (logoUrl && /^https?:\/\//.test(logoUrl)) ? logoUrl : `${siteUrl}/money.png`;
   const logoImg   = `<img src="${_escHtml(validLogo)}" alt="${_escHtml(siteName)}" style="max-height:60px;max-width:220px;width:auto;height:auto;object-fit:contain;display:block;margin:0 auto;" onerror="this.style.display='none'">`;
   return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:0;background:#f9f9f9;">
-    <div style="background:#1a1d6e;padding:22px 32px 18px;border-radius:12px 12px 0 0;text-align:center;">
+    <div style="background:#080b53;padding:22px 32px 18px;border-radius:12px 12px 0 0;text-align:center;">
       ${logoImg}
     </div>
     <div style="background:#fff;padding:32px 32px 24px;border-left:1px solid #eee;border-right:1px solid #eee;">
-      <h2 style="margin:0 0 6px;font-size:22px;font-weight:700;color:#1a1d6e;">${heading}</h2>
+      <h2 style="margin:0 0 6px;font-size:22px;font-weight:700;color:#080b53;">${heading}</h2>
       ${subheading ? `<p style="color:#555;font-size:14px;margin-bottom:20px;line-height:1.6;">${subheading}</p>` : ''}
       ${bodyHtml}
     </div>
     <div style="background:#f0f0f0;padding:16px 32px;border-radius:0 0 12px 12px;border:1px solid #eee;border-top:none;text-align:center;">
       <p style="margin:0 0 4px;font-size:12px;color:#888;">${_escHtml(siteName)} — Making Money Matters Memorable</p>
-      <p style="margin:0;font-size:12px;color:#aaa;"><a href="${_escHtml(siteUrl)}" style="color:#1a1d6e;text-decoration:none;">${siteUrl.replace(/^https?:\/\//, '')}</a></p>
+      <p style="margin:0;font-size:12px;color:#aaa;"><a href="${_escHtml(siteUrl)}" style="color:#080b53;text-decoration:none;">${siteUrl.replace(/^https?:\/\//, '')}</a></p>
       ${footerNote ? `<p style="margin:6px 0 0;font-size:11px;color:#bbb;">${footerNote}</p>` : ''}
     </div>
   </div>`;
@@ -234,17 +234,17 @@ export async function sendNotificationEmail(userId, {
 
   // Message block
   const msgHtml = message
-    ? `<div style="background:#f5f5ff;border-left:4px solid #1a1d6e;border-radius:4px;padding:14px 18px;margin-bottom:18px;font-size:14px;color:#333;line-height:1.6;">${message}</div>`
+    ? `<div style="background:#f5f5ff;border-left:4px solid #080b53;border-radius:4px;padding:14px 18px;margin-bottom:18px;font-size:14px;color:#333;line-height:1.6;">${message}</div>`
     : '';
 
   // Amount block
   const amtHtml = fmtAmt
-    ? `<div style="margin-bottom:18px;"><div style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">${amtLabel}</div><strong style="font-size:28px;font-weight:800;color:#1a1d6e;">${fmtAmt}</strong></div>`
+    ? `<div style="margin-bottom:18px;"><div style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">${amtLabel}</div><strong style="font-size:28px;font-weight:800;color:#080b53;">${fmtAmt}</strong></div>`
     : '';
 
   // Contact reach line
   const replyHtml = fromEmail
-    ? `<p style="color:#666;font-size:13px;margin-top:8px;">You can reach them: <a href="mailto:${fromEmail}" style="color:#1a1d6e;">${fromEmail}</a></p>`
+    ? `<p style="color:#666;font-size:13px;margin-top:8px;">You can reach them: <a href="mailto:${fromEmail}" style="color:#080b53;">${fromEmail}</a></p>`
     : '';
 
   const siteName = 'Money IntX';
@@ -257,24 +257,24 @@ export async function sendNotificationEmail(userId, {
 <body style="margin:0;padding:0;background:#f9f9f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <span style="display:none;max-height:0;overflow:hidden;">${fromName} ${isReminder ? 'is following up' : 'sent a record'} — ${fmtAmt}</span>
   <div style="max-width:520px;margin:32px auto;">
-    <div style="background:#1a1d6e;padding:22px 32px 18px;border-radius:12px 12px 0 0;text-align:center;">
+    <div style="background:#080b53;padding:22px 32px 18px;border-radius:12px 12px 0 0;text-align:center;">
       <img src="${logoSrc}" alt="${siteName}" style="max-height:60px;max-width:200px;width:auto;height:auto;object-fit:contain;display:block;margin:0 auto;" onerror="this.style.display='none'">
     </div>
     <div style="background:#fff;padding:32px 32px 24px;border-left:1px solid #eee;border-right:1px solid #eee;">
-      <h2 style="margin:0 0 6px;font-size:22px;font-weight:700;color:#1a1d6e;">${heading}</h2>
+      <h2 style="margin:0 0 6px;font-size:22px;font-weight:700;color:#080b53;">${heading}</h2>
       <p style="color:#555;font-size:14px;margin:0 0 20px;">${subheading}</p>
       ${msgHtml}
       ${amtHtml}
       ${entryId ? `<p style="font-size:13px;color:#888;margin-bottom:16px;">Reference: <strong>#${String(entryId).slice(-6).toUpperCase()}</strong></p>` : ''}
       <div style="text-align:center;margin:24px 0;">
-        <a href="${ctaUrl}" style="display:inline-block;padding:13px 32px;background:#1a1d6e;color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:8px;">View on ${siteName} →</a>
+        <a href="${ctaUrl}" style="display:inline-block;padding:13px 32px;background:#080b53;color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:8px;">View on ${siteName} →</a>
       </div>
       ${replyHtml}
       <p style="font-size:12px;color:#94a3b8;margin-top:20px;">Money IntX does not hold or transfer money. This email is for record-keeping purposes only.</p>
     </div>
     <div style="background:#f0f0f0;padding:14px 32px;border-radius:0 0 12px 12px;border:1px solid #eee;border-top:none;text-align:center;">
       <p style="margin:0 0 4px;font-size:12px;color:#888;">${siteName} — Making Money Matters Memorable</p>
-      <p style="margin:0;font-size:12px;"><a href="${siteBase}" style="color:#1a1d6e;text-decoration:none;">${siteBase.replace(/^https?:\/\//, '')}</a></p>
+      <p style="margin:0;font-size:12px;"><a href="${siteBase}" style="color:#080b53;text-decoration:none;">${siteBase.replace(/^https?:\/\//, '')}</a></p>
     </div>
   </div>
 </body>
@@ -363,9 +363,9 @@ export async function sendOtpEmail(userId, { to, otp, lockerName, logoUrl, siteU
   const bodyHtml = `
     <p style="color:#555;font-size:14px;margin-bottom:24px;">You requested access to <strong>${_escHtml(lockerName || 'Asset Locker')}</strong> on Money IntX. Enter the code below to unlock your records for this session.</p>
     <div style="text-align:center;margin:0 0 28px;">
-      <div style="display:inline-block;background:#f5f5ff;border:2px solid #1a1d6e;border-radius:12px;padding:22px 40px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#1a1d6e;margin-bottom:10px;">Your Access Code</div>
-        <div style="font-size:40px;font-weight:800;letter-spacing:10px;color:#1a1d6e;font-family:monospace;">${_escHtml(String(otp))}</div>
+      <div style="display:inline-block;background:#f5f5ff;border:2px solid #080b53;border-radius:12px;padding:22px 40px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#080b53;margin-bottom:10px;">Your Access Code</div>
+        <div style="font-size:40px;font-weight:800;letter-spacing:10px;color:#080b53;font-family:monospace;">${_escHtml(String(otp))}</div>
         <div style="font-size:11px;color:#999;margin-top:10px;">Expires in 30 minutes</div>
       </div>
     </div>
@@ -417,11 +417,11 @@ export async function sendInviteEmail(userId, {
   const subject   = `You're Invited — ${typeLabel}: ${_escHtml(groupName)}`;
   const ctaUrl    = inviteLink || siteUrl;
   const bodyHtml  = `
-    <div style="background:#f5f5ff;border-left:4px solid #1a1d6e;border-radius:4px;padding:16px 20px;margin-bottom:20px;">
+    <div style="background:#f5f5ff;border-left:4px solid #080b53;border-radius:4px;padding:16px 20px;margin-bottom:20px;">
       <p style="margin:0;font-size:15px;color:#333;line-height:1.6;">${_escHtml(message) || 'Log in to view and participate.'}</p>
     </div>
     <div style="text-align:center;margin:28px 0;">
-      <a href="${_escHtml(ctaUrl)}" style="display:inline-block;padding:13px 32px;background:#1a1d6e;color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:8px;">Open Money IntX →</a>
+      <a href="${_escHtml(ctaUrl)}" style="display:inline-block;padding:13px 32px;background:#080b53;color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:8px;">Open Money IntX →</a>
     </div>
   `;
   const subheading = `<strong>${_escHtml(fromName)}</strong> has invited you to join ${typeLabel}: <strong>${_escHtml(groupName)}</strong>.`;
@@ -439,13 +439,13 @@ export async function sendNokVerificationEmail(userId, {
   const accessLabel = ACCESS_LABELS[accessLevel] || 'View Only';
   const subject = `You've been designated as a Trusted Contact — Money IntX`;
   const bodyHtml = `
-    <div style="background:#f5f5ff;border-left:4px solid #1a1d6e;border-radius:4px;padding:16px 20px;margin-bottom:20px;">
+    <div style="background:#f5f5ff;border-left:4px solid #080b53;border-radius:4px;padding:16px 20px;margin-bottom:20px;">
       <p style="margin:0 0 8px;font-size:14px;color:#333;"><strong>Relationship:</strong> ${_escHtml(relationship || 'Trusted Contact')}</p>
       <p style="margin:0;font-size:14px;color:#333;"><strong>Your Access Level:</strong> ${_escHtml(accessLabel)}</p>
     </div>
     <p style="font-size:13px;color:#777;margin-bottom:20px;line-height:1.6;">No action is required from you right now. You will receive a separate notification if and when your access is activated. This system releases <strong>information only</strong> — not money or legal title.</p>
     <div style="text-align:center;margin:28px 0;">
-      <a href="${_escHtml(siteUrl)}" style="display:inline-block;padding:13px 32px;background:#1a1d6e;color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:8px;">Learn More →</a>
+      <a href="${_escHtml(siteUrl)}" style="display:inline-block;padding:13px 32px;background:#080b53;color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:8px;">Learn More →</a>
     </div>
   `;
   const subheading = `<strong>${_escHtml(fromName)}</strong> has named you as a <strong>Next of Kin / Trusted Contact</strong> on their Money IntX account.`;
@@ -467,7 +467,7 @@ export async function sendNokActivationEmail(userId, {
   const triggerLabel = TRIGGER_LABELS[triggerReason] || 'Activated by account owner';
   const subject = `Your Trusted Access Has Been Activated — Money IntX`;
   const bodyHtml = `
-    <div style="background:#f5f5ff;border-left:4px solid #1a1d6e;border-radius:4px;padding:16px 20px;margin-bottom:20px;">
+    <div style="background:#f5f5ff;border-left:4px solid #080b53;border-radius:4px;padding:16px 20px;margin-bottom:20px;">
       <p style="margin:0 0 6px;font-size:14px;color:#333;"><strong>Access Level:</strong> ${_escHtml(accessLabel)}</p>
       <p style="margin:0 0 6px;font-size:14px;color:#333;"><strong>Data Release:</strong> ${_escHtml(releaseLabel)}</p>
       <p style="margin:0;font-size:13px;color:#777;"><strong>Reason:</strong> ${_escHtml(triggerLabel)}</p>
@@ -475,7 +475,7 @@ export async function sendNokActivationEmail(userId, {
     ${message ? `<div style="background:#fffbf0;border:1px solid #f0d080;border-radius:6px;padding:14px 18px;margin-bottom:20px;font-size:14px;color:#555;line-height:1.6;font-style:italic;">"${_escHtml(message)}"</div>` : ''}
     <p style="font-size:12px;color:#999;line-height:1.6;">This system releases information only. It is not a legal will, does not transfer money, and is not legally binding for debt assignment. All access is logged and subject to review.</p>
     <div style="text-align:center;margin:28px 0;">
-      <a href="${_escHtml(siteUrl)}" style="display:inline-block;padding:13px 32px;background:#1a1d6e;color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:8px;">Access Money IntX →</a>
+      <a href="${_escHtml(siteUrl)}" style="display:inline-block;padding:13px 32px;background:#080b53;color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:8px;">Access Money IntX →</a>
     </div>
   `;
   const subheading = `Your Next of Kin access to <strong>${_escHtml(fromName)}'s</strong> account on Money IntX is now active.`;
@@ -501,8 +501,8 @@ export async function sendLockerInfoEmail(userId, {
     `<tr><td style="padding:6px 12px 6px 0;font-size:12px;font-weight:700;text-transform:uppercase;color:#999;white-space:nowrap;vertical-align:top;">${_escHtml(k)}</td><td style="padding:6px 0;font-size:14px;color:#333;">${_escHtml(v)}</td></tr>`
   ).join('');
   const bodyHtml = `
-    <div style="background:#f5f5ff;border-left:4px solid #1a1d6e;border-radius:4px;padding:16px 20px;margin-bottom:24px;">
-      <div style="font-size:18px;font-weight:800;color:#1a1d6e;margin-bottom:12px;">${_escHtml(lockerTitle)}</div>
+    <div style="background:#f5f5ff;border-left:4px solid #080b53;border-radius:4px;padding:16px 20px;margin-bottom:24px;">
+      <div style="font-size:18px;font-weight:800;color:#080b53;margin-bottom:12px;">${_escHtml(lockerTitle)}</div>
       <table style="border-collapse:collapse;width:100%;">${tableRows}</table>
     </div>
     <p style="font-size:12px;color:#999;line-height:1.65;">This information is shared for asset location and access purposes only. It does not transfer ownership, constitute a legal instruction, or assign financial liability.</p>
