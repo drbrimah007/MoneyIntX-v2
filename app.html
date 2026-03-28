@@ -6822,11 +6822,26 @@ async function checkAuth() {
     } else {
       document.getElementById('auth-loader').style.display = 'none';
       document.getElementById('landing').style.display = '';
+      _autoOpenAuth();
     }
   } catch(e) {
     console.error('[checkAuth] error:', e);
     document.getElementById('auth-loader').style.display = 'none';
     document.getElementById('landing').style.display = '';
+    _autoOpenAuth();
+  }
+}
+
+// Auto-open login/signup if URL has ?login=1 or ?register=1
+function _autoOpenAuth() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.has('login') || p.has('register')) {
+    const tab = p.has('register') ? 'signup' : 'login';
+    setTimeout(() => {
+      showAuthTab(tab);
+      const authEl = document.getElementById('auth-section');
+      if (authEl) authEl.scrollIntoView({ behavior: 'smooth' });
+    }, 200);
   }
 }
 
