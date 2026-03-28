@@ -45,8 +45,8 @@
   --muted: #8892a4;
   --border: #232842;
   --radius: 10px;
-  --shadow: 0 2px 12px rgba(0,0,0,0.5);
-  --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+  --shadow: 0 2px 12px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
 }
 /* Theme: teal light */
 [data-theme="teal"] {
@@ -85,18 +85,18 @@
   --accent: #6c63ff;
   --accent-hover: #5a52e0;
   --accent-light: rgba(108,99,255,0.15);
-  --green: #6aaa7a;
-  --red: #c07070;
-  --amber: #b89040;
-  --blue: #5098c4;
-  --bg: #0d1520;
-  --bg2: #111d2e;
-  --bg3: #182840;
-  --text: #9eb0c8;
-  --muted: #5a6e8a;
-  --border: #182840;
-  --sidebar-bg: #0d1520;
-  --sidebar-active: #111d2e;
+  --green: #4ade80;
+  --red: #f87171;
+  --amber: #fbbf24;
+  --blue: #60a5fa;
+  --bg: #0b0d14;
+  --bg2: #141722;
+  --bg3: #1b1f2e;
+  --text: #e2e8f0;
+  --muted: #8892a4;
+  --border: #232842;
+  --sidebar-bg: #0b0d14;
+  --sidebar-active: #141722;
 }
 /* Theme: Money IntX Navy — exact logo colors */
 [data-theme="navy"] {
@@ -1350,22 +1350,22 @@ async function renderDash(el) {
   html += `<div style="margin-bottom:14px;overflow-x:auto;padding-bottom:2px;">
     <div style="display:flex;gap:8px;min-width:max-content;">
       <button onclick="openNewEntryModal('owe-me')"
-        style="${_qaBtnBase}background:rgba(106,170,122,.08);border-color:rgba(106,170,122,.20);color:#6aaa7a;"
+        style="${_qaBtnBase}background:rgba(22,163,74,.18);border-color:rgba(22,163,74,.45);color:#4ade80;"
         onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">
         They Owe Me
       </button>
       <button onclick="openNewEntryModal('i-owe')"
-        style="${_qaBtnBase}background:rgba(192,112,112,.08);border-color:rgba(192,112,112,.20);color:#c07070;"
+        style="${_qaBtnBase}background:rgba(220,38,38,.18);border-color:rgba(220,38,38,.45);color:#f87171;"
         onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">
         I Owe Them
       </button>
       <button onclick="openNewEntryModal('advance')"
-        style="${_qaBtnBase}background:rgba(184,144,64,.08);border-color:rgba(184,144,64,.20);color:#b89040;"
+        style="${_qaBtnBase}background:rgba(217,119,6,.16);border-color:rgba(217,119,6,.42);color:#fbbf24;"
         onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">
         Advances
       </button>
       <button onclick="navTo('templates')"
-        style="${_qaBtnBase}background:rgba(80,152,196,.08);border-color:rgba(80,152,196,.20);color:#5098c4;"
+        style="${_qaBtnBase}background:rgba(14,165,233,.15);border-color:rgba(14,165,233,.4);color:#60a5fa;"
         onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">
         New Invoice
       </button>
