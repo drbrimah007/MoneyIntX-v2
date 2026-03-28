@@ -157,6 +157,29 @@ function computeRowFields(fields, rowValues) {
   return result;
 }
 
+// Compute column fields that have calculators, in field order so dependencies chain
+function computeColFields(fields, rawValues) {
+  const vals = { ...rawValues };
+  fields.filter(f => f.direction !== 'row' && (f.calculators||[]).length).forEach(f => {
+    (f.calculators).forEach(calc => {
+      const op = calc.operation;
+      let val = 0;
+      if (BP_BINARY_OPS.includes(op) && ('leftFieldId' in calc || 'leftType' in calc)) {
+        const L = _resolveOperand(calc.leftType  || 'field', calc.leftFieldId,  calc.leftConstant,  vals);
+        const R = _resolveOperand(calc.rightType || 'field', calc.rightFieldId, calc.rightConstant, vals);
+        val = op === 'add' ? L + R : op === 'subtract' ? L - R : op === 'multiply' ? L * R : R !== 0 ? L / R : 0;
+      } else if (op === 'aggregate') {
+        val = fields.filter(ff => ff.id !== f.id && !ff.excludeFromAggregate && ff.direction !== 'row')
+                    .reduce((s, ff) => s + _resolveOperand('field', ff.id, 0, vals), 0);
+      } else if (op === 'select_aggregate') {
+        val = (calc.targetFieldIds || []).reduce((s, fid) => s + _resolveOperand('field', fid, 0, vals), 0);
+      }
+      if (calc.resultVisible !== false) vals[f.id] = val;
+    });
+  });
+  return vals;
+}
+
 function computeSessionPnL(fields, rows) {
   const rowFields = fields.filter(f => f.direction === 'row' && (f.calculators || []).length > 0);
   if (!rowFields.length) return null;
@@ -174,8 +197,10 @@ let _navFn  = null;
 let _toastFn = null;
 let _curPanel = null;
 let _curRows  = [];
-let _bpFldCalcs = [];
-let _bpFldDir   = 'column';
+let _bpFldCalcs    = [];
+let _bpFldDir      = 'column';
+let _bpRowPrefix   = 'bpr';   // 'bpr' for Add modal, 'bped' for Edit modal
+let _bpLastColVals = {};      // cached computed col values for _previewRow
 
 export function initBpEngine(userId, navFn, toastFn) {
   _userId  = userId;
@@ -440,20 +465,22 @@ function renderOpenSession(p, rows, colFields, rowFields, sessionKey, label) {
     html += `<th style="width:52px;"></th></tr></thead><tbody>`;
 
     rows.forEach(row => {
-      const computed = computeRowFields(p.fields, row.values || {});
+      const allColVals = computeColFields(p.fields, row.values || {});
+      const rowComputed = computeRowFields(p.fields, allColVals);
       html += `<tr>
         <td style="font-size:12px;color:var(--muted);">${fmtDate(row.row_date)}</td>`;
       colFields.forEach(f => {
-        const raw = row.values?.[f.id] ?? '';
+        const raw = allColVals[f.id] ?? '';
         if (f.type === 'numeric' || f.type === 'paired') {
           const fv = fmtFieldVal(raw, f, currency);
-          html += `<td style="font-weight:600;">${fv !== null ? fv : '<span style="color:var(--muted);">—</span>'}</td>`;
+          const isAuto = (f.calculators||[]).length > 0;
+          html += `<td style="font-weight:600;${isAuto?'color:var(--accent);':''}">${fv !== null ? fv : '<span style="color:var(--muted);">—</span>'}</td>`;
         } else {
           html += `<td style="font-size:13px;">${esc(raw)}</td>`;
         }
       });
       rowFields.forEach(f => {
-        const val = computed[f.id];
+        const val = rowComputed[f.id];
         html += `<td style="font-weight:700;color:var(--accent);">${val !== undefined ? fmtMoney(val, currency) : '—'}</td>`;
       });
       html += `<td style="text-align:right;">
@@ -541,19 +568,21 @@ function renderFoldedBody(p, rows, sessionKey) {
   html += `</tr></thead><tbody>`;
 
   rows.forEach(row => {
-    const computed = computeRowFields(p.fields, row.values || {});
+    const allColVals = computeColFields(p.fields, row.values || {});
+    const rowComputed = computeRowFields(p.fields, allColVals);
     html += `<tr><td style="font-size:12px;color:var(--muted);">${fmtDate(row.row_date)}</td>`;
     colFields.forEach(f => {
-      const raw = row.values?.[f.id] ?? '';
+      const raw = allColVals[f.id] ?? '';
       if (f.type === 'numeric' || f.type === 'paired') {
         const fv = fmtFieldVal(raw, f, currency);
-        html += `<td style="font-weight:600;">${fv !== null ? fv : '<span style="color:var(--muted);">—</span>'}</td>`;
+        const isAuto = (f.calculators||[]).length > 0;
+        html += `<td style="font-weight:600;${isAuto?'color:var(--accent);':''}">${fv !== null ? fv : '<span style="color:var(--muted);">—</span>'}</td>`;
       } else {
         html += `<td style="font-size:13px;">${esc(raw)}</td>`;
       }
     });
     rowFields.forEach(f => {
-      const val = computed[f.id];
+      const val = rowComputed[f.id];
       html += `<td style="font-weight:700;color:var(--accent);">${val !== undefined ? fmtMoney(val, currency) : '—'}</td>`;
     });
     html += `</tr>`;
@@ -650,25 +679,40 @@ function openAddRowModal(sessionKey) {
   const p = _curPanel;
   const colFields = (p.fields || []).filter(f => f.direction !== 'row');
   if (!colFields.length) { toast('Add column fields first via ⚙ Fields.', 'error'); return; }
+  _bpRowPrefix   = 'bpr';
+  _bpLastColVals = {};
 
   let fieldsHtml = '';
   colFields.forEach(f => {
+    const isAuto = (f.calculators || []).length > 0;
+    const _uh = f.unitType === 'currency' ? ` <span style="color:var(--muted);font-weight:400;">(${f.unitValue||p.currency})</span>`
+              : f.unitType === 'weight'   ? ` <span style="color:var(--muted);font-weight:400;">(${f.unitValue||'kg'})</span>` : '';
     if (f.type === 'text') {
       fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}</label>
-        <input id="bpr-${f.id}" placeholder="${esc(f.label)}"></div>`;
+        <input id="bpr-${f.id}" placeholder="${esc(f.label)}" oninput="window._bpEngine._recomputeColPreview()"></div>`;
     } else if (f.type === 'numeric') {
-      const _uh = f.unitType === 'currency' ? ` <span style="color:var(--muted);font-weight:400;">(${f.unitValue||p.currency})</span>`
-                : f.unitType === 'weight'   ? ` <span style="color:var(--muted);font-weight:400;">(${f.unitValue||'kg'})</span>` : '';
-      fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
-        <input type="number" id="bpr-${f.id}" step="0.01" placeholder="0.00" oninput="window._bpEngine._previewRow()"></div>`;
+      if (isAuto) {
+        fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
+          <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:var(--accent);font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
+          <div id="bpr-auto-${f.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--accent);font-weight:600;font-size:15px;">—</div>
+        </div>`;
+      } else {
+        fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
+          <input type="number" id="bpr-${f.id}" step="0.01" placeholder="0.00" oninput="window._bpEngine._recomputeColPreview()"></div>`;
+      }
     } else if (f.type === 'paired') {
-      const _uh = f.unitType === 'currency' ? ` <span style="color:var(--muted);font-weight:400;">(${f.unitValue||p.currency})</span>`
-                : f.unitType === 'weight'   ? ` <span style="color:var(--muted);font-weight:400;">(${f.unitValue||'kg'})</span>` : '';
-      fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
-        <div style="display:flex;gap:8px;">
-          <input id="bpr-${f.id}-text" placeholder="${esc(f.textLabel || 'Item')}" style="flex:2;">
-          <input type="number" id="bpr-${f.id}-num" step="0.01" placeholder="0.00" style="flex:1;" oninput="window._bpEngine._previewRow()">
-        </div></div>`;
+      if (isAuto) {
+        fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
+          <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:var(--accent);font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
+          <div id="bpr-auto-${f.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--accent);font-weight:600;font-size:15px;">—</div>
+        </div>`;
+      } else {
+        fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
+          <div style="display:flex;gap:8px;">
+            <input id="bpr-${f.id}-text" placeholder="${esc(f.textLabel || 'Item')}" style="flex:2;" oninput="window._bpEngine._recomputeColPreview()">
+            <input type="number" id="bpr-${f.id}-num" step="0.01" placeholder="0.00" style="flex:1;" oninput="window._bpEngine._recomputeColPreview()">
+          </div></div>`;
+      }
     }
   });
 
@@ -697,26 +741,59 @@ function openAddRowModal(sessionKey) {
     </div>
   </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
-  if (hasRowFields) setTimeout(() => _previewRow(), 50);
+  setTimeout(() => _recomputeColPreview(), 50);
 }
 
-function _previewRow() {
+// Reads manual field inputs → computeColFields → updates AUTO displays → calls _previewRow
+function _recomputeColPreview() {
+  const p = _curPanel;
+  if (!p) return;
+  const prefix    = _bpRowPrefix;
+  const colFields = (p.fields || []).filter(f => f.direction !== 'row');
+
+  // Gather values from manual (non-auto) fields only
+  const rawVals = {};
+  colFields.forEach(f => {
+    if ((f.calculators || []).length > 0) return; // skip auto fields — no input
+    if (f.type === 'paired') {
+      rawVals[f.id] = {
+        text: document.getElementById(`${prefix}-${f.id}-text`)?.value.trim() || '',
+        num:  parseFloat(document.getElementById(`${prefix}-${f.id}-num`)?.value) || 0
+      };
+    } else if (f.type === 'numeric') {
+      rawVals[f.id] = parseFloat(document.getElementById(`${prefix}-${f.id}`)?.value) || 0;
+    } else {
+      rawVals[f.id] = document.getElementById(`${prefix}-${f.id}`)?.value.trim() || '';
+    }
+  });
+
+  // Compute auto-calc column fields
+  const allColVals = computeColFields(p.fields, rawVals);
+  _bpLastColVals = allColVals;
+
+  // Update the AUTO display divs
+  colFields.forEach(f => {
+    if (!(f.calculators || []).length) return;
+    const el = document.getElementById(`${prefix}-auto-${f.id}`);
+    if (!el) return;
+    const val = allColVals[f.id];
+    el.textContent = (val !== undefined && val !== null) ? fmtFieldVal(val, f, p.currency) : '—';
+  });
+
+  // Update row-field preview panel
+  _previewRow(allColVals);
+}
+
+// Updates the row-field preview panel using precomputed col values (or cached)
+function _previewRow(precomputedColVals) {
   const p = _curPanel;
   if (!p) return;
   const rowFields = (p.fields || []).filter(f => f.direction === 'row' && (f.calculators||[]).length);
   if (!rowFields.length) return;
 
-  const colFields = (p.fields || []).filter(f => f.direction !== 'row');
-  const vals = {};
-  colFields.forEach(f => {
-    if (f.type === 'paired') {
-      vals[f.id] = parseFloat(document.getElementById(`bpr-${f.id}-num`)?.value) || 0;
-    } else {
-      vals[f.id] = parseFloat(document.getElementById(`bpr-${f.id}`)?.value) || 0;
-    }
-  });
-  const computed = computeRowFields(p.fields, vals);
-  const preview = document.getElementById('bpr-preview');
+  const colVals  = precomputedColVals || _bpLastColVals;
+  const computed = computeRowFields(p.fields, colVals);
+  const preview  = document.getElementById('bpr-preview');
   if (preview) preview.style.display = '';
   rowFields.forEach(f => {
     const el = document.getElementById(`bpr-preview-${f.id}`);
@@ -727,21 +804,27 @@ function _previewRow() {
 async function _doAddRow(sessionKey) {
   const p = _curPanel;
   if (!p) return;
-  const rowDate = document.getElementById('bpr-date')?.value || todayStr();
+  const rowDate   = document.getElementById('bpr-date')?.value || todayStr();
   const colFields = (p.fields || []).filter(f => f.direction !== 'row');
-  const values = {};
+
+  // Read only manual (non-auto) fields from the DOM
+  const rawValues = {};
   colFields.forEach(f => {
+    if ((f.calculators || []).length > 0) return; // auto field — no input
     if (f.type === 'paired') {
-      values[f.id] = {
+      rawValues[f.id] = {
         text: document.getElementById(`bpr-${f.id}-text`)?.value.trim() || '',
-        num: parseFloat(document.getElementById(`bpr-${f.id}-num`)?.value) || 0
+        num:  parseFloat(document.getElementById(`bpr-${f.id}-num`)?.value) || 0
       };
     } else if (f.type === 'numeric') {
-      values[f.id] = parseFloat(document.getElementById(`bpr-${f.id}`)?.value) || 0;
+      rawValues[f.id] = parseFloat(document.getElementById(`bpr-${f.id}`)?.value) || 0;
     } else {
-      values[f.id] = document.getElementById(`bpr-${f.id}`)?.value.trim() || '';
+      rawValues[f.id] = document.getElementById(`bpr-${f.id}`)?.value.trim() || '';
     }
   });
+
+  // Compute auto-calc column fields and merge
+  const values = computeColFields(p.fields, rawValues);
 
   document.getElementById('bpAddRowBg')?.remove();
   const row = await addRow(p.id, _userId, sessionKey, rowDate, values);
@@ -757,23 +840,47 @@ async function openEditRowModal(rowId) {
   if (!row || !_curPanel) return;
   const p = _curPanel;
   const colFields = (p.fields || []).filter(f => f.direction !== 'row');
+  _bpRowPrefix = 'bped';
+
+  // Pre-compute auto-calc values from saved data for initial display
+  const initColVals = computeColFields(p.fields, row.values || {});
+  _bpLastColVals    = initColVals;
 
   let fieldsHtml = '';
   colFields.forEach(f => {
-    const val = row.values?.[f.id];
+    const val    = row.values?.[f.id];
+    const isAuto = (f.calculators || []).length > 0;
+    const _uh    = f.unitType === 'currency' ? ` <span style="color:var(--muted);font-weight:400;">(${f.unitValue||p.currency})</span>`
+                 : f.unitType === 'weight'   ? ` <span style="color:var(--muted);font-weight:400;">(${f.unitValue||'kg'})</span>` : '';
     if (f.type === 'text') {
       fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}</label>
-        <input id="bped-${f.id}" value="${esc(val || '')}"></div>`;
+        <input id="bped-${f.id}" value="${esc(val || '')}" oninput="window._bpEngine._recomputeColPreview()"></div>`;
     } else if (f.type === 'numeric') {
-      fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}</label>
-        <input type="number" id="bped-${f.id}" step="0.01" value="${val !== undefined ? val : ''}"></div>`;
+      if (isAuto) {
+        const dispVal = initColVals[f.id] !== undefined ? fmtFieldVal(initColVals[f.id], f, p.currency) : '—';
+        fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
+          <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:var(--accent);font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
+          <div id="bped-auto-${f.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--accent);font-weight:600;font-size:15px;">${dispVal}</div>
+        </div>`;
+      } else {
+        fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
+          <input type="number" id="bped-${f.id}" step="0.01" value="${val !== undefined ? val : ''}" oninput="window._bpEngine._recomputeColPreview()"></div>`;
+      }
     } else if (f.type === 'paired') {
       const tv = typeof val === 'object' ? val : {};
-      fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}</label>
-        <div style="display:flex;gap:8px;">
-          <input id="bped-${f.id}-text" value="${esc(tv.text || '')}" placeholder="${esc(f.textLabel || 'Item')}" style="flex:2;">
-          <input type="number" id="bped-${f.id}-num" step="0.01" value="${tv.num || ''}" placeholder="0.00" style="flex:1;">
-        </div></div>`;
+      if (isAuto) {
+        const dispVal = initColVals[f.id] !== undefined ? fmtFieldVal(initColVals[f.id], f, p.currency) : '—';
+        fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
+          <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:var(--accent);font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
+          <div id="bped-auto-${f.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--accent);font-weight:600;font-size:15px;">${dispVal}</div>
+        </div>`;
+      } else {
+        fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
+          <div style="display:flex;gap:8px;">
+            <input id="bped-${f.id}-text" value="${esc(tv.text || '')}" placeholder="${esc(f.textLabel || 'Item')}" style="flex:2;" oninput="window._bpEngine._recomputeColPreview()">
+            <input type="number" id="bped-${f.id}-num" step="0.01" value="${tv.num || ''}" placeholder="0.00" style="flex:1;" oninput="window._bpEngine._recomputeColPreview()">
+          </div></div>`;
+      }
     }
   });
 
@@ -799,20 +906,25 @@ async function openEditRowModal(rowId) {
 
 async function _doSaveRow(rowId) {
   const row = _curRows.find(r => r.id === rowId);
-  const p = _curPanel;
+  const p   = _curPanel;
   if (!row || !p) return;
   const colFields = (p.fields || []).filter(f => f.direction !== 'row');
-  const values = {};
+
+  // Read only manual (non-auto) fields from the DOM
+  const rawValues = {};
   colFields.forEach(f => {
+    if ((f.calculators || []).length > 0) return; // auto field — no input
     if (f.type === 'paired') {
-      values[f.id] = { text: document.getElementById(`bped-${f.id}-text`)?.value.trim() || '', num: parseFloat(document.getElementById(`bped-${f.id}-num`)?.value) || 0 };
+      rawValues[f.id] = { text: document.getElementById(`bped-${f.id}-text`)?.value.trim() || '', num: parseFloat(document.getElementById(`bped-${f.id}-num`)?.value) || 0 };
     } else if (f.type === 'numeric') {
-      values[f.id] = parseFloat(document.getElementById(`bped-${f.id}`)?.value) || 0;
+      rawValues[f.id] = parseFloat(document.getElementById(`bped-${f.id}`)?.value) || 0;
     } else {
-      values[f.id] = document.getElementById(`bped-${f.id}`)?.value.trim() || '';
+      rawValues[f.id] = document.getElementById(`bped-${f.id}`)?.value.trim() || '';
     }
   });
 
+  // Compute auto-calc column fields and merge
+  const values  = computeColFields(p.fields, rawValues);
   const newDate = document.getElementById('bped-date')?.value || row.row_date;
   document.getElementById('bpEditRowBg')?.remove();
   await updateRow(rowId, values);
@@ -1330,7 +1442,7 @@ export function exposeBpEngine() {
     openFieldBuilder, openAddFieldChoice,
     _bpOpenFieldModal, _bpTypeChange, _bpUnitTypeChange, _bpUnitTypeChangeP, _bpRenderCalcList, _bpAddCalc, _bpUpdCalc, _bpRemCalc, _bpCalcOpChange, _bpSetSide, _bpSaveField,
     _bpMoveField, _bpDeleteField,
-    openAddRowModal, _previewRow, _doAddRow,
+    openAddRowModal, _recomputeColPreview, _previewRow, _doAddRow,
     openEditRowModal, _doSaveRow, _doDeleteRow,
     toggleFoldedSession, archiveSession,
     openArchiveView
