@@ -44,7 +44,7 @@ DECLARE
   v_tok_id        uuid;
   v_existing_tok  uuid;
   v_from_name     text;
-  v_amount        numeric;
+  v_amount        bigint;
   v_currency      text;
 BEGIN
   -- Guard: skip if no email provided
@@ -102,7 +102,7 @@ BEGIN
   -- 5. Fire in-app notification for recipient (if they have an account)
   IF v_recipient_id IS NOT NULL THEN
     v_from_name  := COALESCE(p_snapshot->>'from_name', 'Someone');
-    v_amount     := COALESCE((p_snapshot->>'amount')::numeric, 0);
+    v_amount     := COALESCE((p_snapshot->>'amount')::numeric::bigint, 0);
     v_currency   := COALESCE(p_snapshot->>'currency', 'USD');
 
     INSERT INTO notifications (
