@@ -102,23 +102,23 @@ export function fmtRelative(ts) {
   return fmtDate(ts);
 }
 
-// ── Status badge ──────────────────────────────────────────────────
+// ── Status badge — calm production palette ─────────────────────────
 const STATUS_COLORS = {
-  draft:             { bg: 'rgba(107,114,128,.18)', color: '#9ca3af', border: 'rgba(107,114,128,.3)' },
-  posted:            { bg: 'rgba(96,165,250,.14)',  color: '#60a5fa', border: 'rgba(96,165,250,.3)' },
-  sent:              { bg: 'rgba(139,92,246,.16)',  color: '#a78bfa', border: 'rgba(139,92,246,.3)' },
-  viewed:            { bg: 'rgba(167,139,250,.14)', color: '#c4b5fd', border: 'rgba(167,139,250,.28)' },
-  accepted:          { bg: 'rgba(52,211,153,.14)',  color: '#34d399', border: 'rgba(52,211,153,.28)' },
-  due:               { bg: 'rgba(251,191,36,.14)',  color: '#fbbf24', border: 'rgba(251,191,36,.3)' },
-  partially_settled: { bg: 'rgba(251,191,36,.14)',  color: '#fbbf24', border: 'rgba(251,191,36,.3)' },
-  settled:           { bg: 'rgba(74,222,128,.14)',  color: '#4ade80', border: 'rgba(74,222,128,.28)' },
-  fulfilled:         { bg: 'rgba(74,222,128,.14)',  color: '#4ade80', border: 'rgba(74,222,128,.28)' },
-  overdue:           { bg: 'rgba(248,113,113,.14)', color: '#f87171', border: 'rgba(248,113,113,.3)' },
-  disputed:          { bg: 'rgba(248,113,113,.14)', color: '#f87171', border: 'rgba(248,113,113,.3)' },
-  voided:            { bg: 'rgba(107,114,128,.12)', color: '#6b7280', border: 'rgba(107,114,128,.22)' },
-  cancelled:         { bg: 'rgba(107,114,128,.12)', color: '#6b7280', border: 'rgba(107,114,128,.22)' },
-  closed:            { bg: 'rgba(107,114,128,.12)', color: '#6b7280', border: 'rgba(107,114,128,.22)' },
-  payment:           { bg: 'rgba(52,211,153,.14)',  color: '#34d399', border: 'rgba(52,211,153,.28)' },
+  draft:             { bg: 'rgba(143,168,214,.08)', color: '#8fa8d6', border: 'rgba(143,168,214,.16)' },
+  posted:            { bg: 'rgba(143,168,214,.12)', color: '#8fa8d6', border: 'rgba(143,168,214,.20)' },
+  sent:              { bg: 'rgba(108,99,255,.10)',  color: '#a78bfa', border: 'rgba(108,99,255,.18)' },
+  viewed:            { bg: 'rgba(108,99,255,.08)',  color: '#c4b5fd', border: 'rgba(108,99,255,.15)' },
+  accepted:          { bg: 'rgba(127,224,208,.12)', color: '#7fe0d0', border: 'rgba(127,224,208,.20)' },
+  due:               { bg: 'rgba(214,185,122,.12)', color: '#d6b97a', border: 'rgba(214,185,122,.20)' },
+  partially_settled: { bg: 'rgba(214,185,122,.12)', color: '#d6b97a', border: 'rgba(214,185,122,.20)' },
+  settled:           { bg: 'rgba(127,224,208,.12)', color: '#7fe0d0', border: 'rgba(127,224,208,.20)' },
+  fulfilled:         { bg: 'rgba(127,224,208,.12)', color: '#7fe0d0', border: 'rgba(127,224,208,.20)' },
+  overdue:           { bg: 'rgba(208,120,120,.12)', color: '#d07878', border: 'rgba(208,120,120,.20)' },
+  disputed:          { bg: 'rgba(208,120,120,.12)', color: '#d07878', border: 'rgba(208,120,120,.20)' },
+  voided:            { bg: 'rgba(255,255,255,.04)', color: '#6f7c96', border: 'rgba(255,255,255,.08)' },
+  cancelled:         { bg: 'rgba(255,255,255,.04)', color: '#6f7c96', border: 'rgba(255,255,255,.08)' },
+  closed:            { bg: 'rgba(255,255,255,.04)', color: '#6f7c96', border: 'rgba(255,255,255,.08)' },
+  payment:           { bg: 'rgba(127,224,208,.12)', color: '#7fe0d0', border: 'rgba(127,224,208,.20)' },
 };
 
 const STATUS_LABELS = {
