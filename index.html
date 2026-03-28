@@ -2682,15 +2682,33 @@ window.openSendReminderModal = async function(id) {
   const entry = await getEntry(id);
   if (!entry) return;
   const cName = entry.contact?.name || 'Contact';
+  const cEmail = entry.contact?.email || '';
   const remaining = entry.amount - entry.settled_amount;
+  const hasEmail = !!cEmail;
 
   openModal(`
     <h3 style="margin-bottom:16px;">Send Reminder</h3>
     <div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:14px;">
-      <div style="font-size:12px;color:var(--muted);">Record</div>
-      <div style="font-weight:700;">${esc(cName)} — ${fmtMoney(remaining, entry.currency)}</div>
+      <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Record</div>
+      <div style="font-weight:700;margin-top:4px;">${esc(cName)} — ${fmtMoney(remaining, entry.currency)}</div>
     </div>
     <div class="form-group"><label>Message</label><textarea id="rem-msg" rows="3">For your attention.</textarea></div>
+    <div class="form-group">
+      <label>Notify</label>
+      <div style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+        <button type="button" id="rem-nwho-them" onclick="setReminderNwho('them')" style="padding:8px 18px;font-size:13px;font-weight:600;background:var(--accent);color:#fff;border:none;cursor:pointer;">Contact</button>
+        <button type="button" id="rem-nwho-you" onclick="setReminderNwho('you')" style="padding:8px 18px;font-size:13px;background:var(--bg3);color:var(--text);border:none;border-left:1px solid var(--border);cursor:pointer;">You</button>
+        <button type="button" id="rem-nwho-both" onclick="setReminderNwho('both')" style="padding:8px 18px;font-size:13px;background:var(--bg3);color:var(--text);border:none;border-left:1px solid var(--border);cursor:pointer;">Both</button>
+      </div>
+    </div>
+    <div id="rem-no-email-wrap" style="${hasEmail ? 'display:none;' : ''}margin-bottom:12px;">
+      <div style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:8px;padding:10px 14px;">
+        <div style="font-size:13px;color:#f59e0b;margin-bottom:8px;">⚠️ <strong>${esc(cName)}</strong> has no email on file.</div>
+        <input type="email" id="rem-contact-email" placeholder="Enter email to send reminder"
+          style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg2);color:var(--text);" />
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Email will be saved to this contact.</div>
+      </div>
+    </div>
     <div class="form-group">
       <label>When</label>
       <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
@@ -2720,8 +2738,74 @@ window.openSendReminderModal = async function(id) {
       <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="doSendReminder('${id}')">Send</button>
     </div>
-  `, { maxWidth: '420px' });
+    <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Or share directly</div>
+      <div id="rem-share-wrap" style="text-align:center;">
+        <div style="font-size:13px;color:var(--muted);">Generating link…</div>
+      </div>
+    </div>
+  `, { maxWidth: '440px' });
+
   window._reminderWhen = 'now';
+  window._reminderNwho = 'them';
+
+  // Async: generate share link
+  (async () => {
+    try {
+      const { data: existing } = await supabase
+        .from('share_tokens').select('token').eq('entry_id', id).maybeSingle();
+      let token = existing?.token;
+      if (!token) {
+        const newToken = await createShareToken(currentUser.id, id, { recipientEmail: cEmail });
+        token = newToken?.token;
+      }
+      const wrap = document.getElementById('rem-share-wrap');
+      if (!wrap || !token) {
+        if (wrap) wrap.innerHTML = `<div style="font-size:12px;color:var(--muted);">Share link unavailable — use Send above.</div>`;
+        return;
+      }
+      const shareUrl = getShareUrl(token);
+      window._reminderShareUrl = shareUrl;
+      const cat = entry.category || entry.tx_type || '';
+      const recipientLabel = ['owed_to_me','bill_sent','invoice_sent','they_owe_you','invoice','bill'].includes(cat)
+        ? 'You Owe'
+        : ['i_owe','bill_received','invoice_received','you_owe_them'].includes(cat)
+          ? 'You Are Owed' : 'Amount';
+      const shareMsg = `Hi ${cName},\n\nThis is to inform you that:\n${recipientLabel}: ${fmtMoney(remaining, entry.currency)}\n\nView full details here:\n${shareUrl}\n\nYour kind attention is requested.`;
+      window._reminderShareMsg = shareMsg;
+      wrap.innerHTML = `
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:12px;color:var(--accent);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;">${esc(shareUrl)}</span>
+          <button class="btn btn-primary btn-sm" style="flex-shrink:0;font-size:12px;" onclick="navigator.clipboard.writeText(window._reminderShareUrl);toast('Link copied!','success');">Copy</button>
+        </div>
+        <textarea id="rem-share-msg" rows="5" style="width:100%;box-sizing:border-box;font-size:12px;border:1px solid var(--border);border-radius:8px;padding:8px;resize:vertical;background:var(--bg2);color:var(--text);margin-bottom:8px;">${esc(shareMsg)}</textarea>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="navigator.clipboard.writeText(document.getElementById('rem-share-msg').value);toast('Message copied!','success');">📋 Copy Message</button>
+          ${'share' in navigator ? `<button class="btn btn-secondary btn-sm" style="flex:1;" onclick="navigator.share({title:'Reminder',text:document.getElementById('rem-share-msg').value,url:window._reminderShareUrl}).catch(()=>{});">📤 Share via…</button>` : ''}
+        </div>`;
+    } catch(_) {
+      const wrap = document.getElementById('rem-share-wrap');
+      if (wrap) wrap.innerHTML = `<div style="font-size:12px;color:var(--muted);">Share link unavailable — use Send above.</div>`;
+    }
+  })();
+};
+
+window.setReminderNwho = function(val) {
+  window._reminderNwho = val;
+  ['them','you','both'].forEach(k => {
+    const btn = document.getElementById('rem-nwho-' + k);
+    if (!btn) return;
+    const active = k === val;
+    btn.style.background = active ? 'var(--accent)' : 'var(--bg3)';
+    btn.style.color = active ? '#fff' : 'var(--text)';
+    btn.style.fontWeight = active ? '600' : '400';
+  });
+  // Show no-email warning only when contact is targeted and has no email
+  const wrap = document.getElementById('rem-no-email-wrap');
+  if (wrap) {
+    const targets = val === 'them' || val === 'both';
+    wrap.style.display = (targets && wrap.querySelector('#rem-contact-email') !== null) ? '' : 'none';
+  }
 };
 
 window.setReminderWhen = function(val) {
@@ -2739,38 +2823,70 @@ window.doSendReminder = async function(entryId) {
   const message = document.getElementById('rem-msg').value.trim();
   if (!message) return toast('Message required.', 'error');
 
+  const notifyWho = window._reminderNwho || 'them';
+  const notifyContact = notifyWho === 'them' || notifyWho === 'both';
+  const notifySelf    = notifyWho === 'you'  || notifyWho === 'both';
+
   if (window._reminderWhen === 'now') {
     // Send immediately
     const entry = await getEntry(entryId);
     const cName = entry?.contact?.name || 'Someone';
-    const cEmail = entry?.contact?.email || '';
+    let cEmail = entry?.contact?.email || '';
     const linkedUserId = entry?.contact?.linked_user_id;
-    if (linkedUserId) {
+
+    // If contact has no email, check for inline-entered email
+    if (!cEmail && notifyContact) {
+      const inlineEmail = document.getElementById('rem-contact-email')?.value?.trim();
+      if (inlineEmail) {
+        cEmail = inlineEmail;
+        // Save email to contact
+        if (entry?.contact_id) {
+          await supabase.from('contacts').update({ email: inlineEmail }).eq('id', entry.contact_id);
+        }
+      }
+    }
+
+    if (notifyContact) {
+      if (linkedUserId) {
+        await supabase.from('notifications').insert({
+          user_id: linkedUserId, type: 'reminder',
+          message: `Reminder from ${currentProfile?.display_name || 'Someone'}: ${message}`,
+          entry_id: entryId, contact_name: currentProfile?.display_name || '',
+          amount: entry.amount, currency: entry.currency
+        });
+      }
+      if (cEmail) {
+        try {
+          const fromName = currentProfile?.display_name || currentProfile?.company_name || 'Money IntX';
+          const result = await sendNotificationEmail(currentUser.id, {
+            to: cEmail, fromName, txType: entry.category || entry.tx_type,
+            amount: fmtMoney(entry.amount, entry.currency),
+            currency: entry.currency, message, entryId, isReminder: true
+          });
+          if (!result?.ok) toast('Reminder sent (email failed: ' + (result?.error || 'check Settings → Email Diagnostics') + ')', 'info');
+        } catch(e) { console.warn('Email reminder failed:', e); toast('Reminder email failed: ' + e.message, 'error'); }
+      }
+    }
+
+    if (notifySelf) {
       await supabase.from('notifications').insert({
-        user_id: linkedUserId, type: 'reminder',
-        message: `Reminder from ${currentProfile?.display_name || 'Someone'}: ${message}`,
-        entry_id: entryId, contact_name: currentProfile?.display_name || '',
-        amount: entry.amount, currency: entry.currency
+        user_id: currentUser.id, type: 'reminder',
+        message: `Reminder (self): ${message}`,
+        entry_id: entryId, contact_name: cName,
+        amount: entry?.amount, currency: entry?.currency
       });
     }
-    // Also send email reminder if contact has email
-    if (cEmail) {
-      try {
-        const fromName = currentProfile?.display_name || currentProfile?.company_name || 'Money IntX';
-        const result = await sendNotificationEmail(currentUser.id, {
-          to: cEmail, fromName, txType: entry.category || entry.tx_type,
-          amount: fmtMoney(entry.amount, entry.currency),
-          currency: entry.currency, message, entryId, isReminder: true
-        });
-        if (!result?.ok) toast('Reminder sent (email failed: ' + (result?.error || 'check Settings → Email Diagnostics') + ')', 'info');
-      } catch(e) { console.warn('Email reminder failed:', e); toast('Reminder email failed: ' + e.message, 'error'); }
-    }
+
+    // Always log the send action for the user
     await supabase.from('notifications').insert({
       user_id: currentUser.id, type: 'reminder',
-      message: `Reminder sent to ${cName}: ${message}`,
+      message: notifyContact
+        ? `Reminder sent to ${cName}: ${message}`
+        : `Reminder noted (self): ${message}`,
       entry_id: entryId, contact_name: cName,
       amount: entry?.amount, currency: entry?.currency
     });
+
     // Direct update — bypass updateEntry to avoid amount conversion
     await supabase.from('entries').update({
       reminder_count: (entry?.reminder_count || 0) + 1,
@@ -2778,7 +2894,8 @@ window.doSendReminder = async function(entryId) {
       updated_at: new Date().toISOString()
     }).eq('id', entryId);
     closeModal();
-    toast('Reminder sent.' + (cEmail ? ' Email queued.' : ''), 'success');
+    const emailNote = notifyContact && cEmail ? ' Email queued.' : '';
+    toast('Reminder sent.' + emailNote, 'success');
   } else {
     // Schedule
     const schedDate = document.getElementById('rem-date').value;
@@ -2787,7 +2904,7 @@ window.doSendReminder = async function(entryId) {
     if (!schedDate) return toast('Pick a date.', 'error');
     await createScheduledReminder(currentUser.id, entryId, {
       nextSendAt: new Date(schedDate + 'T09:00:00').toISOString(),
-      repeatDays, maxSends, notifyWho: 'them', message
+      repeatDays, maxSends, notifyWho, message
     });
     closeModal();
     toast(`Reminder scheduled for ${new Date(schedDate).toLocaleDateString()}${repeatDays > 0 ? ', repeating every ' + repeatDays + ' days' : ''}`, 'success');
