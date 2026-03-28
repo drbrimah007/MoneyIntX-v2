@@ -872,7 +872,34 @@ function openFieldBuilder() {
               ${f.ledgerEffect ? `<span style="color:var(--green);">Ledger: ${LEDGER_FX[f.ledgerEffect] || f.ledgerEffect}</span>` : ''}
               ${f.runSchedule ? `<span>⏱ ${RUN_SCHED[f.runSchedule] || f.runSchedule}</span>` : ''}
             </div>
-            ${calcs.length ? `<div style="margin-top:6px;font-size:12px;color:var(--accent);">⚡ ${calcs.map(c => esc(c.name || c.operation)).join(', ')}</div>` : ''}
+            ${calcs.length ? `<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px;">
+              ${calcs.map(c => {
+                const op = c.operation || '';
+                const sym = BP_OP_SYMBOL[op] || '';
+                const isBin = BP_BINARY_OPS.includes(op);
+                const fldName = id => {
+                  if (!id) return '?';
+                  const ff = fields.find(x => x.id === id);
+                  return ff ? esc(ff.label) : '?';
+                };
+                let expr = '';
+                if (isBin) {
+                  const L = c.leftType  === 'constant' ? (c.leftConstant  ?? '0') : fldName(c.leftFieldId);
+                  const R = c.rightType === 'constant' ? (c.rightConstant ?? '0') : fldName(c.rightFieldId);
+                  expr = `<span style="color:var(--text);">${L}</span> <span style="font-weight:800;">${sym}</span> <span style="color:var(--text);">${R}</span>`;
+                } else if (op === 'aggregate') {
+                  expr = `<span style="color:var(--muted);">sum all fields</span>`;
+                } else if (op === 'select_aggregate') {
+                  expr = `<span style="color:var(--muted);">sum: ${(c.targetFieldIds||[]).map(fldName).join(', ') || '—'}</span>`;
+                }
+                return `<div style="font-size:12px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.18);border-radius:5px;padding:4px 8px;display:flex;gap:8px;align-items:center;">
+                  <span style="color:var(--accent);font-weight:700;">⚡ ${esc(c.name||'?')}</span>
+                  <span style="color:var(--muted);">=</span>
+                  ${expr}
+                  ${c.resultVisible===false?'<span style="color:var(--muted);font-size:10px;">(hidden)</span>':''}
+                </div>`;
+              }).join('')}
+            </div>` : ''}
           </div>
           <div style="display:flex;gap:4px;flex-shrink:0;">
             ${idx > 0 ? `<button class="bs sm" onclick="window._bpEngine._bpMoveField(${idx},-1)">↑</button>` : ''}
@@ -924,55 +951,7 @@ function _bpOpenFieldModal(fid, forceDir) {
   const isRow = _bpFldDir === 'row';
   const ftype = isRow ? 'numeric' : (f?.type || 'numeric');
 
-  // Target field options (column fields only)
-  const colFields = (p.fields || []).filter(ff => ff.id !== fid && ff.direction !== 'row' && ff.type === 'numeric');
-  const targetOpts = (selfFid) => {
-    const cands = (p.fields || []).filter(ff => ff.id !== selfFid && ff.direction !== 'row');
-    if (!cands.length) return '<option value="">— no numeric fields yet —</option>';
-    return '<option value="">— none —</option>' + cands.map(ff =>
-      `<option value="${ff.id}">${esc(ff.label)}</option>`
-    ).join('');
-  };
-  const saggChecks = (selfFid, selIds) => {
-    const cands = (p.fields || []).filter(ff => ff.id !== selfFid && ff.direction !== 'row');
-    if (!cands.length) return '<p style="color:var(--muted);font-size:12px;">No column fields yet.</p>';
-    return cands.map(ff => `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;cursor:pointer;">
-      <input type="checkbox" class="bp-sagg-check" value="${ff.id}" ${(selIds||[]).includes(ff.id)?'checked':''}> ${esc(ff.label)}
-    </label>`).join('');
-  };
-
-  const calcRows = _bpFldCalcs.map((c, i) => {
-    const isAgg  = c.operation === 'aggregate';
-    const isSAgg = c.operation === 'select_aggregate';
-    return `<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;" id="bpfc_${i}">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div class="fg"><label>Result Name *</label>
-          <input value="${esc(c.name||'')}" oninput="window._bpEngine._bpUpdCalc(${i},'name',this.value)" placeholder="e.g. Total"></div>
-        <div class="fg"><label>Operation</label>
-          <select onchange="window._bpEngine._bpUpdCalc(${i},'operation',this.value);window._bpEngine._bpCalcOpChange(${i})">
-            ${Object.entries(CALC_OPS).map(([k,v])=>`<option value="${k}" ${c.operation===k?'selected':''}>${v}</option>`).join('')}
-          </select></div>
-        <div class="fg" id="bpcoper_${i}" style="${isAgg||isSAgg?'display:none':''}">
-          <label>Factor / Operand</label>
-          <input type="number" value="${c.operand||''}" oninput="window._bpEngine._bpUpdCalc(${i},'operand',this.value)" step="any"></div>
-        <div class="fg" id="bpctarg_${i}" style="${isAgg||isSAgg?'display:none':''}">
-          <label>Apply To Field</label>
-          <select onchange="window._bpEngine._bpUpdCalc(${i},'targetFieldId',this.value)">
-            ${targetOpts(fid||'')}
-          </select></div>
-        <div class="fg" id="bpcsagg_${i}" style="${isSAgg?'':'display:none'};grid-column:1/-1;">
-          <label>Fields to Include</label>
-          <div style="border:1px solid var(--border);border-radius:6px;padding:10px;background:var(--bg3);max-height:150px;overflow-y:auto;">
-            ${saggChecks(fid||'', c.targetFieldIds||[])}</div></div>
-        <div class="fg" style="grid-column:1/-1;"><label>Show Result</label>
-          <select onchange="window._bpEngine._bpUpdCalc(${i},'resultVisible',this.value==='yes')">
-            <option value="yes" ${c.resultVisible!==false?'selected':''}>Yes — visible in row</option>
-            <option value="no" ${c.resultVisible===false?'selected':''}>No — hidden (usable in later calcs)</option>
-          </select></div>
-      </div>
-      <button class="bs sm" style="color:var(--red);margin-top:6px;" onclick="window._bpEngine._bpRemCalc(${i})">✕ Remove</button>
-    </div>`;
-  }).join('');
+  // (calcRows removed — _bpRenderCalcList() is called after modal insertion)
 
   const dirBanner = isRow
     ? `<div style="background:rgba(99,102,241,.1);border:1px solid var(--accent);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--accent);font-weight:600;">⚡ Row Field — computed across columns per row</div>`
@@ -1033,7 +1012,7 @@ function _bpOpenFieldModal(fid, forceDir) {
         <div style="border-top:1px solid var(--border);padding-top:12px;">
           <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">⚡ Calculators</div>
           <p style="color:var(--muted);font-size:12px;margin-bottom:10px;">Results chain — each calculator can read from previous results.</p>
-          <div id="bpfl-calc-list">${calcRows}</div>
+          <div id="bpfl-calc-list"></div>
           <button class="bs sm" onclick="window._bpEngine._bpAddCalc()">+ Add Calculator</button>
         </div>
       </div>
@@ -1073,6 +1052,8 @@ function _bpOpenFieldModal(fid, forceDir) {
     </div>
   </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
+  // Render calc list with the new expression-builder UI (always — even on first open)
+  _bpRenderCalcList();
 }
 
 // ── Field modal helpers ───────────────────────────────────────────
