@@ -4655,8 +4655,74 @@ async function renderAdmin(el) {
     </tr>`;
   });
   html += `</tbody></table></div></div>`;
+
+  // Reconciliation section
+  html += `<div class="card" style="margin-top:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h3 style="font-size:16px;font-weight:700;">Balance Reconciliation</h3>
+      <button class="bp sm" onclick="runReconciliation()" id="recon-btn">Run Reconciliation</button>
+    </div>
+    <div id="recon-results"><p style="font-size:13px;color:var(--muted);">Click "Run Reconciliation" to compare balances between all linked user pairs.</p></div>
+  </div>`;
+
   el.innerHTML = html;
 }
+
+window.runReconciliation = async function() {
+  const btn = document.getElementById('recon-btn');
+  const el = document.getElementById('recon-results');
+  if (btn) { btn.disabled = true; btn.textContent = 'Running...'; }
+  el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Checking all linked pairs...</p>';
+  try {
+    const resp = await API.fetch('/api/reconcile');
+    const data = await resp.json();
+    if (!data.ok) { el.innerHTML = `<p style="color:var(--red);">${esc(data.error || 'Failed')}</p>`; return; }
+
+    const { pairs, mismatches, total } = data;
+    let html = `<div class="grid3" style="margin-bottom:14px;">
+      <div class="stat-card"><div class="stat-lbl">Linked Pairs</div><div class="stat-val">${total}</div></div>
+      <div class="stat-card"><div class="stat-lbl">Mismatches</div><div class="stat-val" style="color:${mismatches > 0 ? 'var(--red)' : 'var(--green)'};">${mismatches}</div></div>
+      <div class="stat-card"><div class="stat-lbl">Balanced</div><div class="stat-val" style="color:var(--green);">${total - mismatches}</div></div>
+    </div>`;
+
+    if (pairs.length === 0) {
+      html += '<p style="font-size:13px;color:var(--muted);">No linked user pairs found. Share records with other platform users to create linked pairs.</p>';
+    } else {
+      html += `<div class="tbl-wrap"><table><thead><tr>
+        <th>User A</th><th>User B</th>
+        <th>A→B (Owed)</th><th>B→A (Owed)</th>
+        <th>Difference</th><th>Status</th><th>Shares</th>
+      </tr></thead><tbody>`;
+      pairs.forEach(p => {
+        const nameA = esc(p.userA.name || p.userA.email || '?');
+        const nameB = esc(p.userB.name || p.userB.email || '?');
+        const diff = p.difference.toFixed(2);
+        const statusBadge = p.mismatch
+          ? `<span class="badge badge-red">Mismatch</span>`
+          : `<span class="badge badge-green">Balanced</span>`;
+        html += `<tr style="${p.mismatch ? 'background:var(--red-bg,#fff5f5);' : ''}">
+          <td style="font-weight:600;font-size:13px;">${nameA}</td>
+          <td style="font-weight:600;font-size:13px;">${nameB}</td>
+          <td style="font-size:13px;">$${p.balanceA.toy.toFixed(2)} / $${p.balanceA.yot.toFixed(2)}</td>
+          <td style="font-size:13px;">$${p.balanceB.toy.toFixed(2)} / $${p.balanceB.yot.toFixed(2)}</td>
+          <td style="font-size:13px;font-weight:700;color:${p.mismatch ? 'var(--red)' : 'var(--green)'};">$${diff}</td>
+          <td>${statusBadge}</td>
+          <td style="font-size:13px;text-align:center;">${p.tokens}</td>
+        </tr>`;
+        if (p.warning) {
+          html += `<tr><td colspan="7" style="font-size:11px;color:var(--amber);padding:4px 12px;">⚠ ${esc(p.warning)}</td></tr>`;
+        }
+      });
+      html += `</tbody></table></div>`;
+    }
+    el.innerHTML = html;
+  } catch(e) {
+    console.error('[reconciliation]', e);
+    el.innerHTML = `<p style="color:var(--red);">Error: ${esc(e.message || 'Network error')}</p>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Reconciliation'; }
+  }
+};
 
 window.changeUserRole = async function(userId, role) {
   await updateUserRole(userId, role);
