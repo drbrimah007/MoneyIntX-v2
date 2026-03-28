@@ -3297,38 +3297,60 @@ function _neRenderExtraFields(action) {
   }
   if ((action.extra || []).includes('fulfillment')) {
     html += `
-    <div style="background:var(--bg3);border-radius:10px;padding:12px 14px;margin-bottom:4px;">
-      <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text);">Fulfillment Expectation <span style="font-weight:400;color:var(--muted);">(optional)</span></div>
-      <label style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0;cursor:pointer;">
-        <span style="font-size:13px;">Set Reminder</span>
-        <label style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0;">
-          <input type="checkbox" id="ne-adv-remind" style="opacity:0;width:0;height:0;" onchange="document.getElementById('ne-adv-remind-fields').style.display=this.checked?'block':'none'">
-          <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--border);border-radius:22px;transition:.2s;"
-            onmouseover="" id="ne-adv-remind-track"></span>
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:4px;">
+      <div style="background:var(--bg3);padding:10px 14px;display:flex;align-items:center;gap:8px;cursor:pointer;"
+           onclick="(function(){var b=document.getElementById('ne-fulfill-body');var i=document.getElementById('ne-fulfill-chevron');if(b.style.display==='none'){b.style.display='block';i.textContent='▾';}else{b.style.display='none';i.textContent='▸';}})()">
+        <span style="font-size:14px;">📅</span>
+        <span style="font-size:13px;font-weight:600;color:var(--text);flex:1;">Fulfillment Schedule</span>
+        <span id="ne-fulfill-chevron" style="color:var(--muted);font-size:12px;">▸</span>
+      </div>
+      <div id="ne-fulfill-body" style="display:none;padding:14px;border-top:1px solid var(--border);">
+        <div class="form-group">
+          <label style="font-size:12px;font-weight:600;">Repayment / End Date <span style="font-weight:400;color:var(--muted);">(when this advance should be paid back)</span></label>
+          <input type="date" id="ne-adv-end-date" style="width:100%;">
+        </div>
+        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:8px 0;border-top:1px solid var(--border);margin-top:4px;">
+          <span style="font-size:13px;font-weight:500;color:var(--text);">Set Reminder?</span>
+          <label style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0;">
+            <input type="checkbox" id="ne-adv-remind" style="opacity:0;width:0;height:0;"
+              onchange="(function(cb){var f=document.getElementById('ne-adv-remind-fields');f.style.display=cb.checked?'block':'none';document.getElementById('ne-adv-remind-track').style.background=cb.checked?'var(--accent)':'var(--border)';})(this)">
+            <span id="ne-adv-remind-track" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--border);border-radius:22px;transition:.2s;"></span>
+          </label>
         </label>
-      </label>
-      <div id="ne-adv-remind-fields" style="display:none;margin-top:10px;display:none;">
-        <div style="display:flex;gap:10px;">
-          <div class="form-group" style="flex:1;margin-bottom:0;">
-            <label style="font-size:12px;">Days before reminder</label>
-            <input type="number" id="ne-adv-days" min="1" max="365" value="3" style="width:100%;">
+        <div id="ne-adv-remind-fields" style="display:none;margin-top:10px;">
+          <div class="form-group">
+            <label style="font-size:12px;font-weight:600;">Remind</label>
+            <select id="ne-adv-notify-who" style="width:100%;">
+              <option value="both">Both me &amp; contact</option>
+              <option value="contact">Contact only</option>
+              <option value="you">Just me</option>
+            </select>
           </div>
-          <div class="form-group" style="flex:1;margin-bottom:0;">
-            <label style="font-size:12px;">Number of reminders</label>
-            <input type="number" id="ne-adv-count" min="1" max="10" value="1" style="width:100%;">
+          <div style="display:flex;gap:10px;">
+            <div class="form-group" style="flex:1;margin-bottom:0;">
+              <label style="font-size:12px;font-weight:600;">Days before end date</label>
+              <input type="number" id="ne-adv-days" min="1" max="365" value="3" style="width:100%;">
+            </div>
+            <div class="form-group" style="flex:1;margin-bottom:0;">
+              <label style="font-size:12px;font-weight:600;">Repeat every (days)</label>
+              <input type="number" id="ne-adv-repeat" min="0" max="365" value="0" style="width:100%;" placeholder="0 = once">
+            </div>
+            <div class="form-group" style="flex:1;margin-bottom:0;">
+              <label style="font-size:12px;font-weight:600;">Max reminders</label>
+              <input type="number" id="ne-adv-count" min="1" max="20" value="1" style="width:100%;">
+            </div>
           </div>
+          <p style="font-size:11px;color:var(--muted);margin-top:8px;">Reminder will fire <strong id="ne-adv-days-preview">3</strong> day(s) before the repayment date.</p>
         </div>
       </div>
     </div>`;
   }
   el.innerHTML = html;
-  // Wire the toggle track colour
-  const remCb = document.getElementById('ne-adv-remind');
-  if (remCb) {
-    const track = document.getElementById('ne-adv-remind-track');
-    remCb.addEventListener('change', () => {
-      if (track) track.style.background = remCb.checked ? 'var(--accent)' : 'var(--border)';
-    });
+  // Live preview: update "X day(s) before" label as user types
+  const daysInp = document.getElementById('ne-adv-days');
+  const preview = document.getElementById('ne-adv-days-preview');
+  if (daysInp && preview) {
+    daysInp.addEventListener('input', () => { preview.textContent = daysInp.value || '3'; });
   }
 }
 
@@ -3353,9 +3375,12 @@ window.saveNewEntry = async function() {
   const refNumber  = document.getElementById('ne-ref-number')?.value?.trim() || '';
   const dueDate    = document.getElementById('ne-due-date')?.value || null;
   const advNote    = document.getElementById('ne-advance-note')?.value?.trim() || '';
-  const advRemind  = document.getElementById('ne-adv-remind')?.checked ?? false;
-  const advDays    = parseInt(document.getElementById('ne-adv-days')?.value || '3', 10);
-  const advCount   = parseInt(document.getElementById('ne-adv-count')?.value || '1', 10);
+  const advRemind      = document.getElementById('ne-adv-remind')?.checked ?? false;
+  const advEndDate     = document.getElementById('ne-adv-end-date')?.value || '';
+  const advDays        = parseInt(document.getElementById('ne-adv-days')?.value || '3', 10);
+  const advRepeat      = parseInt(document.getElementById('ne-adv-repeat')?.value || '0', 10);
+  const advCount       = parseInt(document.getElementById('ne-adv-count')?.value || '1', 10);
+  const advNotifyWho   = document.getElementById('ne-adv-notify-who')?.value || 'both';
   const dirSign    = DIRECTION_SIGN[category] ?? 1;
 
   if (!contactId) return toast('Please select a contact.', 'error');
@@ -3379,10 +3404,35 @@ window.saveNewEntry = async function() {
   });
 
   // Persist new fields onto the entry row
+  const isAdvance = ['advance_paid', 'advance_received'].includes(category);
   if (entry?.id) {
     const updates = { category, direction_sign: dirSign, outstanding_amount: Math.round(parseFloat(amount) * 100) };
     if (dueDate) updates.due_date = dueDate;
+    // Save repayment date as due_date for advances
+    if (isAdvance && advEndDate) updates.due_date = advEndDate;
     await supabase.from('entries').update(updates).eq('id', entry.id);
+  }
+
+  // ── Schedule fulfillment reminder (advances only) ─────────────────────────
+  if (isAdvance && advRemind && advEndDate && entry?.id) {
+    try {
+      const endMs   = new Date(advEndDate + 'T09:00:00').getTime();
+      const fireMs  = endMs - (advDays * 86400000);
+      if (fireMs > Date.now()) {
+        const advContactName = window._neContacts?.find(c => c.id === contactId)?.name || 'Contact';
+        const remMsg = `Advance repayment reminder with ${advContactName} — ${currency} ${parseFloat(amount).toLocaleString()} due ${new Date(advEndDate).toLocaleDateString()}`;
+        await createScheduledReminder(currentUser.id, entry.id, {
+          nextSendAt: new Date(fireMs).toISOString(),
+          repeatDays: advRepeat,
+          maxSends: advCount,
+          notifyWho: advNotifyWho,
+          message: remMsg
+        });
+        toast(`Fulfillment reminder set for ${new Date(fireMs).toLocaleDateString()}.`, 'info');
+      } else {
+        toast('Reminder date is in the past — advance saved without reminder.', 'info');
+      }
+    } catch(e) { console.warn('[fulfillment reminder]', e); }
   }
 
   closeModal();
