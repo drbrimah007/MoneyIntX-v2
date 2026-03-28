@@ -966,9 +966,9 @@ function _getModules() {
   try {
     const raw = localStorage.getItem(_modsKey());
     if (raw) return JSON.parse(raw);
-    // First visit for this user — default all modules ON and persist it
+    // First visit for this user — default all modules OFF (user opts in via Settings)
     const defaults = {};
-    OPTIONAL_MODULES.forEach(m => { defaults[m.id] = true; });
+    OPTIONAL_MODULES.forEach(m => { defaults[m.id] = false; });
     try { localStorage.setItem(_modsKey(), JSON.stringify(defaults)); } catch(_) {}
     return defaults;
   } catch(e) { return {}; }
@@ -976,7 +976,7 @@ function _getModules() {
 
 function _modEnabled(mod) {
   const mods = _getModules();
-  if (typeof mods[mod] === 'undefined') return true; // not set → ON by default
+  if (typeof mods[mod] === 'undefined') return false; // not set → OFF by default
   return !!mods[mod];
 }
 
