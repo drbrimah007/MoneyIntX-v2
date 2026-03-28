@@ -1128,50 +1128,18 @@ async function enterApp(user) {
     }, { onConflict: 'id' }).select().single();
     currentProfile = data;
   }
-  // ── Contact auto-linking ─────────────────────────────────────────
-  // On every login: find all contact records across the platform that use
-  // this user's email and set linked_user_id so in-app notifications work.
+  // ── Cross-user login linking (SECURITY DEFINER RPC) ─────────────
+  // Direct table updates can't do this — RLS blocks one user from writing
+  // another user's contacts/share_tokens. The RPC runs with elevated
+  // privileges to: (1) set linked_user_id on all contacts that have this
+  // user's email across the whole platform, (2) set recipient_id on all
+  // share_tokens sent to this email, (3) fire in-app notifications for
+  // each newly linked share.
   if (user.email) {
-    supabase.from('contacts')
-      .update({ linked_user_id: user.id })
-      .eq('email', user.email)
-      .is('linked_user_id', null)
-      .then(({ error }) => { if (error) console.warn('[contact-link]', error.message); });
-
-    // ── Share token auto-linking ──────────────────────────────────
-    // On every login: find all share_tokens sent to this email but not yet
-    // linked to a user account. Set recipient_id so "Shared With Me" shows
-    // records sent before the user logged in, and fire in-app notifications.
-    supabase.from('share_tokens')
-      .update({ recipient_id: user.id })
-      .eq('recipient_email', user.email)
-      .is('recipient_id', null)
-      .neq('status', 'expired')
-      .neq('status', 'dismissed')
-      .select()
+    supabase.rpc('on_user_login', { p_email: user.email, p_user_id: user.id })
       .then(({ data, error }) => {
-        if (error) console.warn('[share-token-link]', error.message);
-        else if (data?.length) {
-          console.log(`[share-token-link] linked ${data.length} pending share(s) to user`);
-          data.forEach(async (st) => {
-            try {
-              const snap = st.entry_snapshot || {};
-              const amt = snap.amount || 0;
-              const cur = snap.currency || 'USD';
-              const fromName = snap.from_name || 'Someone';
-              await supabase.from('notifications').insert({
-                user_id: user.id,
-                type: 'shared_record',
-                message: `${fromName} shared a record with you: ${amt} ${cur}`,
-                entry_id: st.entry_id || null,
-                contact_name: fromName,
-                amount: amt,
-                currency: cur,
-                read: false
-              });
-            } catch(_) {}
-          });
-        }
+        if (error) console.warn('[on_user_login]', error.message);
+        else if (data) console.log('[on_user_login]', data);
       });
   }
 
