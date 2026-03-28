@@ -22,6 +22,35 @@ function fmtMoney(n, cur) {
   catch(e) { return `${cur||'USD'} ${(n||0).toFixed(2)}`; }
 }
 
+// Compact number for table cells: ≤9999 shows in full; 10K+ uses K/M suffix
+function _cmpct(n) {
+  const abs = Math.abs(n), s = n < 0 ? '−' : '';
+  if (abs >= 1_000_000) return s + (abs / 1_000_000).toFixed(abs >= 100_000_000 ? 0 : 1).replace(/\.0$/, '') + 'M';
+  if (abs >= 10_000)    return s + (abs / 1_000).toFixed(abs >= 100_000 ? 0 : 1).replace(/\.0$/, '') + 'K';
+  // under 10 000 — show without trailing zeros
+  return s + abs.toLocaleString('en-US', { minimumFractionDigits:0, maximumFractionDigits:2 });
+}
+
+// Compact version of fmtFieldVal — used in table cells only
+function fmtFieldValC(val, field, panelCur) {
+  let n;
+  if (typeof val === 'object' && val !== null) { n = parseFloat(val.num) || 0; }
+  else { n = parseFloat(val); if (isNaN(n)) return null; }
+  const ut = field.unitType || 'none';
+  if (ut === 'currency') {
+    const sym = (() => { try { return (0).toLocaleString('en-US',{style:'currency',currency:field.unitValue||panelCur||'USD',minimumFractionDigits:0}).replace(/[\d,.\s]/g,'').trim(); } catch(e){ return field.unitValue||panelCur||'$'; } })();
+    return sym + _cmpct(n);
+  }
+  if (ut === 'weight') return `${_cmpct(n)} ${field.unitValue || 'kg'}`;
+  return _cmpct(n);
+}
+
+// Compact fmtMoney — used in table cells only
+function fmtMoneyC(n, cur) {
+  const sym = (() => { try { return (0).toLocaleString('en-US',{style:'currency',currency:cur||'USD',minimumFractionDigits:0}).replace(/[\d,.\s]/g,'').trim(); } catch(e){ return cur||'$'; } })();
+  return sym + _cmpct(n || 0);
+}
+
 const WEIGHT_UNITS = ['kg','lbs','g','oz','t','lb','ton'];
 
 // Format a column field value according to its unitType/unitValue
@@ -472,7 +501,7 @@ function renderOpenSession(p, rows, colFields, rowFields, sessionKey, label) {
       colFields.forEach(f => {
         const raw = allColVals[f.id] ?? '';
         if (f.type === 'numeric' || f.type === 'paired') {
-          const fv = fmtFieldVal(raw, f, currency);
+          const fv = fmtFieldValC(raw, f, currency);
           const isAuto = (f.calculators||[]).length > 0;
           html += `<td style="font-weight:600;${isAuto?'color:var(--accent);':''}">${fv !== null ? fv : '<span style="color:var(--muted);">—</span>'}</td>`;
         } else {
@@ -481,7 +510,7 @@ function renderOpenSession(p, rows, colFields, rowFields, sessionKey, label) {
       });
       rowFields.forEach(f => {
         const val = rowComputed[f.id];
-        html += `<td style="font-weight:700;color:var(--accent);">${val !== undefined ? fmtMoney(val, currency) : '—'}</td>`;
+        html += `<td style="font-weight:700;color:var(--accent);">${val !== undefined ? fmtMoneyC(val, currency) : '—'}</td>`;
       });
       html += `<td style="text-align:right;">
         <button class="bs sm" onclick="window._bpEngine.openEditRowModal('${row.id}')" style="font-size:11px;padding:3px 8px;">Edit</button>
@@ -574,7 +603,7 @@ function renderFoldedBody(p, rows, sessionKey) {
     colFields.forEach(f => {
       const raw = allColVals[f.id] ?? '';
       if (f.type === 'numeric' || f.type === 'paired') {
-        const fv = fmtFieldVal(raw, f, currency);
+        const fv = fmtFieldValC(raw, f, currency);
         const isAuto = (f.calculators||[]).length > 0;
         html += `<td style="font-weight:600;${isAuto?'color:var(--accent);':''}">${fv !== null ? fv : '<span style="color:var(--muted);">—</span>'}</td>`;
       } else {
@@ -583,7 +612,7 @@ function renderFoldedBody(p, rows, sessionKey) {
     });
     rowFields.forEach(f => {
       const val = rowComputed[f.id];
-      html += `<td style="font-weight:700;color:var(--accent);">${val !== undefined ? fmtMoney(val, currency) : '—'}</td>`;
+      html += `<td style="font-weight:700;color:var(--accent);">${val !== undefined ? fmtMoneyC(val, currency) : '—'}</td>`;
     });
     html += `</tr>`;
   });
