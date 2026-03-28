@@ -32,8 +32,8 @@ const BRAND = {
   text: '#1e293b',
   muted: '#64748b',
   border: '#e2e8f0',
-  logoUrl: 'https://v2.moneyinteractions.com/money.png',
-  siteUrl: 'https://v2.moneyinteractions.com'
+  logoUrl: 'https://moneyintx.com/money.png',
+  siteUrl: 'https://moneyintx.com'
 };
 
 // ── Base email wrapper ─────────────────────────────────────────────────────────

@@ -29,12 +29,12 @@
   --red: #f87171;
   --amber: #fbbf24;
   --blue: #60a5fa;
-  --bg: #0f1117;
-  --bg2: #1a1d27;
-  --bg3: #222636;
+  --bg: #0a0c12;
+  --bg2: #11141e;
+  --bg3: #181b28;
   --text: #e2e8f0;
   --muted: #8892a4;
-  --border: #2e3348;
+  --border: #252840;
   --radius: 10px;
   --shadow: 0 2px 12px rgba(0,0,0,0.4);
   --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
@@ -557,7 +557,6 @@ import { listTrustees, createTrustee, deleteTrustee, verifyTrustee, activateTrus
 import { initBpEngine, exposeBpEngine, renderBusinessPage } from './js/bp-engine.js';
 import { listRecurring, createRecurring, deleteRecurring, toggleRecurring, processDueRecurring, FREQUENCIES } from './js/recurring.js';
 import { toast, esc, navigate, statusBadge, TX_LABELS, TX_COLORS, TX_CREATE_LABELS, DIRECTION_SIGN, fmtDate, fmtRelative, openModal, closeModal } from './js/ui.js';
-import { sendNotificationEmail, sendInvoiceEmail } from './js/email.js';
 import { sendNotificationEmail, sendInvoiceEmail, sendOtpEmail, sendInviteEmail, logEmail } from './js/email.js';
 
 let currentUser = null;
@@ -879,8 +878,8 @@ async function enterApp(user) {
   const savedPage = localStorage.getItem('mxi_last_page') || 'dash';
   navTo(savedPage);
   // Process scheduled reminders + recurring rules every 60s
-  setInterval(() => { processDueReminders(user.id); processDueRecurring(user.id); }, 60000);
-  processDueReminders(user.id);
+  setInterval(() => { processDueReminders(user.id, { emailFn: sendNotificationEmail }); processDueRecurring(user.id); }, 60000);
+  processDueReminders(user.id, { emailFn: sendNotificationEmail });
   processDueRecurring(user.id);
 
   // Realtime: live updates across devices
@@ -5768,11 +5767,12 @@ async function renderSettings(el) {
   // ── Theme picker ───────────────────────────────────────────────
   const currentTheme = localStorage.getItem('mxi_theme') || 'classic';
   const themes = [
-    { id: 'purple', name: 'Purple', color: '#6c63ff' },
-    { id: 'teal',   name: 'Teal',   color: '#0d9488' },
-    { id: 'ocean',  name: 'Ocean',  color: '#0284c7' },
-    { id: 'rose',   name: 'Rose',   color: '#e11d48' },
-    { id: 'dark',   name: 'Dark',   color: '#334155' }
+    { id: 'classic', name: 'Classic Dark', color: '#0f1117' },
+    { id: 'dark',   name: 'Dark Blue',    color: '#334155' },
+    { id: 'purple', name: 'Purple',       color: '#6c63ff' },
+    { id: 'teal',   name: 'Teal',         color: '#0d9488' },
+    { id: 'ocean',  name: 'Ocean',        color: '#0284c7' },
+    { id: 'rose',   name: 'Rose',         color: '#e11d48' }
   ];
   html += `<div class="card" style="margin-top:12px;">
     <h3 style="font-size:16px;font-weight:700;margin-bottom:12px;">Theme</h3>
