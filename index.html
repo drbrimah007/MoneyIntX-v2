@@ -466,6 +466,21 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
         </div>
       </div>
     </div>
+    <!-- Mobile-only: float cards shown as row below phone -->
+    <div class="lp-float-mobile" style="display:none;gap:10px;justify-content:center;margin-top:14px;">
+      <div style="padding:14px;border-radius:16px;background:rgba(9,16,31,.95);border:1px solid rgba(255,255,255,.15);width:48%;text-align:center;">
+        <div style="display:inline-flex;padding:3px 8px;border-radius:999px;font-size:9px;font-weight:700;margin-bottom:6px;background:rgba(127,224,208,.1);border:1px solid rgba(127,224,208,.16);color:#b8f4ea;">Invoice sent</div>
+        <strong style="display:block;font-size:11px;margin-bottom:3px;">James Adebayo</strong>
+        <div style="font-size:18px;font-weight:800;letter-spacing:-.03em;">$8,000</div>
+        <div style="font-size:10px;color:#74829b;">Due in 3 days</div>
+      </div>
+      <div style="padding:14px;border-radius:16px;background:rgba(9,16,31,.95);border:1px solid rgba(255,255,255,.15);width:48%;text-align:center;">
+        <div style="display:inline-flex;padding:3px 8px;border-radius:999px;font-size:9px;font-weight:700;margin-bottom:6px;background:rgba(127,224,208,.1);border:1px solid rgba(127,224,208,.16);color:#b8f4ea;">Settled</div>
+        <strong style="display:block;font-size:11px;margin-bottom:3px;">Nadia Stores</strong>
+        <div style="font-size:18px;font-weight:800;letter-spacing:-.03em;">$420</div>
+        <div style="font-size:10px;color:#74829b;">Just now</div>
+      </div>
+    </div>
     </div><!-- close wrapper for floating cards -->
 
     </div><!-- close hero grid -->
@@ -477,6 +492,7 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
       .lp-hero-grid { grid-template-columns:1fr !important; gap:40px !important; text-align:center; }
       .lp-hero-grid > div:first-child { order:0; }
       .lp-float-card { display:none !important; }
+      .lp-float-mobile { display:flex !important; }
     }
   </style>
 
