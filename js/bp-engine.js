@@ -771,7 +771,7 @@ function openAddRowModal(sessionKey) {
         const aClr = f.outputColor || 'var(--accent)';
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
           <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:${aClr};font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
-          <div id="bpr-auto-${f.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:${aClr};font-weight:600;font-size:15px;">—</div>
+          <div id="bpr-auto-${f.id}" style="background:var(--bg3);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 12px;color:${aClr};font-weight:600;font-size:15px;">—</div>
         </div>`;
       } else {
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
@@ -782,7 +782,7 @@ function openAddRowModal(sessionKey) {
         const aClr = f.outputColor || 'var(--accent)';
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
           <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:${aClr};font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
-          <div id="bpr-auto-${f.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:${aClr};font-weight:600;font-size:15px;">—</div>
+          <div id="bpr-auto-${f.id}" style="background:var(--bg3);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 12px;color:${aClr};font-weight:600;font-size:15px;">—</div>
         </div>`;
       } else {
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
@@ -805,7 +805,7 @@ function openAddRowModal(sessionKey) {
         <input type="date" id="bpr-date" value="${todayStr()}">
       </div>
       ${fieldsHtml}
-      ${hasRowFields ? `<div id="bpr-preview" style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;display:none;">
+      ${hasRowFields ? `<div id="bpr-preview" style="background:var(--bg3);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;display:none;">
         <div style="font-weight:700;margin-bottom:8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">Calculated</div>
         ${rowFields.map(f => `<div style="display:flex;justify-content:space-between;padding:3px 0;">
           <span style="color:var(--muted);">${esc(f.label)}</span>
@@ -941,7 +941,7 @@ async function openEditRowModal(rowId) {
         const eClr = f.outputColor || 'var(--accent)';
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
           <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:${eClr};font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
-          <div id="bped-auto-${f.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:${eClr};font-weight:600;font-size:15px;">${dispVal}</div>
+          <div id="bped-auto-${f.id}" style="background:var(--bg3);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 12px;color:${eClr};font-weight:600;font-size:15px;">${dispVal}</div>
         </div>`;
       } else {
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
@@ -954,7 +954,7 @@ async function openEditRowModal(rowId) {
         const eClr = f.outputColor || 'var(--accent)';
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
           <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:${eClr};font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
-          <div id="bped-auto-${f.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:${eClr};font-weight:600;font-size:15px;">${dispVal}</div>
+          <div id="bped-auto-${f.id}" style="background:var(--bg3);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 12px;color:${eClr};font-weight:600;font-size:15px;">${dispVal}</div>
         </div>`;
       } else {
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
@@ -1056,7 +1056,7 @@ function openFieldBuilder() {
       const dirTag = f.direction === 'row'
         ? `<span style="background:rgba(99,102,241,.2);color:var(--accent);border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700;">ROW</span>`
         : `<span style="background:rgba(255,255,255,.08);color:var(--muted);border-radius:4px;padding:1px 6px;font-size:11px;">COL</span>`;
-      html += `<div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;">
+      html += `<div style="border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:14px;margin-bottom:10px;">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
           <div style="flex:1;">
             <div style="font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;">${dirTag} ${esc(f.label || 'Unnamed')}</div>
@@ -1149,7 +1149,7 @@ function _bpOpenFieldModal(fid, forceDir) {
 
   const dirBanner = isRow
     ? `<div style="background:rgba(99,102,241,.1);border:1px solid var(--accent);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--accent);font-weight:600;">⚡ Row Field — computed across columns per row</div>`
-    : `<div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--muted);">📊 Column Field — user enters data per row</div>`;
+    : `<div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.35);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--muted);">📊 Column Field — user enters data per row</div>`;
 
   const html = `<div class="modal-bg" id="bpFieldModalBg" onclick="if(event.target===this)this.remove()">
     <div class="modal" style="max-width:680px;max-height:90vh;overflow-y:auto;" onclick="event.stopPropagation()">
@@ -1180,7 +1180,7 @@ function _bpOpenFieldModal(fid, forceDir) {
 
       <!-- NUMERIC OPTIONS -->
       <div id="bpfl-panel-numeric" style="display:${isRow||ftype==='numeric'?'block':'none'}">
-        ${isRow ? '' : `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;padding:12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);">
+        ${isRow ? '' : `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;padding:12px;background:var(--bg3);border-radius:8px;border:1px solid rgba(255,255,255,0.1);">
           <div class="fg" style="margin:0;"><label style="font-size:12px;">Unit</label>
             <select id="bpfl-unittype" onchange="window._bpEngine._bpUnitTypeChange(this.value)">
               <option value="none" ${(f?.unitType||'none')==='none'?'selected':''}>None</option>
@@ -1223,7 +1223,7 @@ function _bpOpenFieldModal(fid, forceDir) {
           <div class="fg"><label>Text Label</label><input id="bpfl-textlabel" value="${esc(f?.textLabel||'Item')}" placeholder="Item"></div>
           <div class="fg"><label>Number Label</label><input id="bpfl-numlabel" value="${esc(f?.numericLabel||'Amount')}" placeholder="Amount"></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;padding:12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;padding:12px;background:var(--bg3);border-radius:8px;border:1px solid rgba(255,255,255,0.1);">
           <div class="fg" style="margin:0;"><label style="font-size:12px;">Unit</label>
             <select id="bpfl-unittype-p" onchange="window._bpEngine._bpUnitTypeChangeP(this.value)">
               <option value="none" ${(f?.unitType||'none')==='none'?'selected':''}>None</option>
@@ -1246,7 +1246,7 @@ function _bpOpenFieldModal(fid, forceDir) {
       </div>
 
       <!-- OUTPUT COLOR -->
-      <div style="margin-top:14px;padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;">
+      <div style="margin-top:14px;padding:12px;background:var(--bg3);border:1px solid rgba(255,255,255,0.1);border-radius:8px;">
         <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">🎨 Display Color</div>
         <input type="hidden" id="bpfl-color" value="${esc(f?.outputColor||'')}">
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
@@ -1361,7 +1361,7 @@ function _bpRenderCalcList() {
     const isSAgg = op === 'select_aggregate';
     const sym    = BP_OP_SYMBOL[op] || '';
 
-    return `<div style="border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;background:var(--bg2);" id="bpfc_${i}">
+    return `<div style="border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:14px;margin-bottom:12px;background:var(--bg2);" id="bpfc_${i}">
       <!-- Top row: name + op + remove -->
       <div style="display:grid;grid-template-columns:1fr 200px auto;gap:10px;align-items:flex-end;margin-bottom:12px;">
         <div class="fg" style="margin:0;">
@@ -1379,7 +1379,7 @@ function _bpRenderCalcList() {
 
       <!-- Binary expression: [Left] OP [Right] -->
       <div id="bpc-expr-${i}" style="${isBin?'':'display:none'}">
-        <div style="display:grid;grid-template-columns:1fr 32px 1fr;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;">
+        <div style="display:grid;grid-template-columns:1fr 32px 1fr;align-items:center;gap:10px;background:var(--bg3);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px;">
           <div>
             <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px;">LEFT</div>
             ${_operandPicker(i, 'left', c)}
@@ -1396,7 +1396,7 @@ function _bpRenderCalcList() {
       <!-- select_aggregate checkboxes -->
       <div id="bpcsagg_${i}" style="${isSAgg?'':'display:none'}">
         <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Fields to sum:</div>
-        <div style="border:1px solid var(--border);border-radius:6px;padding:10px;background:var(--bg3);max-height:160px;overflow-y:auto;">
+        <div style="border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;background:var(--bg3);max-height:160px;overflow-y:auto;">
           ${_saggChecks(c.targetFieldIds||[])}
         </div>
       </div>
