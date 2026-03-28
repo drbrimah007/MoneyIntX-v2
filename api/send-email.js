@@ -13,8 +13,8 @@ export default async function handler(req, res) {
   }
 
   const apiKey = process.env.RESEND_API_KEY;
-  // Always use noreply@moneyintx.com — matching V1 config
-  const from   = 'Money IntX <noreply@moneyintx.com>';
+  // Use hello@ — avoids spam penalty for "no-reply" sender names
+  const from   = 'Money IntX <hello@moneyintx.com>';
 
   if (!apiKey) {
     console.error('[send-email] RESEND_API_KEY is not set in environment variables');
