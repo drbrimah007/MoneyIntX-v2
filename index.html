@@ -1853,9 +1853,9 @@ window.openEntryDetail = async function(id) {
     </div>` : ''}
     ${settleHtml}
     ${canMarkPaid ? `
-    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:10px;flex-direction:column;">
-      <button class="btn btn-primary" style="width:100%;padding:13px 16px;font-size:15px;font-weight:700;border-radius:12px;letter-spacing:.01em;box-shadow:0 2px 12px rgba(99,102,241,.25);" onclick="closeModal();openMarkPaidModal('${entry.id}')">💳 Record Payment${remaining > 0 ? ` · ${fmtMoney(remaining, entry.currency || 'USD')} outstanding` : ''}</button>
-      ${canFulfill ? `<button class="bs" style="width:100%;padding:11px 16px;font-size:14px;font-weight:600;border-radius:12px;border-color:var(--green);color:var(--green);" onclick="closeModal();openRecordFulfillmentModal('${entry.id}')">✅ Record Fulfillment</button>` : ''}
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="bs sm" style="background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;" onclick="closeModal();openMarkPaidModal('${entry.id}')">💳 Record Payment${remaining > 0 ? ` (${fmtMoney(remaining, entry.currency || 'USD')})` : ''}</button>
+      ${canFulfill ? `<button class="bs sm" style="border-color:var(--green);color:var(--green);font-weight:600;" onclick="closeModal();openRecordFulfillmentModal('${entry.id}')">✅ Record Fulfillment</button>` : ''}
     </div>` : ''}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:${canMarkPaid ? '10' : '14'}px;${canMarkPaid ? '' : 'border-top:1px solid var(--border);margin-top:16px;'}">
       <button class="bs sm" onclick="openEditEntryModal('${entry.id}')">Edit</button>
@@ -2180,79 +2180,144 @@ window.openMarkPaidModal = async function(id) {
 
     <div class="form-row">
       <div class="form-group">
-        <label>Payment Amount</label>
+        <label>Amount</label>
         <input type="number" id="mp-amount" value="${outstandingDollars}" min="0.01" step="0.01"
           placeholder="${outstandingDollars}" style="width:100%;">
         <div style="font-size:11px;color:var(--muted);margin-top:4px;">Outstanding: ${fmtMoney(outstanding, currency)}</div>
+      </div>
+      <div class="form-group"><label>Date</label>
+        <input type="date" id="mp-date" value="${new Date().toISOString().slice(0,10)}" style="width:100%;"></div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group"><label>Method</label>
+        <select id="mp-method" style="width:100%;">
+          <option value="">— optional —</option>
+          <option value="cash">Cash</option>
+          <option value="bank">Bank Transfer</option>
+          <option value="card">Card</option>
+          <option value="mobile">Mobile Money</option>
+          <option value="cheque">Cheque</option>
+          <option value="crypto">Crypto</option>
+          <option value="other">Other</option>
+        </select>
       </div>
       <div class="form-group"><label>Currency</label>
         <input type="text" value="${esc(currency)}" readonly style="width:100%;opacity:.7;">
       </div>
     </div>
-    <div class="form-group"><label>Payment Date</label>
-      <input type="date" id="mp-date" value="${new Date().toISOString().slice(0,10)}" style="width:100%;"></div>
+
     <div class="form-group"><label>Note <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
-      <textarea id="mp-note" rows="2" placeholder="e.g. Paid via bank transfer"></textarea></div>
+      <textarea id="mp-note" rows="2" placeholder="e.g. Cash handed over"></textarea></div>
+
+    <div class="form-group">
+      <label>Receipt / Proof <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+      <input type="file" id="mp-proof" accept="image/*,.pdf" style="width:100%;font-size:13px;">
+      <div id="mp-proof-preview" style="margin-top:6px;display:none;">
+        <img id="mp-proof-img" style="max-width:100%;max-height:120px;border-radius:6px;border:1px solid var(--border);">
+      </div>
+    </div>
+
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="bs sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary btn-sm" id="mp-save-btn" onclick="saveMarkPaid('${id}','${currency}')">Record Payment</button>
+      <button class="bs sm" id="mp-save-btn" onclick="saveMarkPaid('${id}','${currency}')"
+        style="background:var(--accent);color:#fff;border-color:var(--accent);">💳 Save</button>
     </div>
-  `, { maxWidth: '420px' });
+  `, { maxWidth: '460px' });
+
+  // Preview uploaded file
+  document.getElementById('mp-proof')?.addEventListener('change', function() {
+    const file = this.files?.[0];
+    const preview = document.getElementById('mp-proof-preview');
+    const img = document.getElementById('mp-proof-img');
+    if (file && file.type.startsWith('image/') && preview && img) {
+      img.src = URL.createObjectURL(file);
+      preview.style.display = '';
+    } else if (preview) { preview.style.display = 'none'; }
+  });
 };
 
 window.saveMarkPaid = async function(entryId, currency) {
   const amountDollars = parseFloat(document.getElementById('mp-amount').value);
   if (!amountDollars || amountDollars <= 0) return toast('Enter a valid amount.', 'error');
   const amountCents = Math.round(amountDollars * 100);
-  const payDate     = document.getElementById('mp-date').value || new Date().toISOString().slice(0,10);
-  const note        = document.getElementById('mp-note').value.trim();
-  const btn         = document.getElementById('mp-save-btn');
+  const payDate  = document.getElementById('mp-date').value || new Date().toISOString().slice(0,10);
+  const note     = document.getElementById('mp-note')?.value.trim() || null;
+  const method   = document.getElementById('mp-method')?.value || null;
+  const proofFile= document.getElementById('mp-proof')?.files?.[0] || null;
+  const btn      = document.getElementById('mp-save-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
 
   try {
-    // Use the atomic Postgres function from migration 009
-    const { data, error } = await supabase.rpc('record_payment', {
-      p_entry_id: entryId,
-      p_user_id:  currentUser.id,
-      p_amount:   amountCents,
-      p_currency: currency,
-      p_date:     payDate,
-      p_note:     note || null
-    });
+    // 1. Fetch current entry state
+    const { data: entry, error: fetchErr } = await supabase
+      .from('entries').select('*').eq('id', entryId).single();
+    if (fetchErr || !entry) throw fetchErr || new Error('Entry not found');
 
-    if (error) throw error;
-    const result = data;
+    const prevPaid      = entry.paid_amount || 0;
+    const newPaid       = prevPaid + amountCents;
+    const newOutstanding= Math.max(0, (entry.amount || 0) - newPaid);
+    const newStatus     = newOutstanding === 0 ? 'settled' : (newPaid > 0 ? 'partially_settled' : entry.status);
 
-    // Also insert a payment_recorded entry in the entries table for ledger visibility
-    const { data: origEntry } = await supabase.from('entries')
-      .select('contact_id, direction_sign').eq('id', entryId).single();
-    if (origEntry) {
-      // direction_sign for payment is opposite of original (+1 debt → -1 payment reduces it)
-      const paymentSign = origEntry.direction_sign != null ? -origEntry.direction_sign : 1;
-      await supabase.from('entries').insert({
-        user_id:        currentUser.id,
-        contact_id:     origEntry.contact_id,
-        tx_type:        'they_paid_you',          // legacy compat
-        category:       'payment_recorded',
-        direction_sign: paymentSign,
-        amount:         amountCents,
-        currency,
-        date:           payDate,
-        note:           note || null,
-        status:         'posted',
-        paid_amount:    amountCents,
-        outstanding_amount: 0,
-        entry_number:   null
-      });
+    // 2. Upload proof file if provided
+    let proofUrl = null;
+    if (proofFile) {
+      const ext  = proofFile.name.split('.').pop();
+      const path = `payments/${currentUser.id}/${entryId}_${Date.now()}.${ext}`;
+      const { data: upData, error: upErr } = await supabase.storage
+        .from('attachments').upload(path, proofFile, { upsert: true });
+      if (!upErr && upData) {
+        const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(path);
+        proofUrl = urlData?.publicUrl || null;
+      }
     }
 
+    // 3. Update the original entry (no RPC — pure JS, no constraint risk)
+    const { error: updateErr } = await supabase.from('entries').update({
+      paid_amount:        newPaid,
+      outstanding_amount: newOutstanding,
+      status:             newStatus,
+      updated_at:         new Date().toISOString()
+    }).eq('id', entryId);
+    if (updateErr) throw updateErr;
+
+    // 4. Insert payment record into payments table (best effort)
+    await supabase.from('payments').insert({
+      entry_id:     entryId,
+      user_id:      currentUser.id,
+      amount:       amountCents,
+      currency:     currency,
+      payment_date: payDate,
+      note:         note,
+      method:       method,
+      proof_url:    proofUrl
+    }).then(r => { if (r.error) console.warn('[payments insert]', r.error.message); });
+
+    // 5. Ledger visibility entry (payment_recorded)
+    const paymentSign = entry.direction_sign != null ? -entry.direction_sign : 1;
+    await supabase.from('entries').insert({
+      user_id:            currentUser.id,
+      contact_id:         entry.contact_id,
+      category:           'payment_recorded',
+      direction_sign:     paymentSign,
+      amount:             amountCents,
+      currency,
+      date:               payDate,
+      note,
+      status:             'posted',
+      paid_amount:        amountCents,
+      outstanding_amount: 0
+    }).then(r => { if (r.error) console.warn('[ledger entry]', r.error.message); });
+
     closeModal();
-    const statusText = (result?.status === 'settled' || result?.outstanding_amount === 0) ? 'Fully settled ✓' : `Partially settled — ${fmtMoney(result?.outstanding_amount, currency)} still outstanding`;
+    const statusText = newOutstanding === 0
+      ? 'Fully settled ✓'
+      : `Partially settled — ${fmtMoney(newOutstanding, currency)} still outstanding`;
     toast(statusText, 'success');
     _invalidateEntries(); navTo('entries');
   } catch (err) {
     toast('Error: ' + (err?.message || err), 'error');
-    if (btn) { btn.disabled = false; btn.textContent = 'Record Payment'; }
+    if (btn) { btn.disabled = false; btn.textContent = '💳 Save'; }
   }
 };
 
