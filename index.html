@@ -3893,6 +3893,43 @@ window.saveNewEntry = async function() {
   toast('Entry created.', 'success');
   _invalidateEntries(); navTo('entries');
 
+  // ── Auto-share to linked platform user (runs regardless of notify toggle) ──
+  // If the contact is a registered platform user (linked_user_id is set),
+  // automatically create a share token so the entry lands in their "Shared With Me".
+  if (entry?.id && contactId) {
+    try {
+      const { data: cRow } = await supabase.from('contacts')
+        .select('email, linked_user_id').eq('id', contactId).single();
+      if (cRow?.linked_user_id) {
+        // Only create if no token already exists for this entry
+        const { data: existTok } = await supabase.from('share_tokens')
+          .select('id').eq('entry_id', entry.id).maybeSingle();
+        if (!existTok) {
+          const fromName = currentProfile?.display_name || currentProfile?.company_name || 'Someone';
+          const autoSnap = {
+            amount: parseFloat(amount), currency, tx_type: category,
+            date, note, invoice_number: invNumber || '',
+            from_name: fromName, from_email: currentUser.email
+          };
+          const tok = await createShareToken(currentUser.id, entry.id, {
+            recipientEmail: cRow.email || '', entrySnapshot: autoSnap
+          });
+          if (tok?.id) {
+            await supabase.from('share_tokens')
+              .update({ recipient_id: cRow.linked_user_id, status: 'sent' })
+              .eq('id', tok.id);
+            await supabase.from('notifications').insert({
+              user_id: cRow.linked_user_id, type: 'shared_record',
+              message: `${fromName} shared a record with you: ${fmtMoney(parseFloat(amount), currency)}`,
+              entry_id: entry.id, contact_name: fromName,
+              amount: parseFloat(amount), currency, read: false
+            });
+          }
+        }
+      }
+    } catch(e) { console.warn('[auto-share linked]', e); }
+  }
+
   // ── Post-save notifications (only when Notify toggle is ON) ─────
   if (!notifyOn) return;
   try {
