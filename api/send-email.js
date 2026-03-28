@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   }
 
   const apiKey = process.env.RESEND_API_KEY;
-  const from   = 'Money IntX <noreply@moneyintx.com>';
+  const from   = 'Money IntX <hello@moneyintx.com>';
 
   if (!apiKey) {
     console.error('[send-email] RESEND_API_KEY is not set in environment variables');
