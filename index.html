@@ -5198,7 +5198,7 @@ window.runReconciliation = async function() {
   if (btn) { btn.disabled = true; btn.textContent = 'Running...'; }
   el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Checking all linked pairs...</p>';
   try {
-    const resp = await API.fetch('/api/reconcile');
+    const resp = await fetch('/api/reconcile', { credentials: 'include' });
     const data = await resp.json();
     if (!data.ok) { el.innerHTML = `<p style="color:var(--red);">${esc(data.error || 'Failed')}</p>`; return; }
 
