@@ -118,8 +118,9 @@ BEGIN
     ) VALUES (
       v_recipient_id,
       'shared_record',
+      -- snapshot.amount is in cents; divide by 100 for human-readable display
       v_from_name || ' shared a record with you: '
-        || v_currency || ' ' || v_amount::text,
+        || v_currency || ' ' || ((v_amount::numeric / 100.0))::numeric(20,2)::text,
       p_entry_id,
       v_tok_id,
       v_amount,

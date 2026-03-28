@@ -1662,10 +1662,12 @@ async function renderDash(el) {
       </tr></thead><tbody>`;
     _pendingSharesAll.forEach(s => {
       const snap = s.entry_snapshot || {};
-      const fromName = snap.from_name || 'Someone';
+      const fromName = snap.from_name || s.sender_name || 'Someone';
       const amt = snap.amount || 0;
       const cur = snap.currency || 'USD';
-      const txLabel = TX_LABELS[snap.tx_type] || snap.tx_type || '—';
+      // Flip tx_type to show recipient's perspective (sender's "Owed to me" → recipient's "I Owe")
+      const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'bill','bill':'invoice' };
+      const txLabel = TX_LABELS[SNAP_FLIP[snap.tx_type] || snap.tx_type] || snap.tx_type || '—';
       html += `<tr data-pending-id="${s.id}">
         <td style="font-weight:700;">${esc(fromName)}</td>
         <td style="font-weight:700;color:#f59e0b;">${fmtMoney(amt, cur)}</td>
@@ -2203,10 +2205,12 @@ async function renderEntries(el, page, forceRefresh) {
       </tr></thead><tbody>`;
     _pendingSharesAll.forEach(s => {
       const snap = s.entry_snapshot || {};
-      const fromName = snap.from_name || 'Someone';
+      const fromName = snap.from_name || s.sender_name || 'Someone';
       const amt = snap.amount || 0;
       const cur = snap.currency || 'USD';
-      const txLabel = TX_LABELS[snap.tx_type] || snap.tx_type || '—';
+      // Flip tx_type to show recipient's perspective
+      const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'bill','bill':'invoice' };
+      const txLabel = TX_LABELS[SNAP_FLIP[snap.tx_type] || snap.tx_type] || snap.tx_type || '—';
       const note = snap.note ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(snap.note)}</div>` : '';
       html += `<tr data-pending-id="${s.id}">
         <td style="font-weight:700;">${esc(fromName)}</td>
@@ -2242,7 +2246,7 @@ async function renderEntries(el, page, forceRefresh) {
       <th>Contact</th><th>Amount</th><th class="hide-mobile" style="max-width:90px;">Doc #</th><th class="hide-mobile">Type</th><th>Date</th><th>Status</th><th style="width:44px;"></th>
     </tr></thead><tbody>`;
     pageEntries.forEach(e => {
-      const cName = e.contact?.name || '—';
+      const cName = e.contact?.name || e.from_name || '—';
       const cId = e.contact?.id || '';
       const _txKey = e.category || e.tx_type;
       const txLabel = TX_LABELS[_txKey] || _txKey;
@@ -4098,7 +4102,8 @@ window.saveNewEntry = async function() {
       if (recipientEmail) {
         const fromName = currentProfile?.display_name || currentProfile?.company_name || 'Someone';
         const autoSnap = {
-          amount: parseFloat(amount), currency, tx_type: category,
+          amount: Math.round(parseFloat(amount) * 100), // cents — consistent with entries table & fmtMoney
+          currency, tx_type: category,
           date, note, invoice_number: invNumber || '',
           from_name: fromName, from_email: currentUser.email
         };
