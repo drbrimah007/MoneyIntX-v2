@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Money IntX — Clean, clear money tracking between people</title>
+  <link rel="icon" href="favicon.png" type="image/png">
+  <meta name="description" content="Track who owes what, what was agreed, and what's been paid — in one shared place.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:#07111f;
+      --bg-soft:#0a1528;
+      --panel:#0d182b;
+      --panel-2:#101d33;
+      --line:rgba(255,255,255,.08);
+      --line-2:rgba(255,255,255,.12);
+      --text:#eef4ff;
+      --muted:#96a3ba;
+      --muted-2:#74829b;
+      --white:#ffffff;
+      --teal:#7fe0d0;
+      --teal-strong:#b8f4ea;
+      --teal-soft:rgba(127,224,208,.12);
+      --gold:#e7c98f;
+      --shadow:0 24px 70px rgba(0,0,0,.42);
+      --radius:22px;
+      --max:1120px;
+    }
+
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{
+      font-family:'Inter',sans-serif;
+      background:
+        radial-gradient(900px 420px at 85% -10%, rgba(127,224,208,.08), transparent 60%),
+        linear-gradient(180deg,#07111f 0%, #081221 100%);
+      color:var(--text);
+      line-height:1.5;
+      overflow-x:hidden;
+    }
+    .wrap{width:min(var(--max),calc(100% - 32px));margin:0 auto;position:relative}
+
+    .nav{
+      display:flex;justify-content:space-between;align-items:center;
+      padding:22px 0 16px;
+    }
+    .brand-wrap{display:flex;align-items:center;gap:12px}
+    .brand-wrap img{height:42px}
+    .brand{font-weight:700;font-size:15px;letter-spacing:-.02em}
+    .brand-sub{font-size:11px;color:var(--muted-2);margin-top:2px}
+
+    .btn{
+      display:inline-flex;align-items:center;justify-content:center;
+      padding:0 18px;height:48px;border-radius:13px;font-weight:700;
+      text-decoration:none;border:1px solid transparent;
+      transition:transform .16s ease, box-shadow .16s ease, background .16s ease;
+      white-space:nowrap;font-size:14px;
+    }
+    .btn:hover{transform:translateY(-1px)}
+    .btn-primary{
+      background:#f7fbff;color:#08111d;
+      box-shadow:0 10px 24px rgba(0,0,0,.18);
+    }
+    .btn-secondary{
+      color:var(--text);
+      border-color:var(--line-2);
+      background:rgba(255,255,255,.025);
+    }
+
+    .hero{
+      display:grid;grid-template-columns:1.02fr .98fr;gap:72px;
+      align-items:center;padding:42px 0 74px;
+    }
+    .eyebrow{
+      display:inline-flex;align-items:center;gap:8px;
+      font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+      color:var(--teal-strong);
+      padding:8px 12px;border-radius:999px;
+      background:var(--teal-soft);border:1px solid rgba(127,224,208,.18);
+      margin-bottom:22px;
+    }
+    .eyebrow::before{
+      content:'';width:7px;height:7px;border-radius:50%;background:var(--teal);
+    }
+    h1{
+      font-size:clamp(42px,6vw,68px);line-height:1.02;
+      letter-spacing:-.05em;margin-bottom:18px;font-weight:800;
+      max-width:620px;
+    }
+    h1 .accent{color:var(--teal-strong)}
+    .sub{
+      color:var(--muted);font-size:18px;line-height:1.68;
+      margin-bottom:28px;max-width:540px;
+    }
+    .cta-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+    .micro-proof{font-size:13px;color:var(--muted);margin-bottom:24px}
+
+    .trust{
+      display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;
+    }
+    .trust span{
+      font-size:13px;color:var(--muted);
+      padding:9px 12px;border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.02);
+    }
+    .social-proof{
+      padding:14px 16px;border-radius:16px;
+      border:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.02));
+      font-size:13px;color:var(--muted);max-width:520px;
+    }
+    .social-proof strong{display:block;color:var(--white);margin-bottom:4px;font-size:14px}
+
+    .phone-scene{position:relative;display:flex;justify-content:center;align-items:center;overflow:visible}
+    .phone-scene::before{
+      content:'';position:absolute;inset:auto;
+      width:360px;height:360px;border-radius:50%;
+      background:radial-gradient(circle, rgba(127,224,208,.09), transparent 68%);
+      filter:blur(8px);
+    }
+    .device{
+      width:338px;border-radius:42px;
+      isolation:isolate;
+      border:1px solid rgba(255,255,255,.12);
+      background:linear-gradient(180deg,#121c31,#0a1325);
+      padding:14px;box-shadow:var(--shadow);position:relative;z-index:2;
+    }
+    .device::before{
+      content:'';position:absolute;inset:0;border-radius:42px;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+      pointer-events:none;
+    }
+    .side-btn{
+      position:absolute;width:4px;border-radius:4px;
+      background:linear-gradient(180deg,#1c2840,#111a2e);
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .side-btn.left-1{height:38px;top:105px;left:-5px}
+    .side-btn.left-2{height:38px;top:150px;left:-5px}
+    .side-btn.right-1{height:58px;top:122px;right:-5px}
+    .notch{
+      width:88px;height:23px;background:#050b16;border-radius:999px;
+      margin:0 auto 10px;border:1px solid rgba(255,255,255,.05);
+      display:flex;align-items:center;justify-content:center;
+    }
+    .notch::after{
+      content:'';width:8px;height:8px;border-radius:50%;background:#0d1730;
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .screen{
+      border-radius:30px;background:linear-gradient(180deg,#0c1528,#091121);
+      overflow:hidden;min-height:590px;border:1px solid rgba(255,255,255,.04);
+    }
+    .screen-top{
+      display:flex;justify-content:space-between;align-items:center;
+      font-size:10px;color:var(--muted-2);padding:11px 16px 4px;
+    }
+    .app-head{
+      display:flex;justify-content:space-between;align-items:center;
+      padding:10px 16px 8px;
+    }
+    .app-head small{display:block;color:var(--muted-2);font-size:10px;margin-bottom:2px}
+    .app-head strong{font-size:15px;letter-spacing:-.02em}
+    .app-head img{height:26px}
+    .avatar{
+      width:32px;height:32px;border-radius:50%;display:grid;place-items:center;
+      background:linear-gradient(135deg,#17304d,#7fe0d0);color:#fff;font-weight:700;font-size:12px;
+    }
+    .hero-card{
+      margin:8px 16px 12px;padding:18px;border-radius:20px;
+      background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.07);
+    }
+    .label{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted-2)}
+    .balance{font-size:44px;font-weight:800;letter-spacing:-.05em;margin:8px 0 4px}
+    .muted-xs{font-size:11px;color:var(--muted-2)}
+    .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px 14px}
+    .stat{
+      padding:14px;border-radius:16px;
+      background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);
+    }
+    .stat strong{display:block;font-size:22px;letter-spacing:-.04em;margin:5px 0 3px}
+    .stat.teal{border-color:rgba(127,224,208,.16)}
+    .stat.gold{border-color:rgba(231,201,143,.16)}
+    .activity{padding:0 16px 16px}
+    .activity-head{
+      display:flex;justify-content:space-between;align-items:center;
+      color:var(--muted-2);font-size:10px;text-transform:uppercase;letter-spacing:.1em;font-weight:700;
+      margin-bottom:8px;
+    }
+    .item{
+      display:flex;justify-content:space-between;align-items:center;gap:12px;
+      padding:12px 13px;border-radius:14px;background:rgba(255,255,255,.02);
+      border:1px solid rgba(255,255,255,.05);margin-bottom:8px;font-size:14px;
+    }
+    .item-left{display:flex;align-items:center;gap:10px}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--teal);flex-shrink:0}
+    .item strong{font-size:14px}
+    .item-title{font-size:13px;font-weight:600}
+    .item-sub{font-size:11px;color:var(--muted-2);margin-top:1px}
+    .status{
+      display:inline-flex;align-items:center;justify-content:center;
+      min-height:22px;padding:0 8px;border-radius:999px;
+      font-size:10px;font-weight:700;margin-left:6px;
+      background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);color:var(--muted);
+    }
+    .status.ok{background:rgba(127,224,208,.1);color:var(--teal-strong);border-color:rgba(127,224,208,.18)}
+    .status.warn{background:rgba(231,201,143,.1);color:var(--gold);border-color:rgba(231,201,143,.18)}
+    .bottom-nav{
+      display:flex;justify-content:space-around;align-items:center;
+      border-top:1px solid rgba(255,255,255,.05);padding:12px 10px 14px;
+      color:var(--muted-2);font-size:10px;background:rgba(5,10,20,.9)
+    }
+    .bottom-nav .active{color:var(--teal-strong)}
+
+    .float-card{
+      position:absolute;z-index:3;padding:13px 14px;border-radius:16px;
+      background:rgba(9,16,31,.95);border:1px solid rgba(255,255,255,.08);
+      box-shadow:0 18px 45px rgba(0,0,0,.42);min-width:145px;
+    }
+    .float-card.top{right:-16px;top:70px;opacity:.92;transform:scale(.96)}
+    .float-card.bottom{left:-16px;bottom:96px;opacity:.92;transform:scale(.96)}
+    .float-badge{
+      display:inline-flex;padding:3px 8px;border-radius:999px;
+      font-size:9px;font-weight:700;margin-bottom:7px;
+      background:rgba(127,224,208,.1);border:1px solid rgba(127,224,208,.16);color:var(--teal-strong)
+    }
+    .float-card strong{display:block;font-size:12px;margin-bottom:3px}
+    .float-card .value{font-size:21px;font-weight:800;letter-spacing:-.03em;margin-bottom:3px}
+    .float-card .meta{font-size:11px;color:var(--muted-2)}
+
+    .section{padding:72px 0}
+    .section-label{
+      font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+      color:var(--teal-strong);margin-bottom:12px;text-align:center;
+    }
+    .section h2{
+      font-size:clamp(30px,4vw,46px);letter-spacing:-.04em;
+      text-align:center;margin-bottom:12px;line-height:1.06;
+    }
+    .section > p{
+      color:var(--muted);max-width:620px;margin:0 auto 34px;text-align:center;font-size:17px;
+    }
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .card{
+      padding:22px;border:1px solid var(--line);border-radius:18px;
+      background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(255,255,255,.018));
+    }
+    .icon{
+      width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
+      background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06);
+      margin-bottom:16px;font-size:18px;
+    }
+    .card h3{font-size:16px;margin-bottom:7px;letter-spacing:-.02em}
+    .card p{font-size:13px;color:var(--muted);line-height:1.65}
+
+    .grow-line{
+      text-align:center;margin-top:-6px;margin-bottom:16px;color:var(--muted);
+      font-size:14px;
+    }
+
+    .cta{
+      padding:68px 0 86px;
+    }
+    .cta-box{
+      border-radius:26px;padding:50px 24px;text-align:center;
+      border:1px solid var(--line-2);
+      background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.02));
+      position:relative;overflow:hidden;
+    }
+    .cta-box::before{
+      content:'';position:absolute;top:-110px;left:50%;transform:translateX(-50%);
+      width:380px;height:380px;border-radius:50%;
+      background:radial-gradient(circle, rgba(127,224,208,.09), transparent 70%);
+      pointer-events:none;
+    }
+    .cta-box h2{font-size:clamp(34px,4.5vw,54px);letter-spacing:-.045em;margin-bottom:14px;position:relative;z-index:1}
+    .cta-box p{color:var(--muted);max-width:520px;margin:0 auto 20px;position:relative;z-index:1;font-size:17px}
+    .cta-box .tiny{font-size:13px;color:var(--muted);margin-bottom:18px;position:relative;z-index:1}
+    .cta-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;position:relative;z-index:1}
+
+    footer{
+      border-top:1px solid var(--line);padding:22px 0 30px;
+      display:flex;justify-content:space-between;align-items:center;gap:12px;
+      color:var(--muted);font-size:13px;flex-wrap:wrap;
+    }
+    footer .left{display:flex;align-items:center;gap:10px}
+    footer .left img{height:22px}
+    footer a{color:var(--muted);text-decoration:none;margin-left:16px}
+    footer a:hover{color:var(--text)}
+
+    @media(max-width:960px){
+      .hero{grid-template-columns:1fr;gap:42px}
+      .grid{grid-template-columns:1fr}
+      .float-card{display:none}
+      .phone-scene{padding-top:8px}
+      footer{flex-direction:column;text-align:center}
+    }
+    @media(max-width:640px){
+      .wrap{width:calc(100% - 24px)}
+      h1{font-size:40px}
+      .device{width:100%;max-width:340px}
+      .cta-actions,.cta-row{flex-direction:column;align-items:stretch}
+      .btn{width:100%}
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <div class="nav">
+      <div class="brand-wrap">
+        <img src="money.png" alt="Money IntX">
+      </div>
+      <a href="index.html?register=1" class="btn btn-primary">Start free</a>
+    </div>
+
+    <div class="hero">
+      <div>
+        <div class="eyebrow">Shared money, made clear</div>
+        <h1>No more <span class="accent">"I thought I paid you."</span></h1>
+        <p class="sub">Track who owes what, what was agreed, and what's been paid — in one shared place everyone can see.</p>
+
+        <div class="cta-row">
+          <a href="index.html?register=1" class="btn btn-primary">Start free — takes 2 minutes</a>
+          <a href="#features" class="btn btn-secondary">See how it works</a>
+        </div>
+
+        <div class="micro-proof">Built for real-life money between friends, teams, and small businesses.</div>
+
+        <div class="trust">
+          <span>No credit card</span>
+          <span>Private</span>
+          <span>2-minute setup</span>
+        </div>
+
+        <div class="social-proof">
+          <strong>No more guessing who paid.</strong>
+          Everything is written down, visible, and easy to check later.
+        </div>
+      </div>
+
+      <div class="phone-scene">
+        <div class="float-card top">
+          <div class="float-badge">Invoice sent</div>
+          <strong>James Adebayo</strong>
+          <div class="value">$8,000</div>
+          <div class="meta">Due in 3 days</div>
+        </div>
+
+        <div class="device">
+          <div class="side-btn left-1"></div>
+          <div class="side-btn left-2"></div>
+          <div class="side-btn right-1"></div>
+          <div class="notch"></div>
+          <div class="screen">
+            <div class="screen-top">
+              <span>9:41</span>
+              <span>LTE &bull; 87%</span>
+            </div>
+
+            <div class="app-head">
+              <div>
+                <small>Good morning, Perry</small>
+                <strong>Dashboard</strong>
+              </div>
+              <div class="avatar">P</div>
+            </div>
+
+            <div class="hero-card">
+              <div class="label">Net balance</div>
+              <div class="balance">$6,240</div>
+              <div class="muted-xs">10 active records</div>
+            </div>
+
+            <div class="stats">
+              <div class="stat teal">
+                <div class="label">They owe you</div>
+                <strong>$8,420</strong>
+                <div class="muted-xs">7 records</div>
+              </div>
+              <div class="stat gold">
+                <div class="label">You owe</div>
+                <strong>$2,180</strong>
+                <div class="muted-xs">3 records</div>
+              </div>
+            </div>
+
+            <div class="activity">
+              <div class="activity-head">
+                <span>Recent activity</span>
+                <span>View all</span>
+              </div>
+
+              <div class="item">
+                <div class="item-left">
+                  <div class="dot" style="background:var(--gold)"></div>
+                  <div>
+                    <div class="item-title">James invoice <span class="status warn">Due soon</span></div>
+                    <div class="item-sub">Awaiting payment</div>
+                  </div>
+                </div>
+                <strong>$8,000</strong>
+              </div>
+
+              <div class="item">
+                <div class="item-left">
+                  <div class="dot"></div>
+                  <div>
+                    <div class="item-title">Nadia balance <span class="status ok">Settled</span></div>
+                    <div class="item-sub">Paid and confirmed</div>
+                  </div>
+                </div>
+                <strong>$1,250</strong>
+              </div>
+
+              <div class="item">
+                <div class="item-left">
+                  <div class="dot" style="background:#a8b3c5"></div>
+                  <div>
+                    <div class="item-title">Shared record <span class="status">Pending</span></div>
+                    <div class="item-sub">Waiting for confirmation</div>
+                  </div>
+                </div>
+                <strong>Review</strong>
+              </div>
+            </div>
+
+            <div class="bottom-nav">
+              <span class="active">Home</span>
+              <span>Contacts</span>
+              <span>Entries</span>
+              <span>More</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="float-card bottom">
+          <div class="float-badge">Settled</div>
+          <strong>Nadia Stores</strong>
+          <div class="value">$420</div>
+          <div class="meta">Just now</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" id="features">
+      <div class="section-label">Why people use it</div>
+      <h2>Clear records. Less confusion. Better follow-through.</h2>
+      <p>Money IntX helps everyone see the same truth, so payments are easier to track and misunderstandings stop before they start.</p>
+
+      <div class="grid">
+        <div class="card">
+          <div class="icon">&#9997;&#65039;</div>
+          <h3>No more "I thought I paid you"</h3>
+          <p>Keep a shared written record so nobody has to rely on memory or old chat messages.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#128065;&#65039;</div>
+          <h3>Everyone sees the same record</h3>
+          <p>What was agreed, what was paid, and what is still pending all stay visible in one place.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#128276;</div>
+          <h3>Nothing slips through</h3>
+          <p>Status updates, reminders, and clear history help money move without awkward follow-ups.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="grow-line">And it grows with you — susu circles, business tools, and more.</div>
+
+    <div class="cta" id="signup">
+      <div class="cta-box">
+        <h2>Stop losing track. Start free.</h2>
+        <p>No spreadsheets. No confusion. Just clear records between real people.</p>
+        <div class="tiny">Takes less than 2 minutes.</div>
+        <div class="cta-actions">
+          <a href="index.html?register=1" class="btn btn-primary">Start free — takes 2 minutes</a>
+          <a href="index.html" class="btn btn-secondary">Log in</a>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <div class="left">
+        <img src="money.png" alt="Money IntX">
+        <span>&copy; 2026 Money IntX &middot; Making Money Matters Memorable</span>
+      </div>
+      <div>
+        <a href="index.html">App</a>
+        <a href="index.html?register=1">Sign Up</a>
+      </div>
+    </footer>
+
+  </div>
+</body>
+</html>
