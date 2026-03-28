@@ -1137,6 +1137,8 @@ if (window.location.hash.includes('type=recovery') || window.location.hash.inclu
         <button style="width:100%;margin-top:8px;padding:14px;font-size:15px;font-weight:700;border-radius:12px;background:#7fe0d0;color:#07111f;border:none;cursor:pointer;" onclick="doResetPassword()">Update Password</button>
       `;
       _authForms.appendChild(_rf);
+      // Auto-scroll to the reset form
+      setTimeout(() => { _rf.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 200);
     }
   }
 }
@@ -1147,21 +1149,38 @@ window.doResetPassword = async function() {
   if (!pass || pass.length < 6) return toast('Password must be at least 6 characters.', 'error');
   if (pass !== pass2) return toast('Passwords do not match.', 'error');
   const token = window._resetToken;
-  if (!token) return toast('Reset token missing. Please use the link from your email.', 'error');
+
+  // Try Supabase auth first (if the reset email came from Supabase)
   try {
-    const resp = await fetch('/api/auth/reset-confirm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, password: pass })
-    });
-    const data = await resp.json();
-    if (!data.ok) return toast(data.error || 'Failed to reset password.', 'error');
-    toast('Password updated! You can now log in.', 'success');
-    window.location.hash = '';
-    setTimeout(() => window.location.reload(), 1500);
-  } catch(e) {
-    toast('Network error. Please try again.', 'error');
+    const { error } = await supabase.auth.updateUser({ password: pass });
+    if (!error) {
+      toast('Password updated! Logging you in...', 'success');
+      window._isRecovery = false;
+      window.location.hash = '';
+      setTimeout(() => window.location.reload(), 1500);
+      return;
+    }
+    console.warn('[doResetPassword] Supabase updateUser failed:', error.message);
+  } catch(e) { console.warn('[doResetPassword] Supabase error:', e); }
+
+  // Fall back to custom API if we have a custom token
+  if (token) {
+    try {
+      const resp = await fetch('/api/auth/reset-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password: pass })
+      });
+      const data = await resp.json();
+      if (!data.ok) return toast(data.error || 'Failed to reset password.', 'error');
+      toast('Password updated! You can now log in.', 'success');
+      window.location.hash = '';
+      setTimeout(() => window.location.reload(), 1500);
+      return;
+    } catch(e) { /* fall through */ }
   }
+
+  toast('Could not update password. The reset link may have expired — please request a new one.', 'error');
 };
 
 async function handleLogOut() {
