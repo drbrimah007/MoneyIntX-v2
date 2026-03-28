@@ -1783,7 +1783,7 @@ window.openEntryDetail = async function(id) {
   const settlements = entry.settlements || [];
   const paidAmt  = entry.paid_amount || entry.settled_amount || 0;
   const remaining = entry.outstanding_amount != null ? entry.outstanding_amount : (entry.amount - paidAmt);
-  const isTerminal = ['settled','partially_settled','voided','cancelled','fulfilled','closed'].includes(entry.status);
+  const isTerminal = ['settled','voided','cancelled','fulfilled','closed'].includes(entry.status);
   const canMarkPaid = ['owed_to_me','bill_sent','invoice_sent','i_owe','bill_received','invoice_received',
     'they_owe_you','you_owe_them','invoice','bill','advance_paid','advance_received'].includes(_ecat) && !isTerminal;
   const canFulfill  = ['advance_paid','advance_received'].includes(_ecat) && !isTerminal;
