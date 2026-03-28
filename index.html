@@ -2818,11 +2818,20 @@ window.copyNotifLink = async function(entryId) {
   if (!entry) return;
   let shareUrl = '';
   try {
-    const { data } = await supabase.from('share_tokens').select('token').eq('entry_id', entryId).maybeSingle();
-    if (data?.token) {
-      shareUrl = window.location.origin + '/view?t=' + data.token;
+    const { data: existing } = await supabase.from('share_tokens').select('token').eq('entry_id', entryId).maybeSingle();
+    if (existing?.token) {
+      shareUrl = window.location.origin + '/view?t=' + existing.token;
     } else {
-      const res = await createShareToken(currentUser.id, entryId);
+      const snapshot = {
+        amount: entry.amount, currency: entry.currency, tx_type: entry.tx_type,
+        date: entry.date, note: entry.note, invoice_number: entry.invoice_number,
+        status: entry.status, from_name: currentProfile?.display_name || '',
+        from_email: currentUser.email
+      };
+      const contactEmail = entry.contact?.email || '';
+      const res = await createShareToken(currentUser.id, entryId, {
+        recipientEmail: contactEmail, entrySnapshot: snapshot
+      });
       if (res?.token) shareUrl = window.location.origin + '/view?t=' + res.token;
     }
   } catch(_) {}
@@ -2836,11 +2845,20 @@ window.copyNotifMessage = async function(entryId) {
   const msg = document.getElementById('notif-msg')?.value?.trim() || '';
   let shareUrl = '';
   try {
-    const { data } = await supabase.from('share_tokens').select('token').eq('entry_id', entryId).maybeSingle();
-    if (data?.token) {
-      shareUrl = window.location.origin + '/view?t=' + data.token;
+    const { data: existing } = await supabase.from('share_tokens').select('token').eq('entry_id', entryId).maybeSingle();
+    if (existing?.token) {
+      shareUrl = window.location.origin + '/view?t=' + existing.token;
     } else {
-      const res = await createShareToken(currentUser.id, entryId);
+      const snapshot = {
+        amount: entry.amount, currency: entry.currency, tx_type: entry.tx_type,
+        date: entry.date, note: entry.note, invoice_number: entry.invoice_number,
+        status: entry.status, from_name: currentProfile?.display_name || '',
+        from_email: currentUser.email
+      };
+      const contactEmail = entry.contact?.email || '';
+      const res = await createShareToken(currentUser.id, entryId, {
+        recipientEmail: contactEmail, entrySnapshot: snapshot
+      });
       if (res?.token) shareUrl = window.location.origin + '/view?t=' + res.token;
     }
   } catch(_) {}
@@ -3123,12 +3141,21 @@ window.openSharedWithMe = async function() {
 };
 
 window.doConfirmShare = async function(tokenId) {
-  const entry = await confirmShare(tokenId, currentUser.id);
-  if (entry) {
+  const { data, error } = await supabase.rpc('confirm_share_for_recipient', {
+    p_token_id: tokenId,
+    p_recipient_id: currentUser.id
+  });
+  if (error) {
+    console.error('[doConfirmShare]', error.message);
+    toast('Failed to confirm: ' + error.message, 'error');
+    return;
+  }
+  if (data?.entry_id) {
     toast('Record confirmed and tracked!', 'success');
+    _invalidateEntries();
     openSharedWithMe();
   } else {
-    toast('Failed to confirm.', 'error');
+    toast('Failed to confirm — please try again.', 'error');
   }
 };
 
