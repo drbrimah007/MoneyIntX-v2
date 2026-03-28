@@ -1218,6 +1218,15 @@ async function enterApp(user) {
   // Start realtime notifications
   notifChannel = subscribeToNotifications(user.id, (notif) => {
     updateNotifBadge();
+    // For shared records: invalidate pending cache so it appears immediately wherever user is
+    if (notif.type === 'shared_record') {
+      _pendingSharesAll = null; // force re-fetch on next render
+      const el = document.getElementById('content');
+      if (el) {
+        if (window._currentPage === 'entries') renderEntries(el, 1, true);
+        else if (window._currentPage === 'dash')  renderDash(el);
+      }
+    }
     if (window._currentPage === 'notifications') navTo('notifications');
     toast(notif.message || 'New notification');
   });
@@ -1636,6 +1645,41 @@ async function renderDash(el) {
       </div>`;
     });
     html += `</div>`;
+  }
+
+  // ── Pending Shared Records on Dashboard (same as entries page) ────
+  if (_pendingSharesAll === null) {
+    try {
+      const allShares = await listReceivedShares(currentUser.id);
+      _pendingSharesAll = (allShares || []).filter(s => s.status !== 'confirmed' && s.status !== 'dismissed');
+    } catch(e) { _pendingSharesAll = []; }
+  }
+  if (_pendingSharesAll && _pendingSharesAll.length > 0) {
+    html += `<div class="card" style="padding:0;overflow:hidden;border:2px solid rgba(245,158,11,.5);margin-bottom:14px;">
+      <div style="background:rgba(245,158,11,.1);padding:10px 16px;border-bottom:1px solid rgba(245,158,11,.2);display:flex;align-items:center;gap:8px;">
+        <span style="font-size:15px;">⏳</span>
+        <span style="font-weight:700;font-size:13px;color:#f59e0b;">Pending — Records Shared With You (${_pendingSharesAll.length})</span>
+      </div>
+      <div class="tbl-wrap"><table><thead><tr>
+        <th>From</th><th>Amount</th><th class="hide-mobile">Type</th><th>Action</th>
+      </tr></thead><tbody>`;
+    _pendingSharesAll.forEach(s => {
+      const snap = s.entry_snapshot || {};
+      const fromName = snap.from_name || 'Someone';
+      const amt = snap.amount || 0;
+      const cur = snap.currency || 'USD';
+      const txLabel = TX_LABELS[snap.tx_type] || snap.tx_type || '—';
+      html += `<tr data-pending-id="${s.id}">
+        <td style="font-weight:700;">${esc(fromName)}</td>
+        <td style="font-weight:700;color:#f59e0b;">${fmtMoney(amt, cur)}</td>
+        <td class="hide-mobile" style="font-size:12px;color:var(--muted);">${esc(txLabel)}</td>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-primary btn-sm" onclick="doPendingConfirm('${s.id}')" style="padding:5px 14px;font-size:12px;font-weight:700;">✓ Confirm</button>
+          <button class="bs sm" onclick="doPendingReject('${s.id}')" style="margin-left:4px;padding:5px 10px;font-size:12px;color:var(--red);border-color:var(--red);">✕ Reject</button>
+        </td>
+      </tr>`;
+    });
+    html += `</tbody></table></div></div>`;
   }
 
   // Recent Entries — same format as full entries page
@@ -2166,14 +2210,15 @@ async function renderEntries(el, page, forceRefresh) {
       const amt = snap.amount || 0;
       const cur = snap.currency || 'USD';
       const txLabel = TX_LABELS[snap.tx_type] || snap.tx_type || '—';
-      html += `<tr>
+      const note = snap.note ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(snap.note)}</div>` : '';
+      html += `<tr data-pending-id="${s.id}">
         <td style="font-weight:700;">${esc(fromName)}</td>
-        <td style="font-weight:700;color:#f59e0b;">${fmtMoney(amt, cur)}</td>
+        <td style="font-weight:700;color:#f59e0b;">${fmtMoney(amt, cur)}${note}</td>
         <td class="hide-mobile" style="font-size:12px;color:var(--muted);">${esc(txLabel)}</td>
         <td class="hide-mobile" style="font-size:12px;color:var(--muted);">${fmtDate(snap.date)}</td>
         <td style="white-space:nowrap;">
-          <button class="btn btn-primary btn-sm" onclick="doPendingConfirm('${s.id}')" style="padding:5px 12px;font-size:12px;">✓ Confirm</button>
-          <button class="bs sm" onclick="doPendingReject('${s.id}')" style="margin-left:4px;padding:5px 10px;font-size:12px;color:var(--red);">✕ Reject</button>
+          <button class="btn btn-primary btn-sm" onclick="doPendingConfirm('${s.id}')" style="padding:5px 14px;font-size:12px;font-weight:700;">✓ Confirm</button>
+          <button class="bs sm" onclick="doPendingReject('${s.id}')" style="margin-left:4px;padding:5px 10px;font-size:12px;color:var(--red);border-color:var(--red);">✕ Reject</button>
         </td>
       </tr>`;
     });
@@ -3242,17 +3287,21 @@ window.doConfirmShare = async function(tokenId) {
   }
   if (data?.entry_id) {
     toast('Record confirmed and added to your ledger!', 'success');
-    _invalidateEntries();
-    navTo('entries');
+    _refreshPendingInPlace(tokenId, true);
   } else {
     toast('Failed to confirm — please try again.', 'error');
   }
 };
 
-// Inline confirm/reject from entries list pending section
+// Inline confirm/reject from entries list — updates IN PLACE, no page jump
 window.doPendingConfirm = async function(tokenId) {
-  const btn = event?.target;
-  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  // Disable the row's buttons immediately for feedback
+  const row = document.querySelector(`[data-pending-id="${tokenId}"]`);
+  if (row) {
+    row.querySelectorAll('button').forEach(b => { b.disabled = true; });
+    const confirmBtn = row.querySelector('.btn-primary');
+    if (confirmBtn) confirmBtn.textContent = '…';
+  }
   const { data, error } = await supabase.rpc('confirm_share_for_recipient', {
     p_token_id: tokenId,
     p_recipient_id: currentUser.id
@@ -3260,32 +3309,51 @@ window.doPendingConfirm = async function(tokenId) {
   if (error) {
     console.error('[doPendingConfirm]', error.message);
     toast('Failed to confirm: ' + error.message, 'error');
-    if (btn) { btn.disabled = false; btn.textContent = '✓ Confirm'; }
+    if (row) row.querySelectorAll('button').forEach(b => { b.disabled = false; });
     return;
   }
   if (data?.entry_id) {
     toast('Record confirmed and added to your ledger!', 'success');
-    _invalidateEntries();
-    navTo('entries');
+    _refreshPendingInPlace(tokenId, true);
   } else {
     toast('Could not confirm — please try again.', 'error');
-    if (btn) { btn.disabled = false; btn.textContent = '✓ Confirm'; }
+    if (row) row.querySelectorAll('button').forEach(b => { b.disabled = false; });
   }
 };
 
 window.doPendingReject = async function(tokenId) {
+  const row = document.querySelector(`[data-pending-id="${tokenId}"]`);
+  if (row) row.querySelectorAll('button').forEach(b => { b.disabled = true; });
   await dismissShare(tokenId);
   toast('Record rejected.', 'success');
-  _invalidateEntries();
-  navTo('entries');
+  _refreshPendingInPlace(tokenId, false);
 };
 
 window.doDismissShare = async function(tokenId) {
   await dismissShare(tokenId);
   toast('Record dismissed.', 'success');
-  _invalidateEntries();
-  navTo('entries');
+  _refreshPendingInPlace(tokenId, false);
 };
+
+// ── In-place refresh after confirm/reject (no page navigation) ────
+async function _refreshPendingInPlace(tokenId, wasConfirmed) {
+  // 1. Remove from the pending cache immediately
+  if (_pendingSharesAll) {
+    _pendingSharesAll = _pendingSharesAll.filter(s => s.id !== tokenId);
+  }
+  // 2. Force re-fetch of the entries list (new confirmed entry is now in DB)
+  invalidateEntryCache(currentUser?.id);
+  _entriesAll = [];
+  // 3. Re-render current page in-place — no navigation
+  const el = document.getElementById('content');
+  if (!el) return;
+  if (window._currentPage === 'dash') {
+    await renderDash(el);
+  } else {
+    // entries page (or any other page) — re-render entries
+    await renderEntries(el, 1, true);
+  }
+}
 
 // ── Enhanced Send Reminder with scheduling ────────────────────────
 window.openSendReminderModal = async function(id) {
@@ -4198,7 +4266,7 @@ async function renderNotifications(el) {
     </tr></thead><tbody>`;
     notifs.forEach(n => {
       const actionBtn = n.type === 'shared_record'
-        ? `<button onclick="navTo('entries');deleteNotif('${n.id}')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View →</button>`
+        ? `<button onclick="navTo('entries')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View in Entries →</button>`
         : '';
       html += `<tr>
         <td style="font-weight:600;font-size:13px;">${esc(n.contact_name || '—')}</td>
