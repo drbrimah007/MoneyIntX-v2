@@ -16,13 +16,13 @@ export default async function handler(req, res) {
     return res.status(400).json({ ok: false, error: 'Email is required' });
   }
 
-  const supabaseUrl     = process.env.SUPABASE_URL;
-  const serviceRoleKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl     = process.env.SUPABASE_URL || 'https://nczneamvffmzdbeuvloo.supabase.co';
+  const serviceRoleKey  = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   const resendApiKey    = process.env.RESEND_API_KEY;
   const siteUrl         = 'https://moneyinteractions.com';
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    console.error('[send-reset-email] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+  if (!serviceRoleKey) {
+    console.error('[send-reset-email] Missing SUPABASE_SERVICE_KEY');
     // Fall through — we'll try generating the link; fail gracefully
     return res.status(500).json({ ok: false, error: 'Server misconfiguration — contact support.' });
   }
