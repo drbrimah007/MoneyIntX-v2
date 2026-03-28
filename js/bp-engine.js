@@ -53,6 +53,32 @@ function fmtMoneyC(n, cur) {
 
 const WEIGHT_UNITS = ['kg','lbs','g','oz','t','lb','ton'];
 
+// Per-field output color presets  [ value, bg, label ]
+const BP_OUTPUT_COLORS = [
+  ['',         'var(--accent)', 'Default'],
+  ['#10b981',  '#10b981',       'Green'],
+  ['#22c55e',  '#22c55e',       'Lime'],
+  ['#3b82f6',  '#3b82f6',       'Blue'],
+  ['#0ea5e9',  '#0ea5e9',       'Sky'],
+  ['#8b5cf6',  '#8b5cf6',       'Violet'],
+  ['#f97316',  '#f97316',       'Orange'],
+  ['#ef4444',  '#ef4444',       'Red'],
+  ['#f43f5e',  '#f43f5e',       'Rose'],
+  ['#f59e0b',  '#f59e0b',       'Amber'],
+  ['#6b7280',  '#6b7280',       'Gray'],
+];
+
+function _bpPickColor(color) {
+  const inp = document.getElementById('bpfl-color');
+  if (inp) inp.value = color;
+  document.querySelectorAll('.bp-csw').forEach(btn => {
+    const sel = btn.dataset.color === color;
+    btn.style.boxShadow = sel ? '0 0 0 3px var(--text)' : 'none';
+    const chk = btn.querySelector('.bp-csw-chk');
+    if (chk) chk.style.display = sel ? 'flex' : 'none';
+  });
+}
+
 // Format a column field value according to its unitType/unitValue
 function fmtFieldVal(val, field, panelCur) {
   let n;
@@ -503,17 +529,19 @@ function renderOpenSession(p, rows, colFields, rowFields, sessionKey, label) {
         if (f.type === 'numeric' || f.type === 'paired') {
           const fv = fmtFieldValC(raw, f, currency);
           const isAuto = (f.calculators||[]).length > 0;
-          html += `<td style="font-weight:600;${isAuto?'color:var(--accent);':''}">${fv !== null ? fv : '<span style="color:var(--muted);">—</span>'}</td>`;
+          const fClr = f.outputColor || (isAuto ? 'var(--accent)' : '');
+          html += `<td style="font-weight:600;${fClr?'color:'+fClr+';':''}">${fv !== null ? fv : '<span style="color:var(--muted);">—</span>'}</td>`;
         } else {
           html += `<td style="font-size:13px;">${esc(raw)}</td>`;
         }
       });
       rowFields.forEach(f => {
         const val = rowComputed[f.id];
-        html += `<td style="font-weight:700;color:var(--accent);">${val !== undefined ? fmtMoneyC(val, currency) : '—'}</td>`;
+        const rfClr = f.outputColor || 'var(--accent)';
+        html += `<td style="font-weight:700;color:${rfClr};">${val !== undefined ? fmtMoneyC(val, currency) : '—'}</td>`;
       });
-      html += `<td style="text-align:right;">
-        <button class="bs sm" onclick="window._bpEngine.openEditRowModal('${row.id}')" style="font-size:11px;padding:3px 8px;">Edit</button>
+      html += `<td style="text-align:right;white-space:nowrap;">
+        <button class="bs sm" onclick="window._bpEngine.openEditRowModal('${row.id}')" style="font-size:11px;padding:3px 8px;white-space:nowrap;">Edit</button>
       </td></tr>`;
     });
 
@@ -605,14 +633,16 @@ function renderFoldedBody(p, rows, sessionKey) {
       if (f.type === 'numeric' || f.type === 'paired') {
         const fv = fmtFieldValC(raw, f, currency);
         const isAuto = (f.calculators||[]).length > 0;
-        html += `<td style="font-weight:600;${isAuto?'color:var(--accent);':''}">${fv !== null ? fv : '<span style="color:var(--muted);">—</span>'}</td>`;
+        const fClr = f.outputColor || (isAuto ? 'var(--accent)' : '');
+        html += `<td style="font-weight:600;${fClr?'color:'+fClr+';':''}">${fv !== null ? fv : '<span style="color:var(--muted);">—</span>'}</td>`;
       } else {
         html += `<td style="font-size:13px;">${esc(raw)}</td>`;
       }
     });
     rowFields.forEach(f => {
       const val = rowComputed[f.id];
-      html += `<td style="font-weight:700;color:var(--accent);">${val !== undefined ? fmtMoneyC(val, currency) : '—'}</td>`;
+      const rfClr = f.outputColor || 'var(--accent)';
+      html += `<td style="font-weight:700;color:${rfClr};">${val !== undefined ? fmtMoneyC(val, currency) : '—'}</td>`;
     });
     html += `</tr>`;
   });
@@ -718,22 +748,24 @@ function openAddRowModal(sessionKey) {
               : f.unitType === 'weight'   ? ` <span style="color:var(--muted);font-weight:400;">(${f.unitValue||'kg'})</span>` : '';
     if (f.type === 'text') {
       fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}</label>
-        <input id="bpr-${f.id}" placeholder="${esc(f.label)}" oninput="window._bpEngine._recomputeColPreview()"></div>`;
+        <input id="bpr-${f.id}" placeholder="${esc(f.label)}" oninput="window._bpEngine._recomputeColPreview()">${f.hint ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(f.hint)}</div>` : ''}</div>`;
     } else if (f.type === 'numeric') {
       if (isAuto) {
+        const aClr = f.outputColor || 'var(--accent)';
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
-          <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:var(--accent);font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
-          <div id="bpr-auto-${f.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--accent);font-weight:600;font-size:15px;">—</div>
+          <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:${aClr};font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
+          <div id="bpr-auto-${f.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:${aClr};font-weight:600;font-size:15px;">—</div>
         </div>`;
       } else {
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
-          <input type="number" id="bpr-${f.id}" step="0.01" placeholder="0.00" oninput="window._bpEngine._recomputeColPreview()"></div>`;
+          <input type="number" id="bpr-${f.id}" step="0.01" placeholder="0.00" oninput="window._bpEngine._recomputeColPreview()">${f.hint ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(f.hint)}</div>` : ''}</div>`;
       }
     } else if (f.type === 'paired') {
       if (isAuto) {
+        const aClr = f.outputColor || 'var(--accent)';
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
-          <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:var(--accent);font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
-          <div id="bpr-auto-${f.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--accent);font-weight:600;font-size:15px;">—</div>
+          <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:${aClr};font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
+          <div id="bpr-auto-${f.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:${aClr};font-weight:600;font-size:15px;">—</div>
         </div>`;
       } else {
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
@@ -800,13 +832,15 @@ function _recomputeColPreview() {
   const allColVals = computeColFields(p.fields, rawVals);
   _bpLastColVals = allColVals;
 
-  // Update the AUTO display divs
+  // Update the AUTO display divs (color is set on the element at modal-open time)
   colFields.forEach(f => {
     if (!(f.calculators || []).length) return;
     const el = document.getElementById(`${prefix}-auto-${f.id}`);
     if (!el) return;
     const val = allColVals[f.id];
     el.textContent = (val !== undefined && val !== null) ? fmtFieldVal(val, f, p.currency) : '—';
+    // Re-apply color in case element was recreated
+    el.style.color = f.outputColor || 'var(--accent)';
   });
 
   // Update row-field preview panel
@@ -883,25 +917,27 @@ async function openEditRowModal(rowId) {
                  : f.unitType === 'weight'   ? ` <span style="color:var(--muted);font-weight:400;">(${f.unitValue||'kg'})</span>` : '';
     if (f.type === 'text') {
       fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}</label>
-        <input id="bped-${f.id}" value="${esc(val || '')}" oninput="window._bpEngine._recomputeColPreview()"></div>`;
+        <input id="bped-${f.id}" value="${esc(val || '')}" oninput="window._bpEngine._recomputeColPreview()">${f.hint ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(f.hint)}</div>` : ''}</div>`;
     } else if (f.type === 'numeric') {
       if (isAuto) {
         const dispVal = initColVals[f.id] !== undefined ? fmtFieldVal(initColVals[f.id], f, p.currency) : '—';
+        const eClr = f.outputColor || 'var(--accent)';
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
-          <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:var(--accent);font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
-          <div id="bped-auto-${f.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--accent);font-weight:600;font-size:15px;">${dispVal}</div>
+          <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:${eClr};font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
+          <div id="bped-auto-${f.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:${eClr};font-weight:600;font-size:15px;">${dispVal}</div>
         </div>`;
       } else {
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
-          <input type="number" id="bped-${f.id}" step="0.01" value="${val !== undefined ? val : ''}" oninput="window._bpEngine._recomputeColPreview()"></div>`;
+          <input type="number" id="bped-${f.id}" step="0.01" value="${val !== undefined ? val : ''}" oninput="window._bpEngine._recomputeColPreview()">${f.hint ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(f.hint)}</div>` : ''}</div>`;
       }
     } else if (f.type === 'paired') {
       const tv = typeof val === 'object' ? val : {};
       if (isAuto) {
         const dispVal = initColVals[f.id] !== undefined ? fmtFieldVal(initColVals[f.id], f, p.currency) : '—';
+        const eClr = f.outputColor || 'var(--accent)';
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
-          <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:var(--accent);font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
-          <div id="bped-auto-${f.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--accent);font-weight:600;font-size:15px;">${dispVal}</div>
+          <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:${eClr};font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
+          <div id="bped-auto-${f.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:${eClr};font-weight:600;font-size:15px;">${dispVal}</div>
         </div>`;
       } else {
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
@@ -1114,6 +1150,12 @@ function _bpOpenFieldModal(fid, forceDir) {
           </select></div>`}
       </div>
 
+      <!-- FIELD HINT (shown to form fillers) -->
+      <div class="fg" style="margin-bottom:12px;">
+        <label>Field Hint <span style="color:var(--muted);font-weight:400;">(optional — shown below the field when filling a row)</span></label>
+        <input id="bpfl-hint" value="${esc(f?.hint||'')}" placeholder="e.g. Enter weight in kg, Include delivery fee, etc.">
+      </div>
+
       <!-- TEXT OPTIONS -->
       <div id="bpfl-panel-text" style="display:${!isRow&&ftype==='text'?'block':'none'}">
         <p style="color:var(--muted);font-size:13px;margin-bottom:10px;">Text fields capture descriptive data per row.</p>
@@ -1186,6 +1228,23 @@ function _bpOpenFieldModal(fid, forceDir) {
         </div>
       </div>
 
+      <!-- OUTPUT COLOR -->
+      <div style="margin-top:14px;padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">🎨 Display Color</div>
+        <input type="hidden" id="bpfl-color" value="${esc(f?.outputColor||'')}">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          ${BP_OUTPUT_COLORS.map(([val, bg, label]) => {
+            const sel = (f?.outputColor||'') === val;
+            return `<button type="button" class="bp-csw" data-color="${val}"
+              onclick="window._bpEngine._bpPickColor('${val}')"
+              title="${label}"
+              style="width:26px;height:26px;border-radius:50%;background:${bg};border:none;cursor:pointer;position:relative;flex-shrink:0;box-shadow:${sel?'0 0 0 3px var(--text)':'none'};">
+              <span class="bp-csw-chk" style="position:absolute;inset:0;display:${sel?'flex':'none'};align-items:center;justify-content:center;font-size:13px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5);">✓</span>
+            </button>`;
+          }).join('')}
+        </div>
+      </div>
+
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;border-top:1px solid var(--border);padding-top:16px;">
         <button class="bs" onclick="document.getElementById('bpFieldModalBg').remove()">Cancel</button>
         <button class="btn btn-primary" onclick="window._bpEngine._bpSaveField('${fid||''}')">Save Field</button>
@@ -1193,6 +1252,27 @@ function _bpOpenFieldModal(fid, forceDir) {
     </div>
   </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
+
+  // Explicitly set select .value after dynamic insertion — browsers don't always
+  // honour the 'selected' attribute on <option> elements in insertAdjacentHTML.
+  if (f) {
+    const ut = f.unitType || 'none';
+    const uv = f.unitValue || '';
+    const _sv = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+    _sv('bpfl-type',         f.type || 'numeric');
+    _sv('bpfl-unittype',     ut);
+    _sv('bpfl-unittype-p',   ut);
+    _sv('bpfl-unitvalue-cur',   ut === 'currency' ? uv : '');
+    _sv('bpfl-unitvalue-cur-p', ut === 'currency' ? uv : '');
+    _sv('bpfl-unitvalue-wt',    ut === 'weight'   ? uv : '');
+    _sv('bpfl-unitvalue-wt-p',  ut === 'weight'   ? uv : '');
+    _sv('bpfl-schedule',    f.runSchedule || '');
+    _sv('bpfl-ledger',      f.ledgerEffect || '');
+    _sv('bpfl-textlabel',   f.textLabel    || '');
+    _sv('bpfl-numlabel',    f.numericLabel || '');
+    _sv('bpfl-hint',        f.hint         || '');
+  }
+
   // Render calc list with the new expression-builder UI (always — even on first open)
   _bpRenderCalcList();
 }
@@ -1395,8 +1475,11 @@ async function _bpSaveField(fid) {
     return { unitType: ut, unitValue: uv };
   };
 
+  const outputColor = document.getElementById('bpfl-color')?.value || '';
+  const hint = document.getElementById('bpfl-hint')?.value.trim() || '';
+
   if (type === 'text') {
-    field = { id: fid || uuid(), label, type, direction: 'column', calculators: [] };
+    field = { id: fid || uuid(), label, type, direction: 'column', outputColor, hint, calculators: [] };
   } else if (type === 'paired') {
     const { unitType, unitValue } = _readUnit('-p');
     field = {
@@ -1404,7 +1487,7 @@ async function _bpSaveField(fid) {
       textLabel: document.getElementById('bpfl-textlabel')?.value.trim() || 'Item',
       numericLabel: document.getElementById('bpfl-numlabel')?.value.trim() || 'Amount',
       excludeFromAggregate: document.getElementById('bpfl-excludeagg-p')?.checked || false,
-      unitType, unitValue,
+      unitType, unitValue, outputColor, hint,
       calculators: []
     };
   } else {
@@ -1414,7 +1497,7 @@ async function _bpSaveField(fid) {
       excludeFromAggregate: document.getElementById('bpfl-excludeagg')?.checked || false,
       ledgerEffect: document.getElementById('bpfl-ledger')?.value || null,
       runSchedule: document.getElementById('bpfl-schedule')?.value || '',
-      unitType, unitValue,
+      unitType, unitValue, outputColor, hint,
       calculators: _bpFldCalcs.filter(c => c.operation)
     };
   }
@@ -1469,7 +1552,7 @@ export function exposeBpEngine() {
     openCreateModal, _doCreate,
     openPanel, backToList,
     openFieldBuilder, openAddFieldChoice,
-    _bpOpenFieldModal, _bpTypeChange, _bpUnitTypeChange, _bpUnitTypeChangeP, _bpRenderCalcList, _bpAddCalc, _bpUpdCalc, _bpRemCalc, _bpCalcOpChange, _bpSetSide, _bpSaveField,
+    _bpOpenFieldModal, _bpTypeChange, _bpUnitTypeChange, _bpUnitTypeChangeP, _bpRenderCalcList, _bpAddCalc, _bpUpdCalc, _bpRemCalc, _bpCalcOpChange, _bpSetSide, _bpPickColor, _bpSaveField,
     _bpMoveField, _bpDeleteField,
     openAddRowModal, _recomputeColPreview, _previewRow, _doAddRow,
     openEditRowModal, _doSaveRow, _doDeleteRow,
