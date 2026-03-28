@@ -35,13 +35,13 @@
   --accent-hover: #5a52e0;
   --accent-light: rgba(108,99,255,0.10);
 
-  /* Backgrounds — real black foundation */
-  --bg:       #06080f;
-  --bg2:      #0b1020;
-  --bg3:      #0f1528;
-  --bg-soft:  #0b1020;
-  --panel:    #0b1020;
-  --panel-2:  #0f1528;
+  /* Backgrounds — jet black center, lighter outer shell */
+  --bg:       #0d1120;  /* outer body — slightly lighter (was the center) */
+  --bg2:      #000000;  /* jet black — cards, nav, topbar */
+  --bg3:      #060608;  /* near-black — inputs, nested panels */
+  --bg-soft:  #000000;
+  --panel:    #000000;
+  --panel-2:  #060608;
 
   /* Text hierarchy */
   --text:     #eef2f7;
@@ -86,32 +86,92 @@
   --accent: #0d9488; --accent-hover: #0f766e;
   --accent-light: rgba(13,148,136,0.08);
   --green: #16a34a; --red: #dc2626; --amber: #d97706; --blue: #3b82f6;
-  --bg: #ffffff; --bg2: #f0fdfa; --bg3: #ccfbf1;
-  --text: #0f172a; --muted: #64748b; --border: #99f6e4;
+  --bg: #f0fdfa; --bg2: #ffffff; --bg3: #f0fdfa;
+  --text: #0f172a; --text-2: #1e293b; --muted: #475569; --muted-2: #64748b;
+  --border: #99f6e4; --line: #b2f5ea; --line-2: #81e6d9;
+  --panel: #ffffff; --panel-2: #f0fdfa;
+  --shadow: 0 2px 8px rgba(0,0,0,.08); --shadow-lg: 0 8px 24px rgba(0,0,0,.12);
+  --contact: #0d9488;
+  --green-bg: rgba(22,163,74,.08); --red-bg: rgba(220,38,38,.08);
+  --gold-bg: rgba(217,119,6,.08); --blue-bg: rgba(59,130,246,.08);
+  --posted-bg: rgba(59,130,246,.08); --partial-bg: rgba(217,119,6,.08);
+  --success: #16a34a; --success-bg: rgba(22,163,74,.08);
 }
 /* Theme: ocean light */
 [data-theme="ocean"] {
   --accent: #0284c7; --accent-hover: #0369a1;
   --accent-light: rgba(2,132,199,0.08);
   --green: #16a34a; --red: #dc2626; --amber: #d97706; --blue: #3b82f6;
-  --bg: #ffffff; --bg2: #f0f9ff; --bg3: #e0f2fe;
-  --text: #0f172a; --muted: #64748b; --border: #bae6fd;
+  --bg: #f0f9ff; --bg2: #ffffff; --bg3: #f0f9ff;
+  --text: #0f172a; --text-2: #1e293b; --muted: #475569; --muted-2: #64748b;
+  --border: #bae6fd; --line: #bae6fd; --line-2: #93c5fd;
+  --panel: #ffffff; --panel-2: #f0f9ff;
+  --shadow: 0 2px 8px rgba(0,0,0,.08); --shadow-lg: 0 8px 24px rgba(0,0,0,.12);
+  --contact: #0284c7;
+  --green-bg: rgba(22,163,74,.08); --red-bg: rgba(220,38,38,.08);
+  --gold-bg: rgba(217,119,6,.08); --blue-bg: rgba(59,130,246,.08);
+  --posted-bg: rgba(59,130,246,.08); --partial-bg: rgba(217,119,6,.08);
+  --success: #16a34a; --success-bg: rgba(22,163,74,.08);
 }
 /* Theme: rose light */
 [data-theme="rose"] {
   --accent: #e11d48; --accent-hover: #be123c;
   --accent-light: rgba(225,29,72,0.08);
   --green: #16a34a; --red: #dc2626; --amber: #d97706; --blue: #3b82f6;
-  --bg: #ffffff; --bg2: #fff1f2; --bg3: #ffe4e6;
-  --text: #0f172a; --muted: #64748b; --border: #fecdd3;
+  --bg: #fff1f2; --bg2: #ffffff; --bg3: #fff1f2;
+  --text: #0f172a; --text-2: #1e293b; --muted: #475569; --muted-2: #64748b;
+  --border: #fecdd3; --line: #fecdd3; --line-2: #fda4af;
+  --panel: #ffffff; --panel-2: #fff1f2;
+  --shadow: 0 2px 8px rgba(0,0,0,.08); --shadow-lg: 0 8px 24px rgba(0,0,0,.12);
+  --contact: #e11d48;
+  --green-bg: rgba(22,163,74,.08); --red-bg: rgba(220,38,38,.08);
+  --gold-bg: rgba(217,119,6,.08); --blue-bg: rgba(59,130,246,.08);
+  --posted-bg: rgba(59,130,246,.08); --partial-bg: rgba(217,119,6,.08);
+  --success: #16a34a; --success-bg: rgba(22,163,74,.08);
 }
 /* Theme: purple light */
 [data-theme="purple"] {
   --accent: #6c63ff; --accent-hover: #5a52e0;
   --accent-light: rgba(108,99,255,0.08);
   --green: #16a34a; --red: #dc2626; --amber: #d97706; --blue: #3b82f6;
-  --bg: #ffffff; --bg2: #f8fafc; --bg3: #f1f5f9;
-  --text: #0f172a; --muted: #64748b; --border: #e2e8f0;
+  --bg: #f5f3ff; --bg2: #ffffff; --bg3: #f5f3ff;
+  --text: #0f172a; --text-2: #1e293b; --muted: #475569; --muted-2: #64748b;
+  --border: #ddd6fe; --line: #ddd6fe; --line-2: #c4b5fd;
+  --panel: #ffffff; --panel-2: #f5f3ff;
+  --shadow: 0 2px 8px rgba(0,0,0,.08); --shadow-lg: 0 8px 24px rgba(0,0,0,.12);
+  --contact: #6c63ff;
+  --green-bg: rgba(22,163,74,.08); --red-bg: rgba(220,38,38,.08);
+  --gold-bg: rgba(217,119,6,.08); --blue-bg: rgba(59,130,246,.08);
+  --posted-bg: rgba(59,130,246,.08); --partial-bg: rgba(217,119,6,.08);
+  --success: #16a34a; --success-bg: rgba(22,163,74,.08);
+}
+/* Light theme form input override — must come after dark base */
+[data-theme="teal"] .form-input,
+[data-theme="ocean"] .form-input,
+[data-theme="rose"] .form-input,
+[data-theme="purple"] .form-input,
+[data-theme="teal"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="ocean"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="rose"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="purple"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="teal"] textarea,
+[data-theme="ocean"] textarea,
+[data-theme="rose"] textarea,
+[data-theme="purple"] textarea,
+[data-theme="teal"] select,
+[data-theme="ocean"] select,
+[data-theme="rose"] select,
+[data-theme="purple"] select {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: var(--border) !important;
+}
+[data-theme="teal"] .form-input:focus,
+[data-theme="ocean"] .form-input:focus,
+[data-theme="rose"] .form-input:focus,
+[data-theme="purple"] .form-input:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px var(--accent-light) !important;
 }
 /* Theme: dark — production navy system */
 [data-theme="dark"] {
@@ -162,11 +222,11 @@
   --shadow:    0 2px 12px rgba(0,0,0,.55);
   --shadow-lg: 0 8px 28px rgba(0,0,0,.55);
 }
-/* Theme: Money IntX Navy — production system, blue-tinted foundation */
+/* Theme: Money IntX — soft dark-blue, distinct from Classic */
 [data-theme="navy"] {
-  --accent: #e020b0;
-  --accent-hover: #c01898;
-  --accent-light: rgba(224,32,176,0.10);
+  --accent: #4a7fd4;
+  --accent-hover: #3a6ab8;
+  --accent-light: rgba(74,127,212,0.12);
 
   --bg:      #050e1b;
   --bg2:     #081426;
@@ -707,19 +767,23 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
       <button class="landing-tab" onclick="showAuthTab('signup')">Sign Up</button>
     </div>
     <div id="auth-forms">
-      <!-- Login form (default) -->
+      <!-- Login form (default) — wrapped in <form> for browser save-password -->
       <div id="login-form">
-        <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="you@example.com" autocomplete="email"></div>
-        <div class="form-group"><label>Password</label><input type="password" id="login-pass" placeholder="Your password" autocomplete="current-password"></div>
-        <button style="width:100%;margin-top:8px;padding:14px;font-size:15px;font-weight:700;border-radius:12px;background:#7fe0d0;color:#07111f;border:none;cursor:pointer;" onclick="handleLogin()">Log In →</button>
+        <form id="login-form-el" autocomplete="on" onsubmit="handleLogin();return false;" style="margin:0;">
+          <div class="form-group"><label>Email</label><input type="email" id="login-email" name="email" placeholder="you@example.com" autocomplete="username email"></div>
+          <div class="form-group"><label>Password</label><input type="password" id="login-pass" name="password" placeholder="Your password" autocomplete="current-password"></div>
+          <button type="submit" style="width:100%;margin-top:8px;padding:14px;font-size:15px;font-weight:700;border-radius:12px;background:#7fe0d0;color:#07111f;border:none;cursor:pointer;">Log In →</button>
+        </form>
         <p style="text-align:center;margin-top:12px;font-size:13px;"><a href="#" onclick="handleForgotPassword();return false;" style="color:#7fe0d0;text-decoration:none;">Forgot password?</a></p>
       </div>
-      <!-- Signup form (hidden) -->
+      <!-- Signup form (hidden) — wrapped in <form> for browser credential saving -->
       <div id="signup-form" style="display:none;">
-        <div class="form-group"><label>Display Name</label><input type="text" id="signup-name" placeholder="Your name" autocomplete="name"></div>
-        <div class="form-group"><label>Email</label><input type="email" id="signup-email" placeholder="you@example.com" autocomplete="email"></div>
-        <div class="form-group"><label>Password</label><input type="password" id="signup-pass" placeholder="Choose a strong password" autocomplete="new-password"></div>
-        <button style="width:100%;margin-top:8px;padding:14px;font-size:15px;font-weight:700;border-radius:12px;background:#7fe0d0;color:#07111f;border:none;cursor:pointer;" onclick="handleSignup()">Create Free Account →</button>
+        <form id="signup-form-el" autocomplete="on" onsubmit="handleSignup();return false;" style="margin:0;">
+          <div class="form-group"><label>Display Name</label><input type="text" id="signup-name" name="name" placeholder="Your name" autocomplete="name"></div>
+          <div class="form-group"><label>Email</label><input type="email" id="signup-email" name="email" placeholder="you@example.com" autocomplete="username email"></div>
+          <div class="form-group"><label>Password</label><input type="password" id="signup-pass" name="password" placeholder="Choose a strong password" autocomplete="new-password"></div>
+          <button type="submit" style="width:100%;margin-top:8px;padding:14px;font-size:15px;font-weight:700;border-radius:12px;background:#7fe0d0;color:#07111f;border:none;cursor:pointer;">Create Free Account →</button>
+        </form>
       </div>
     </div>
   </div>
@@ -743,8 +807,8 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
     <div id="topbar-left">
       <button class="hamburger" onclick="document.getElementById('nav').classList.toggle('open')">☰</button>
       <div style="cursor:pointer;display:flex;align-items:center;gap:8px;" onclick="app.navigate('dash')" title="Money IntX — Dashboard">
-        <img id="topbar-logo" src="money.png" alt="Money IntX" style="height:40px;width:auto;max-width:160px;border-radius:8px;object-fit:contain;" onerror="this.style.display='none'">
-        <span style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);opacity:.85;white-space:nowrap;" class="hide-mobile">Record · Manage · Grow</span>
+        <img id="topbar-logo" src="money.png" alt="Money IntX" style="height:40px;width:auto;max-width:160px;border-radius:8px;object-fit:contain;" onerror="this.style.display='none';document.getElementById('topbar-brand-name').style.display='inline'">
+        <span id="topbar-brand-name" style="display:none;font-size:15px;font-weight:800;letter-spacing:.04em;color:var(--text);white-space:nowrap;">Money IntX</span>
       </div>
     </div>
     <div id="topbar-center">
@@ -752,7 +816,7 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
       <div id="search-results" style="display:none;position:absolute;left:50%;transform:translateX(-50%);width:400px;max-width:90vw;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);z-index:200;max-height:300px;overflow-y:auto;margin-top:4px;"></div>
     </div>
     <div id="topbar-right">
-      <button class="btn btn-primary btn-sm hide-mobile" onclick="openNewEntryModal()" style="padding:6px 14px;font-size:13px;">+ Entry</button>
+      <button class="btn btn-primary btn-sm" onclick="openNewEntryModal()" style="padding:6px 14px;font-size:13px;">+ Entry</button>
       <span id="sidebar-user-name" style="font-size:13px;font-weight:600;"></span>
       <button class="bs sm" onclick="app.logOut()">Sign Out</button>
     </div>
@@ -781,19 +845,7 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
   <div id="main"><div id="content"></div></div>
 
   <!-- Floating Add Entry Button (visible on all pages) -->
-  <!-- FAB: shown on mobile only (desktop has topbar "+ Entry" button) -->
-  <button id="fab-add-entry" onclick="openNewEntryModal()" title="Add Entry"
-    style="position:fixed;bottom:calc(68px + env(safe-area-inset-bottom));right:16px;z-index:4000;
-           width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;
-           background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-size:26px;line-height:1;font-weight:400;
-           box-shadow:0 4px 18px rgba(99,102,241,.55);align-items:center;justify-content:center;
-           transition:transform .15s,box-shadow .15s;" aria-label="Add Entry"
-    onmouseover="this.style.transform='scale(1.1)';this.style.boxShadow='0 6px 24px rgba(99,102,241,.7)'"
-    onmouseout="this.style.transform='';this.style.boxShadow='0 4px 18px rgba(99,102,241,.55)'">+</button>
-  <style>
-    #fab-add-entry.fab-visible { display:flex; }
-    @media(min-width:641px){ #fab-add-entry.fab-visible { display:none!important; } }
-  </style>
+  <!-- FAB removed — use topbar "+ Entry" button instead -->
 
   <!-- Mobile Bottom Tab Bar -->
   <div id="mobile-tab-bar">
@@ -1060,15 +1112,20 @@ window.doSendResetEmail = async function() {
   const email = document.getElementById('forgot-email')?.value.trim();
   if (!email) return toast('Enter your email address.', 'error');
   try {
-    const resp = await fetch('/api/auth/reset-request', {
+    // Use send-reset-email which generates Supabase link + sends via Resend from our domain
+    const resp = await fetch('/api/send-reset-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
     });
-    const result = await resp.json();
-    if (!result.ok) return toast(result.error || 'Failed to send reset email.', 'error');
+    // Always show success to prevent email enumeration — API sends only if email exists
+    if (!resp.ok && resp.status !== 200) {
+      // Silently fail — still show "check inbox" message
+      console.warn('[reset] API returned', resp.status);
+    }
   } catch(e) {
-    return toast('Network error. Please try again.', 'error');
+    console.warn('[reset] fetch error', e);
+    // Show success anyway — better UX
   }
   const forms = document.getElementById('auth-forms');
   if (forms) forms.innerHTML = `
@@ -1131,19 +1188,20 @@ window.doResetPassword = async function() {
   const pass2 = document.getElementById('reset-pass2')?.value;
   if (!pass || pass.length < 6) return toast('Password must be at least 6 characters.', 'error');
   if (pass !== pass2) return toast('Passwords do not match.', 'error');
-  const token = window._resetToken;
-  if (!token) return toast('Reset token missing. Please use the link from your email.', 'error');
   try {
-    const resp = await fetch('/api/auth/reset-confirm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, password: pass })
-    });
-    const data = await resp.json();
-    if (!data.ok) return toast(data.error || 'Failed to reset password.', 'error');
-    toast('Password updated! You can now log in.', 'success');
+    // Supabase has already set the session via PASSWORD_RECOVERY event — just update password
+    const { error } = await supabase.auth.updateUser({ password: pass });
+    if (error) return toast(error.message || 'Failed to reset password.', 'error');
+    toast('Password updated! Signing you in…', 'success');
+    window._isRecovery = false;
     window.location.hash = '';
-    setTimeout(() => { showAuthTab('login'); }, 1500);
+    // Session is already active — enter the app
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      setTimeout(() => enterApp(session.user), 1000);
+    } else {
+      setTimeout(() => { showAuthTab('login'); }, 1200);
+    }
   } catch(e) {
     toast('Network error. Please try again.', 'error');
   }
@@ -1157,7 +1215,7 @@ async function handleLogOut() {
   currentProfile = null;
   document.getElementById('shell').classList.remove('active');
   document.getElementById('landing').style.display = '';
-  document.getElementById('fab-add-entry')?.classList.remove('fab-visible');
+  // fab removed
 }
 
 // ── Enter app after auth ──────────────────────────────────────────
@@ -1191,8 +1249,7 @@ async function enterApp(user) {
   document.getElementById('auth-loader').style.display = 'none';
   document.getElementById('landing').style.display = 'none';
   document.getElementById('shell').classList.add('active');
-  // Show FAB now that user is logged in (CSS hides it on desktop automatically)
-  document.getElementById('fab-add-entry')?.classList.add('fab-visible');
+  // (FAB removed — topbar "+ Entry" button is used instead)
   document.getElementById('sidebar-user-name').textContent = currentProfile?.display_name || user.email;
   // sidebar-user-email removed in v1-style layout
   // Show admin link for admin users
@@ -1258,8 +1315,44 @@ async function enterApp(user) {
     if (bar) bar.textContent = '💡 ' + pick;
   })();
 
-  const savedPage = localStorage.getItem('mxi_last_page') || 'dash';
-  navTo(savedPage);
+  // New user check — created within last 3 minutes = first login
+  const isNewUser = currentProfile?.created_at && (Date.now() - new Date(currentProfile.created_at).getTime()) < 3 * 60 * 1000;
+  const firstLoginKey = 'mxi_welcomed_' + user.id;
+  const alreadyWelcomed = localStorage.getItem(firstLoginKey);
+  navTo('dash'); // always start on dashboard
+  if (isNewUser && !alreadyWelcomed) {
+    localStorage.setItem(firstLoginKey, '1');
+    setTimeout(() => {
+      openModal(`
+        <div style="text-align:center;padding:8px 0 16px;">
+          <div style="font-size:48px;margin-bottom:12px;">👋</div>
+          <h2 style="font-size:22px;font-weight:800;margin-bottom:8px;">Welcome to Money IntX!</h2>
+          <p style="color:var(--muted);font-size:14px;margin-bottom:20px;line-height:1.6;">Track who owes you and who you owe — all in one place.</p>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
+          <div style="background:rgba(99,214,154,.1);border:1px solid rgba(99,214,154,.25);border-radius:10px;padding:16px;text-align:center;">
+            <div style="font-size:28px;margin-bottom:6px;">💰</div>
+            <div style="font-weight:700;color:#63d69a;font-size:13px;">They Owe Me</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">Record money someone owes you</div>
+          </div>
+          <div style="background:rgba(208,120,120,.1);border:1px solid rgba(208,120,120,.25);border-radius:10px;padding:16px;text-align:center;">
+            <div style="font-size:28px;margin-bottom:6px;">💸</div>
+            <div style="font-weight:700;color:#d07878;font-size:13px;">I Owe Them</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">Record money you owe someone</div>
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:16px;">Start by adding a contact, then record your first entry.</p>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-secondary" style="flex:1;" onclick="closeModal()">Explore First</button>
+          <button class="btn btn-primary" style="flex:1;" onclick="closeModal();openNewContactModal()">+ Add Contact</button>
+        </div>
+      `);
+    }, 600);
+  } else if (!isNewUser) {
+    // returning user — restore last page
+    const savedPage = localStorage.getItem('mxi_last_page') || 'dash';
+    navTo(savedPage);
+  }
   // Process scheduled reminders + recurring rules every 60s
   setInterval(() => { processDueReminders(user.id, { emailFn: sendNotificationEmail }); processDueRecurring(user.id); }, 60000);
   processDueReminders(user.id, { emailFn: sendNotificationEmail });
@@ -1561,48 +1654,48 @@ async function renderDash(el) {
       <button onclick="openNewEntryModal('owe-me')"
         style="${_qaBtnBase}background:rgba(99,214,154,.10);border-color:rgba(99,214,154,.20);color:#63d69a;"
         onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
-        They Owe Me
+        + They Owe Me
       </button>
       <button onclick="openNewEntryModal('i-owe')"
         style="${_qaBtnBase}background:rgba(208,120,120,.10);border-color:rgba(208,120,120,.20);color:#d07878;"
         onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
-        I Owe Them
+        + I Owe Them
       </button>
       <button onclick="openNewEntryModal('advance')"
         style="${_qaBtnBase}background:rgba(213,187,122,.10);border-color:rgba(213,187,122,.20);color:#d5bb7a;"
         onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
-        Advances
+        + Advances
       </button>
-      <button onclick="navTo('templates')"
+      <button onclick="openNewEntryModal('owe-me');setTimeout(()=>{document.querySelector('[onclick*=invoice_sent]')?.click()},80)"
         style="${_qaBtnBase}background:rgba(157,178,219,.10);border-color:rgba(157,178,219,.20);color:#9db2db;"
         onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
-        New Invoice
+        + New Invoice
       </button>
       <button onclick="openNewContactModal()"
         style="${_qaBtnBase}background:transparent;border-color:rgba(255,255,255,.15);color:var(--muted);"
         onmouseover="this.style.borderColor='rgba(255,255,255,.3)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.color='var(--muted)'">
         + Contact
       </button>
-      <button onclick="navTo('groups')"
+      ${_modEnabled('groups') ? `<button onclick="navTo('groups')"
         style="${_qaBtnBase}background:transparent;border-color:rgba(255,255,255,.15);color:var(--muted);"
         onmouseover="this.style.borderColor='rgba(255,255,255,.3)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.color='var(--muted)'">
         Groups
-      </button>
-      <button onclick="navTo('investments')"
+      </button>` : ''}
+      ${_modEnabled('investments') ? `<button onclick="navTo('investments')"
         style="${_qaBtnBase}background:transparent;border-color:rgba(255,255,255,.15);color:var(--muted);"
         onmouseover="this.style.borderColor='rgba(255,255,255,.3)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.color='var(--muted)'">
         Invest
-      </button>
+      </button>` : ''}
       <button onclick="navTo('recurring')"
         style="${_qaBtnBase}background:transparent;border-color:rgba(255,255,255,.15);color:var(--muted);"
-        onmouseover="this.style.borderColor='rgba(255,255,255,.3)';this.style.color='var(--text)'" onmouseover="this.style.borderColor='rgba(255,255,255,.3)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.color='var(--muted)'">
+        onmouseover="this.style.borderColor='rgba(255,255,255,.3)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.color='var(--muted)'">
         Recurring
       </button>
-      <button onclick="navTo('nok')"
+      ${_modEnabled('nok') ? `<button onclick="navTo('nok')"
         style="${_qaBtnBase}background:transparent;border-color:rgba(255,255,255,.15);color:var(--muted);"
         onmouseover="this.style.borderColor='rgba(255,255,255,.3)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.color='var(--muted)'">
         Trusted
-      </button>
+      </button>` : ''}
     </div>
   </div>`;
 
@@ -3610,7 +3703,7 @@ window.doSendReminder = async function(entryId) {
 // ── Tab definitions for new entry modal ───────────────────────────────────────
 const NE_TABS = [
   {
-    id: 'owe-me', emoji: '💚', label: 'They Owe Me', color: 'var(--green)',
+    id: 'owe-me', emoji: '+', label: 'They Owe Me', color: 'var(--green)',
     borderActive: 'rgba(74,222,128,.3)', bgActive: 'rgba(74,222,128,.1)',
     actions: [
       { category: 'owed_to_me',    label: 'They owe me',      icon: '💰', extra: [] },
@@ -3619,7 +3712,7 @@ const NE_TABS = [
     ]
   },
   {
-    id: 'i-owe', emoji: '❤️', label: 'I Owe Them', color: 'var(--red)',
+    id: 'i-owe', emoji: '+', label: 'I Owe Them', color: 'var(--red)',
     borderActive: 'rgba(248,113,113,.3)', bgActive: 'rgba(248,113,113,.1)',
     actions: [
       { category: 'i_owe',             label: 'I owe them',         icon: '💸', extra: [] },
@@ -3628,11 +3721,11 @@ const NE_TABS = [
     ]
   },
   {
-    id: 'advance', emoji: '⏳', label: 'Advances', color: '#f59e0b',
+    id: 'advance', emoji: '+', label: 'Advances', color: '#f59e0b',
     borderActive: 'rgba(245,158,11,.3)', bgActive: 'rgba(245,158,11,.1)',
     actions: [
-      { category: 'advance_paid',     label: 'Send Advance',     icon: '⬆️', extra: ['advance_note','fulfillment'] },
-      { category: 'advance_received', label: 'Receive Advance', icon: '⬇️', extra: ['advance_note','fulfillment'] }
+      { category: 'advance_paid',     label: 'Advance Out',  icon: '⬆️', extra: ['advance_note','fulfillment'] },
+      { category: 'advance_received', label: 'Advance In',   icon: '⬇️', extra: ['advance_note','fulfillment'] }
     ]
   }
 ];

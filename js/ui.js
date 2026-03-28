@@ -147,8 +147,8 @@ export const TX_LABELS = {
   i_owe:             'I Owe',
   bill_received:     'Bill Received',
   invoice_received:  'Invoice Received',
-  advance_paid:      'Advance Paid',
-  advance_received:  'Advance Received',
+  advance_paid:      'Advance Out',
+  advance_received:  'Advance In',
   payment_recorded:  'Payment',
   // ── Legacy tx_type aliases (backward compat for un-migrated rows) ──
   they_owe_you:  'Owed to Me',
@@ -167,8 +167,8 @@ export const TX_CREATE_LABELS = {
   i_owe:            'I owe them',
   bill_received:    'Receive a bill',
   invoice_received: 'Receive an invoice',
-  advance_paid:     'Pay in advance',
-  advance_received: 'Receive advance payment'
+  advance_paid:     'Advance Out',
+  advance_received: 'Advance In'
 };
 
 export const TX_COLORS = {
