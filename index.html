@@ -2701,7 +2701,7 @@ window.openSendReminderModal = async function(id) {
         <button type="button" id="rem-nwho-both" onclick="setReminderNwho('both')" style="padding:8px 18px;font-size:13px;background:var(--bg3);color:var(--text);border:none;border-left:1px solid var(--border);cursor:pointer;">Both</button>
       </div>
     </div>
-    <div id="rem-no-email-wrap" style="${hasEmail ? 'display:none;' : ''}margin-bottom:12px;">
+    <div id="rem-no-email-wrap" data-has-email="${hasEmail ? '1' : '0'}" style="${hasEmail ? 'display:none;' : ''}margin-bottom:12px;">
       <div style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:8px;padding:10px 14px;">
         <div style="font-size:13px;color:#f59e0b;margin-bottom:8px;">⚠️ <strong>${esc(cName)}</strong> has no email on file.</div>
         <input type="email" id="rem-contact-email" placeholder="Enter email to send reminder"
@@ -2800,11 +2800,11 @@ window.setReminderNwho = function(val) {
     btn.style.color = active ? '#fff' : 'var(--text)';
     btn.style.fontWeight = active ? '600' : '400';
   });
-  // Show no-email warning only when contact is targeted and has no email
+  // Show no-email warning only when contact is targeted and the wrap was not initially hidden (has-email case)
   const wrap = document.getElementById('rem-no-email-wrap');
-  if (wrap) {
+  if (wrap && wrap.dataset.hasEmail !== '1') {
     const targets = val === 'them' || val === 'both';
-    wrap.style.display = (targets && wrap.querySelector('#rem-contact-email') !== null) ? '' : 'none';
+    wrap.style.display = targets ? '' : 'none';
   }
 };
 
@@ -2868,21 +2868,15 @@ window.doSendReminder = async function(entryId) {
       }
     }
 
-    if (notifySelf) {
-      await supabase.from('notifications').insert({
-        user_id: currentUser.id, type: 'reminder',
-        message: `Reminder (self): ${message}`,
-        entry_id: entryId, contact_name: cName,
-        amount: entry?.amount, currency: entry?.currency
-      });
-    }
-
-    // Always log the send action for the user
+    // Log + self-notify in one insert (no double-insert)
+    const selfMsg = notifyContact && notifySelf
+      ? `Reminder sent to ${cName} (& self): ${message}`
+      : notifyContact
+        ? `Reminder sent to ${cName}: ${message}`
+        : `Reminder noted (self): ${message}`;
     await supabase.from('notifications').insert({
       user_id: currentUser.id, type: 'reminder',
-      message: notifyContact
-        ? `Reminder sent to ${cName}: ${message}`
-        : `Reminder noted (self): ${message}`,
+      message: selfMsg,
       entry_id: entryId, contact_name: cName,
       amount: entry?.amount, currency: entry?.currency
     });
@@ -2894,8 +2888,12 @@ window.doSendReminder = async function(entryId) {
       updated_at: new Date().toISOString()
     }).eq('id', entryId);
     closeModal();
-    const emailNote = notifyContact && cEmail ? ' Email queued.' : '';
-    toast('Reminder sent.' + emailNote, 'success');
+    if (notifyContact && !cEmail) {
+      toast('Reminder logged — no email sent (contact has no email address).', 'info');
+    } else {
+      const emailNote = notifyContact && cEmail ? ' Email queued.' : '';
+      toast('Reminder sent.' + emailNote, 'success');
+    }
   } else {
     // Schedule
     const schedDate = document.getElementById('rem-date').value;
