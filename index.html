@@ -348,27 +348,32 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
   </nav>
 
   <!-- ═══ HERO ═══ -->
-  <div style="position:relative;overflow:hidden;padding:80px 24px 64px;text-align:center;">
+  <div style="position:relative;overflow:hidden;padding:50px 24px 64px;">
     <!-- Glow backgrounds -->
     <div style="position:absolute;inset:0;pointer-events:none;overflow:hidden;">
       <div style="position:absolute;top:-100px;right:20%;width:600px;height:400px;background:radial-gradient(ellipse at center,rgba(127,224,208,.08) 0%,transparent 65%);"></div>
     </div>
 
+    <!-- Two-column hero grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;max-width:1120px;margin:0 auto;position:relative;" class="lp-hero-grid">
+
+    <!-- LEFT: Text content -->
+    <div>
     <!-- Label pill -->
-    <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(127,224,208,.12);border:1px solid rgba(127,224,208,.18);border-radius:100px;padding:7px 14px;font-size:12px;font-weight:700;color:#b8f4ea;margin-bottom:24px;letter-spacing:.06em;text-transform:uppercase;">
+    <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(127,224,208,.12);border:1px solid rgba(127,224,208,.18);border-radius:100px;padding:7px 14px;font-size:12px;font-weight:700;color:#b8f4ea;margin-bottom:22px;letter-spacing:.06em;text-transform:uppercase;">
       <span style="width:7px;height:7px;border-radius:50%;background:#7fe0d0;"></span> Shared money, made clear
     </div>
 
     <!-- Main headline -->
-    <h1 style="font-size:clamp(38px,6vw,64px);font-weight:800;line-height:1.04;margin-bottom:18px;letter-spacing:-.04em;max-width:700px;margin-left:auto;margin-right:auto;">
+    <h1 style="font-size:clamp(38px,5.5vw,62px);font-weight:800;line-height:1.04;margin-bottom:18px;letter-spacing:-.04em;">
       No more <span style="color:#b8f4ea;">"I thought I paid you."</span>
     </h1>
 
     <!-- Sub headline -->
-    <p style="font-size:18px;color:#96a3ba;max-width:540px;margin:0 auto 28px;line-height:1.68;">Track who owes what, what was agreed, and what's been paid — in one shared place everyone can see.</p>
+    <p style="font-size:18px;color:#96a3ba;max-width:540px;margin-bottom:28px;line-height:1.68;">Track who owes what, what was agreed, and what's been paid — in one shared place everyone can see.</p>
 
     <!-- CTAs -->
-    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
       <button class="lp-btn-primary" style="padding:14px 28px;font-size:15px;font-weight:700;border-radius:13px;background:#f7fbff;color:#08111d;" onclick="showAuthTab('signup');document.getElementById('auth-section').scrollIntoView({behavior:'smooth'})">
         Start free — takes 2 minutes
       </button>
@@ -377,23 +382,44 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
       </button>
     </div>
 
-    <p style="font-size:13px;color:#96a3ba;margin-bottom:24px;">Built for real-life money between friends, teams, and small businesses.</p>
+    <p style="font-size:13px;color:#96a3ba;margin-bottom:20px;">Built for real-life money between friends, teams, and small businesses.</p>
 
     <!-- Trust tags -->
-    <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:24px;">
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;">
       <span style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:100px;padding:8px 14px;font-size:13px;color:#96a3ba;">No credit card</span>
       <span style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:100px;padding:8px 14px;font-size:13px;color:#96a3ba;">Private</span>
       <span style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:100px;padding:8px 14px;font-size:13px;color:#96a3ba;">2-minute setup</span>
     </div>
 
     <!-- Social proof -->
-    <div style="max-width:520px;margin:0 auto;padding:14px 16px;border-radius:16px;border:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.02));font-size:13px;color:#96a3ba;text-align:left;">
+    <div style="padding:14px 16px;border-radius:16px;border:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.02));font-size:13px;color:#96a3ba;max-width:520px;">
       <strong style="display:block;color:#fff;margin-bottom:4px;font-size:14px;">No more guessing who paid.</strong>
       Everything is written down, visible, and easy to check later.
     </div>
+    </div><!-- end left -->
 
-    <!-- Dashboard mockup card -->
-    <div style="max-width:520px;margin:0 auto;background:linear-gradient(180deg,#0c1528,#091121);border:1px solid rgba(255,255,255,.1);border-radius:24px;padding:24px;box-shadow:0 32px 80px rgba(0,0,0,.6);text-align:left;">
+    <!-- RIGHT: Phone mockup -->
+
+    <!-- Dashboard mockup with floating cards -->
+    <div style="position:relative;max-width:580px;margin:0 auto;">
+
+      <!-- Float: top right -->
+      <div style="position:absolute;z-index:3;right:-20px;top:30px;padding:13px 14px;border-radius:16px;background:rgba(9,16,31,.95);border:1px solid rgba(255,255,255,.08);box-shadow:0 18px 45px rgba(0,0,0,.42);min-width:145px;opacity:.92;transform:scale(.96);animation:fadeInFloat .6s ease .3s both;">
+        <div style="display:inline-flex;padding:3px 8px;border-radius:999px;font-size:9px;font-weight:700;margin-bottom:7px;background:rgba(127,224,208,.1);border:1px solid rgba(127,224,208,.16);color:#b8f4ea;">Invoice sent</div>
+        <strong style="display:block;font-size:12px;margin-bottom:3px;">James Adebayo</strong>
+        <div style="font-size:21px;font-weight:800;letter-spacing:-.03em;margin-bottom:3px;">$8,000</div>
+        <div style="font-size:11px;color:#74829b;">Due in 3 days</div>
+      </div>
+
+      <!-- Float: bottom left -->
+      <div style="position:absolute;z-index:3;left:-20px;bottom:60px;padding:13px 14px;border-radius:16px;background:rgba(9,16,31,.95);border:1px solid rgba(255,255,255,.08);box-shadow:0 18px 45px rgba(0,0,0,.42);min-width:145px;opacity:.92;transform:scale(.96);animation:fadeInFloat .6s ease .6s both;">
+        <div style="display:inline-flex;padding:3px 8px;border-radius:999px;font-size:9px;font-weight:700;margin-bottom:7px;background:rgba(127,224,208,.1);border:1px solid rgba(127,224,208,.16);color:#b8f4ea;">Settled</div>
+        <strong style="display:block;font-size:12px;margin-bottom:3px;">Nadia Stores</strong>
+        <div style="font-size:21px;font-weight:800;letter-spacing:-.03em;margin-bottom:3px;">$420</div>
+        <div style="font-size:11px;color:#74829b;">Just now</div>
+      </div>
+
+    <div style="max-width:520px;margin:0 auto;background:linear-gradient(180deg,#0c1528,#091121);border:1px solid rgba(255,255,255,.1);border-radius:24px;padding:24px;box-shadow:0 32px 80px rgba(0,0,0,.6);text-align:left;position:relative;z-index:2;">
       <!-- Mock top bar -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.06);">
         <div>
@@ -440,7 +466,19 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
         </div>
       </div>
     </div>
+    </div><!-- close wrapper for floating cards -->
+
+    </div><!-- close hero grid -->
   </div>
+
+  <style>
+    @keyframes fadeInFloat { from { opacity:0; transform:scale(.9) translateY(10px); } to { opacity:.92; transform:scale(.96) translateY(0); } }
+    @media(max-width:900px) {
+      .lp-hero-grid { grid-template-columns:1fr !important; gap:40px !important; text-align:center; }
+      .lp-hero-grid > div:first-child { order:1; }
+      div[style*="right:-20px;top:30px"], div[style*="left:-20px;bottom:60px"] { display:none; }
+    }
+  </style>
 
   <!-- ═══ FEATURES ═══ -->
   <div style="padding:72px 24px 64px;max-width:960px;margin:0 auto;">
