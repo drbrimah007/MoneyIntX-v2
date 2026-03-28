@@ -349,34 +349,3 @@ export async function sendInviteEmail(userId, {
   return { ok: result.ok, subject };
 }
 
-// ── App invite email (from Settings) ─────────────────────────────────────────
-export async function sendAppInviteEmail(userId, { to, fromName, inviteLink }) {
-  const subject = `${fromName} invited you to Money IntX`;
-
-  const body = `
-    <div class="badge">📨 Invitation</div>
-    <h2>You're invited to Money IntX</h2>
-    <p><strong>${fromName}</strong> wants you to join Money IntX — a smart financial record-keeping app for tracking invoices, settlements, and money interactions.</p>
-
-    <div class="amount-box">
-      <div class="label">What you can do</div>
-      <div class="value" style="font-size:16px;color:${BRAND.text};">Track who owes you · Send invoices · Manage currencies · Record settlements</div>
-    </div>
-
-    <a class="btn" href="${inviteLink}">Join Money IntX →</a>
-
-    <p style="font-size:13px;color:${BRAND.muted};">Money IntX is a record-keeping tool. It does not hold or transfer money.</p>
-  `;
-
-  const html = baseTemplate({
-    title: subject,
-    preheader: `${fromName} invited you to join Money IntX — track invoices and financial interactions.`,
-    body
-  });
-
-  const text = `${fromName} invited you to Money IntX.\n\nJoin here: ${inviteLink}\n\nMoney IntX lets you track invoices, settlements, and financial interactions.`;
-
-  const result = await callSendEmail({ to, subject, html, text });
-  await logEmail(userId, { type: 'app_invite', recipient: to, subject, status: result.ok ? 'sent' : 'failed', error: result.error || '' });
-  return { ok: result.ok, subject };
-}
