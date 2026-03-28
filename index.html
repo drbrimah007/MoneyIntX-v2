@@ -403,16 +403,16 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
     <!-- Dashboard mockup with floating cards -->
     <div style="position:relative;max-width:580px;margin:0 auto;">
 
-      <!-- Float: top right — overlaps phone edge -->
-      <div style="position:absolute;z-index:3;right:10px;top:70px;padding:13px 14px;border-radius:16px;background:rgba(9,16,31,.95);border:1px solid rgba(255,255,255,.08);box-shadow:0 18px 45px rgba(0,0,0,.42);min-width:145px;opacity:.92;transform:scale(.96);animation:fadeInFloat .6s ease .3s both;">
+      <!-- Float: top right — mostly outside, slight overlap -->
+      <div style="position:absolute;z-index:3;right:-120px;top:70px;padding:13px 14px;border-radius:16px;background:rgba(9,16,31,.95);border:1px solid rgba(255,255,255,.08);box-shadow:0 18px 45px rgba(0,0,0,.42);min-width:145px;opacity:.92;transform:scale(.96);animation:fadeInFloat .6s ease .3s both;">
         <div style="display:inline-flex;padding:3px 8px;border-radius:999px;font-size:9px;font-weight:700;margin-bottom:7px;background:rgba(127,224,208,.1);border:1px solid rgba(127,224,208,.16);color:#b8f4ea;">Invoice sent</div>
         <strong style="display:block;font-size:12px;margin-bottom:3px;">James Adebayo</strong>
         <div style="font-size:21px;font-weight:800;letter-spacing:-.03em;margin-bottom:3px;">$8,000</div>
         <div style="font-size:11px;color:#74829b;">Due in 3 days</div>
       </div>
 
-      <!-- Float: bottom left — overlaps phone edge -->
-      <div style="position:absolute;z-index:3;left:10px;bottom:100px;padding:13px 14px;border-radius:16px;background:rgba(9,16,31,.95);border:1px solid rgba(255,255,255,.08);box-shadow:0 18px 45px rgba(0,0,0,.42);min-width:145px;opacity:.92;transform:scale(.96);animation:fadeInFloat .6s ease .6s both;">
+      <!-- Float: bottom left — mostly outside, slight overlap -->
+      <div style="position:absolute;z-index:3;left:-120px;bottom:100px;padding:13px 14px;border-radius:16px;background:rgba(9,16,31,.95);border:1px solid rgba(255,255,255,.08);box-shadow:0 18px 45px rgba(0,0,0,.42);min-width:145px;opacity:.92;transform:scale(.96);animation:fadeInFloat .6s ease .6s both;">
         <div style="display:inline-flex;padding:3px 8px;border-radius:999px;font-size:9px;font-weight:700;margin-bottom:7px;background:rgba(127,224,208,.1);border:1px solid rgba(127,224,208,.16);color:#b8f4ea;">Settled</div>
         <strong style="display:block;font-size:12px;margin-bottom:3px;">Nadia Stores</strong>
         <div style="font-size:21px;font-weight:800;letter-spacing:-.03em;margin-bottom:3px;">$420</div>
@@ -476,7 +476,7 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
     @media(max-width:900px) {
       .lp-hero-grid { grid-template-columns:1fr !important; gap:40px !important; text-align:center; }
       .lp-hero-grid > div:first-child { order:1; }
-      div[style*="right:10px;top:70px"], div[style*="left:10px;bottom:100px"] { display:none; }
+      div[style*="right:-120px;top:70px"], div[style*="left:-120px;bottom:100px"] { display:none; }
     }
   </style>
 
