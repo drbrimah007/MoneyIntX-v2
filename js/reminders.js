@@ -1,6 +1,5 @@
 // Money IntX v2 — Reminders Module
 import { supabase } from './supabase.js';
-import { sendNotificationEmail } from './email.js';
 
 // ── Create scheduled reminder ─────────────────────────────────────
 export async function createScheduledReminder(userId, entryId, {
@@ -58,7 +57,7 @@ export async function cancelReminder(id) {
 }
 
 // ── Process due reminders (call on interval) ──────────────────────
-export async function processDueReminders(userId) {
+export async function processDueReminders(userId, { emailFn } = {}) {
   const now = new Date().toISOString();
   const { data: due, error } = await supabase
     .from('scheduled_reminders')
@@ -101,9 +100,9 @@ export async function processDueReminders(userId) {
         currency: rem.entry?.currency
       });
     }
-    // Send email to contact if they have an email address
-    if (contactEmail) {
-      sendNotificationEmail(userId, {
+    // Send email to contact if they have an email and an email function was provided
+    if (contactEmail && emailFn) {
+      emailFn(userId, {
         to: contactEmail,
         fromName: senderName,
         txType: rem.entry?.tx_type,

@@ -879,8 +879,8 @@ async function enterApp(user) {
   const savedPage = localStorage.getItem('mxi_last_page') || 'dash';
   navTo(savedPage);
   // Process scheduled reminders + recurring rules every 60s
-  setInterval(() => { processDueReminders(user.id); processDueRecurring(user.id); }, 60000);
-  processDueReminders(user.id);
+  setInterval(() => { processDueReminders(user.id, { emailFn: sendNotificationEmail }); processDueRecurring(user.id); }, 60000);
+  processDueReminders(user.id, { emailFn: sendNotificationEmail });
   processDueRecurring(user.id);
 
   // Realtime: live updates across devices
