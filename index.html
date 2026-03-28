@@ -926,9 +926,12 @@ window.doSendResetEmail = async function() {
 // Handle password reset from email link
 if (window.location.hash.includes('type=recovery') || window.location.hash.includes('#reset')) {
   window._isRecovery = true;
-  // Supabase puts the token in the URL hash
-  const hashParams = new URLSearchParams(window.location.hash.substring(1));
-  if (hashParams.get('type') === 'recovery' || hashParams.get('access_token')) {
+  // Handle both Supabase recovery and custom API reset token formats
+  const hashStr = window.location.hash.substring(1);
+  const hashParams = new URLSearchParams(hashStr.replace(/^reset\?/, ''));
+  const hasToken = hashParams.get('type') === 'recovery' || hashParams.get('access_token') || hashParams.get('token');
+  if (hasToken) {
+    window._resetToken = hashParams.get('token') || hashParams.get('access_token') || '';
     document.addEventListener('DOMContentLoaded', () => {
       const landing = document.getElementById('landing');
       if (landing) {
@@ -965,11 +968,24 @@ window.doResetPassword = async function() {
   const pass2 = document.getElementById('reset-pass2').value;
   if (!pass || pass.length < 6) return toast('Password must be at least 6 characters.', 'error');
   if (pass !== pass2) return toast('Passwords do not match.', 'error');
-  const { error } = await supabase.auth.updateUser({ password: pass });
-  if (error) return toast(error.message, 'error');
-  toast('Password updated! Logging you in...', 'success');
-  window.location.hash = '';
-  setTimeout(() => window.location.reload(), 1500);
+  const token = window._resetToken;
+  if (!token) return toast('Reset token missing. Please use the link from your email.', 'error');
+  try {
+    const resp = await fetch('/api/auth/reset-confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password: pass })
+    });
+    const data = await resp.json();
+    if (!data.ok) return toast(data.error || 'Failed to reset password.', 'error');
+    toast('Password updated! You can now log in.', 'success');
+    window.location.hash = '';
+    setTimeout(() => {
+      window.location.reload();
+    }, 1500);
+  } catch(e) {
+    toast('Network error. Please try again.', 'error');
+  }
 };
 
 async function handleLogOut() {
