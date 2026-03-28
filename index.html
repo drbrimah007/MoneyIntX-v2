@@ -5559,6 +5559,13 @@ async function renderSettings(el) {
     </div>
     <button class="btn btn-primary btn-sm" id="s-test-email-btn" onclick="sendTestEmail()">📧 Send Test Email</button>
     <div id="s-test-email-out" style="margin-top:10px;font-size:13px;"></div>
+    <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <strong style="font-size:13px;">Recent Email Log</strong>
+        <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 10px;" onclick="loadEmailLog()">↻ Refresh</button>
+      </div>
+      <div id="s-email-log" style="font-size:12px;color:var(--muted);">Loading…</div>
+    </div>
   </div>`;
 
   // ── Invite Friends ─────────────────────────────────────────────
@@ -5667,6 +5674,8 @@ async function renderSettings(el) {
     <button class="btn btn-primary btn-sm" style="margin-top:16px;" onclick="saveModules()">Save Modules</button>
   </div>`;
   el.innerHTML = html;
+  // Auto-load email log after rendering
+  requestAnimationFrame(() => { if (window.loadEmailLog) window.loadEmailLog(); });
 }
 
 window.saveSettings = async function() {
@@ -5743,6 +5752,40 @@ window.saveNotifPrefs = async function() {
   toast('Notification preferences saved.', 'success');
 };
 
+window.loadEmailLog = async function() {
+  const el = document.getElementById('s-email-log');
+  if (!el) return;
+  el.innerHTML = '<span style="color:var(--muted);">Loading…</span>';
+  const { data, error } = await supabase
+    .from('email_log')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .order('created_at', { ascending: false })
+    .limit(15);
+  if (error) { el.innerHTML = '<span style="color:var(--red);">Error: ' + error.message + '</span>'; return; }
+  if (!data || !data.length) {
+    el.innerHTML = '<span style="color:var(--muted);">No email attempts recorded yet.</span>';
+    return;
+  }
+  const rows = data.map(r => {
+    const ts = new Date(r.created_at).toLocaleString();
+    const ok = r.status === 'sent';
+    const statusBadge = `<span style="display:inline-block;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:700;background:${ok?'#dcfce7':'#fee2e2'};color:${ok?'#166534':'#991b1b'};">${r.status.toUpperCase()}</span>`;
+    const errDetail = (!ok && r.error) ? `<div style="color:var(--red);margin-top:2px;font-size:11px;">↳ ${esc(r.error)}</div>` : '';
+    return `<div style="padding:6px 0;border-bottom:1px solid var(--border);">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        ${statusBadge}
+        <span style="color:var(--muted);font-size:11px;">${ts}</span>
+        <span style="font-weight:600;color:var(--text);">${esc(r.type)}</span>
+        <span style="color:var(--muted);">→ ${esc(r.recipient)}</span>
+      </div>
+      <div style="margin-top:2px;color:var(--muted);font-size:11px;">${esc(r.subject || '')}</div>
+      ${errDetail}
+    </div>`;
+  }).join('');
+  el.innerHTML = rows;
+};
+
 window.sendTestEmail = async function() {
   const btn = document.getElementById('s-test-email-btn');
   const out = document.getElementById('s-test-email-out');
@@ -5777,6 +5820,8 @@ window.sendTestEmail = async function() {
     toast('Network error sending email.', 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '📧 Send Test Email'; }
+    // Refresh log after test attempt
+    setTimeout(() => { if (window.loadEmailLog) window.loadEmailLog(); }, 800);
   }
 };
 
