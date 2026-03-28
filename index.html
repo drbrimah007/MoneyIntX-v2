@@ -280,22 +280,64 @@ h3 { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
 .gh { background: transparent; color: var(--text); border: none; cursor: pointer; font-size: 14px; padding: 6px 10px; border-radius: 6px; }
 .gh:hover { background: var(--bg3); }
 
-/* Forms */
-input, select, textarea { background: var(--bg3); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 14px; width: 100%; outline: none; font-family: inherit; }
-input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+/* Forms — premium dark style */
+input, select, textarea {
+  background: var(--panel, var(--bg2));
+  color: var(--text);
+  border: 1px solid var(--line, rgba(255,255,255,.06));
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+  width: 100%;
+  outline: none;
+  font-family: inherit;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+input:hover, select:hover, textarea:hover {
+  border-color: var(--line-2, rgba(255,255,255,.10));
+  background: var(--panel-2, var(--bg3));
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: rgba(127,224,208,.35);
+  background: var(--panel-2, var(--bg3));
+  box-shadow: 0 0 0 2px rgba(127,224,208,.08);
+}
+input::placeholder, textarea::placeholder { color: var(--muted-2, #6f7788); }
+input[type="checkbox"], input[type="radio"] {
+  width: auto; padding: 0; border-radius: 4px;
+  accent-color: var(--green, #63d69a);
+}
+select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238f98ab'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
 /* Green text for filled entry form fields */
 .tpl-field:not([readonly]):not(:placeholder-shown) { color: #22c55e !important; }
 input.tpl-field:focus:not([readonly]) { color: #22c55e !important; border-color: #22c55e; }
 textarea.tpl-field:not(:placeholder-shown) { color: #22c55e !important; }
-label { font-size: 13px; color: var(--muted); margin-bottom: 4px; display: block; }
-.form-input { background: var(--bg3); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 14px; width: 100%; outline: none; font-family: inherit; }
-.form-input:focus { border-color: var(--accent); }
-.fg { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
-.form-group { margin-bottom: 14px; }
+label { font-size: 13px; color: var(--muted, #8f98ab); margin-bottom: 6px; display: block; font-weight: 500; }
+.form-input {
+  background: var(--panel, var(--bg2));
+  color: var(--text);
+  border: 1px solid var(--line, rgba(255,255,255,.06));
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+  width: 100%;
+  outline: none;
+  font-family: inherit;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.form-input:hover { border-color: var(--line-2, rgba(255,255,255,.10)); background: var(--panel-2, var(--bg3)); }
+.form-input:focus { border-color: rgba(127,224,208,.35); background: var(--panel-2, var(--bg3)); box-shadow: 0 0 0 2px rgba(127,224,208,.08); }
+.form-input::placeholder { color: var(--muted-2, #6f7788); }
+hr, .divider { border: none; border-top: 1px solid var(--line, rgba(255,255,255,.05)); margin: 16px 0; }
+.fg { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
+.form-group { margin-bottom: 16px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .frow { display: flex; gap: 10px; align-items: flex-end; }
 @media(max-width:640px) { .frow, .form-row { flex-direction: column; grid-template-columns: 1fr; } }
-@media(max-width:640px) { input, select, textarea { font-size: 16px !important; } }
+@media(max-width:640px) { input, select, textarea { font-size: 16px !important; border-radius: 10px !important; } }
 
 /* Tables */
 .tbl-wrap { overflow-x: auto; }
@@ -1095,6 +1137,42 @@ async function enterApp(user) {
       .eq('email', user.email)
       .is('linked_user_id', null)
       .then(({ error }) => { if (error) console.warn('[contact-link]', error.message); });
+
+    // ── Share token auto-linking ──────────────────────────────────
+    // On every login: find all share_tokens sent to this email but not yet
+    // linked to a user account. Set recipient_id so "Shared With Me" shows
+    // records sent before the user logged in, and fire in-app notifications.
+    supabase.from('share_tokens')
+      .update({ recipient_id: user.id })
+      .eq('recipient_email', user.email)
+      .is('recipient_id', null)
+      .neq('status', 'expired')
+      .neq('status', 'dismissed')
+      .select()
+      .then(({ data, error }) => {
+        if (error) console.warn('[share-token-link]', error.message);
+        else if (data?.length) {
+          console.log(`[share-token-link] linked ${data.length} pending share(s) to user`);
+          data.forEach(async (st) => {
+            try {
+              const snap = st.entry_snapshot || {};
+              const amt = snap.amount || 0;
+              const cur = snap.currency || 'USD';
+              const fromName = snap.from_name || 'Someone';
+              await supabase.from('notifications').insert({
+                user_id: user.id,
+                type: 'shared_record',
+                message: `${fromName} shared a record with you: ${amt} ${cur}`,
+                entry_id: st.entry_id || null,
+                contact_name: fromName,
+                amount: amt,
+                currency: cur,
+                read: false
+              });
+            } catch(_) {}
+          });
+        }
+      });
   }
 
   document.getElementById('auth-loader').style.display = 'none';

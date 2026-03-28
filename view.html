@@ -132,9 +132,86 @@ window.confirmRecord = async function(shareId) {
     window.location.href = '/';
     return;
   }
-  await supabase.from('share_tokens').update({ status:'confirmed', confirmed_at:new Date().toISOString(), recipient_id:session.user.id }).eq('id', shareId);
-  alert('Record confirmed! It will appear in your entries.');
-  window.location.reload();
+  const userId = session.user.id;
+
+  // 1. Get the full share token + entry
+  const { data: token } = await supabase
+    .from('share_tokens')
+    .select('*, entry:entries(id, amount, currency, tx_type, date, note, invoice_number, user_id, status, settled_amount)')
+    .eq('id', shareId)
+    .single();
+
+  if (!token?.entry) {
+    alert('Record not found.');
+    return;
+  }
+
+  // 2. Flip tx_type for recipient perspective
+  const FLIP = {
+    'they_owe_you': 'you_owe_them', 'you_owe_them': 'they_owe_you',
+    'they_paid_you': 'you_paid_them', 'you_paid_them': 'they_paid_you',
+    'invoice': 'bill', 'bill': 'invoice',
+    'invoice_sent': 'invoice_received', 'invoice_received': 'invoice_sent',
+    'owed_to_me': 'i_owe', 'i_owe': 'owed_to_me'
+  };
+  const flippedType = FLIP[token.entry.tx_type] || token.entry.tx_type;
+  const snap = token.entry_snapshot || {};
+  const fromName = snap.from_name || '';
+  const fromEmail = snap.from_email || '';
+
+  // 3. Create entry in recipient's ledger
+  const { data: newEntry, error: entryError } = await supabase
+    .from('entries')
+    .insert({
+      user_id: userId,
+      tx_type: flippedType,
+      sender_tx_type: token.entry.tx_type,
+      amount: token.entry.amount,
+      currency: token.entry.currency,
+      date: token.entry.date,
+      note: token.entry.note || '',
+      invoice_number: token.entry.invoice_number || '',
+      is_shared: true,
+      share_token: token.token,
+      from_name: fromName,
+      from_email: fromEmail,
+      status: 'posted',
+      settled_amount: 0
+    })
+    .select()
+    .single();
+
+  if (entryError) {
+    console.error('[confirmRecord entry]', entryError.message);
+    alert('Error saving record: ' + entryError.message);
+    return;
+  }
+
+  // 4. Mark share token confirmed + set recipient
+  await supabase.from('share_tokens')
+    .update({ status: 'confirmed', confirmed_at: new Date().toISOString(), recipient_id: userId })
+    .eq('id', shareId);
+
+  // 5. Notify the original sender that the record was confirmed
+  if (token.sender_id) {
+    await supabase.from('notifications').insert({
+      user_id: token.sender_id,
+      type: 'shared_record',
+      message: `Your shared record of ${token.entry.amount} ${token.entry.currency} was confirmed by the recipient.`,
+      entry_id: token.entry_id,
+      amount: token.entry.amount,
+      currency: token.entry.currency,
+      read: false
+    });
+  }
+
+  document.getElementById('view-card').innerHTML = `
+    <div style="text-align:center;padding:30px;">
+      <div style="font-size:40px;margin-bottom:12px;">✅</div>
+      <p style="font-size:18px;font-weight:700;margin-bottom:8px;">Record Confirmed!</p>
+      <p style="font-size:14px;color:#8892a4;margin-bottom:20px;">This record has been added to your Money IntX ledger.</p>
+      <a href="/" style="display:inline-block;padding:10px 24px;background:#6c63ff;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">Open Money IntX →</a>
+    </div>`;
 };
 
 window.dismissRecord = async function(shareId) {
