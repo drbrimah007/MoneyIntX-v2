@@ -22,6 +22,29 @@ function fmtMoney(n, cur) {
   catch(e) { return `${cur||'USD'} ${(n||0).toFixed(2)}`; }
 }
 
+const WEIGHT_UNITS = ['kg','lbs','g','oz','t','lb','ton'];
+
+// Format a column field value according to its unitType/unitValue
+function fmtFieldVal(val, field, panelCur) {
+  let n;
+  if (typeof val === 'object' && val !== null) {
+    // paired field — use the numeric part
+    n = parseFloat(val.num) || 0;
+  } else {
+    n = parseFloat(val);
+    if (isNaN(n)) return null;
+  }
+  const ut = field.unitType || 'none';
+  if (ut === 'currency') {
+    return fmtMoney(n, field.unitValue || panelCur || 'USD');
+  }
+  if (ut === 'weight') {
+    return `${n.toLocaleString('en-US', { minimumFractionDigits:0, maximumFractionDigits:3 })} ${field.unitValue || 'kg'}`;
+  }
+  // plain number
+  return n.toLocaleString('en-US', { minimumFractionDigits:0, maximumFractionDigits:4 });
+}
+
 function fmtDate(d) {
   if (!d) return '—';
   const dt = new Date(d + 'T00:00:00');
@@ -381,45 +404,52 @@ function renderOpenSession(p, rows, colFields, rowFields, sessionKey, label) {
     html += `<div class="tbl-wrap"><table><thead><tr>
       <th style="width:80px;">Date</th>`;
     colFields.forEach(f => {
-      html += `<th>${esc(f.label)}</th>`;
+      const unitHint = f.unitType === 'currency' ? ` <span style="font-size:10px;opacity:.6;">(${f.unitValue||currency})</span>`
+        : f.unitType === 'weight' ? ` <span style="font-size:10px;opacity:.6;">(${f.unitValue||'kg'})</span>` : '';
+      html += `<th>${esc(f.label)}${unitHint}</th>`;
     });
     rowFields.forEach(f => {
       html += `<th style="color:var(--accent);">${esc(f.label)}</th>`;
     });
-    html += `<th style="width:40px;"></th></tr></thead><tbody>`;
+    html += `<th style="width:52px;"></th></tr></thead><tbody>`;
 
     rows.forEach(row => {
       const computed = computeRowFields(p.fields, row.values || {});
       html += `<tr>
         <td style="font-size:12px;color:var(--muted);">${fmtDate(row.row_date)}</td>`;
       colFields.forEach(f => {
-        const val = row.values?.[f.id] ?? '';
-        if (f.type === 'numeric') {
-          html += `<td style="font-weight:600;">${val !== '' ? fmtMoney(parseFloat(val)||0, currency) : '<span style="color:var(--muted);">—</span>'}</td>`;
+        const raw = row.values?.[f.id] ?? '';
+        if (f.type === 'numeric' || f.type === 'paired') {
+          const fv = fmtFieldVal(raw, f, currency);
+          html += `<td style="font-weight:600;">${fv !== null ? fv : '<span style="color:var(--muted);">—</span>'}</td>`;
         } else {
-          html += `<td style="font-size:13px;">${esc(val)}</td>`;
+          html += `<td style="font-size:13px;">${esc(raw)}</td>`;
         }
       });
       rowFields.forEach(f => {
         const val = computed[f.id];
         html += `<td style="font-weight:700;color:var(--accent);">${val !== undefined ? fmtMoney(val, currency) : '—'}</td>`;
       });
-      html += `<td>
-        <button class="action-menu-btn" onclick="window._bpEngine.openEditRowModal('${row.id}')" style="font-size:18px;padding:4px 8px;">⋮</button>
+      html += `<td style="text-align:right;">
+        <button class="bs sm" onclick="window._bpEngine.openEditRowModal('${row.id}')" style="font-size:11px;padding:3px 8px;">Edit</button>
       </td></tr>`;
     });
 
     html += `</tbody></table></div>`;
 
     // Session column totals
-    const hasTotals = colFields.some(f => f.type === 'numeric');
+    const hasTotals = colFields.some(f => (f.type === 'numeric' || f.type === 'paired') && !f.excludeFromAggregate);
     if (hasTotals) {
       html += `<div style="display:flex;gap:16px;flex-wrap:wrap;padding:10px 18px 12px;border-top:1px solid var(--border);background:var(--bg3);">`;
-      colFields.filter(f => f.type === 'numeric' && !f.excludeFromAggregate).forEach(f => {
-        const total = rows.reduce((s, r) => s + (parseFloat(r.values?.[f.id]) || 0), 0);
+      colFields.filter(f => (f.type === 'numeric' || f.type === 'paired') && !f.excludeFromAggregate).forEach(f => {
+        const total = rows.reduce((s, r) => {
+          const v = r.values?.[f.id];
+          return s + (typeof v === 'object' ? (parseFloat(v?.num)||0) : (parseFloat(v)||0));
+        }, 0);
+        const totalFmt = fmtFieldVal(total, f, currency) ?? total.toLocaleString('en-US', {maximumFractionDigits:2});
         html += `<div style="font-size:12px;color:var(--muted);">
           <span>${esc(f.label)}:</span>
-          <strong style="color:var(--text);margin-left:4px;">${fmtMoney(total, currency)}</strong>
+          <strong style="color:var(--text);margin-left:4px;">${totalFmt}</strong>
         </div>`;
       });
       const pnl = computeSessionPnL(p.fields, rows);
@@ -476,7 +506,11 @@ function renderFoldedBody(p, rows, sessionKey) {
 
   let html = `<div class="tbl-wrap"><table><thead><tr>
     <th style="width:80px;">Date</th>`;
-  colFields.forEach(f => { html += `<th>${esc(f.label)}</th>`; });
+  colFields.forEach(f => {
+    const unitHint = f.unitType === 'currency' ? ` <span style="font-size:10px;opacity:.6;">(${f.unitValue||p.currency})</span>`
+      : f.unitType === 'weight' ? ` <span style="font-size:10px;opacity:.6;">(${f.unitValue||'kg'})</span>` : '';
+    html += `<th>${esc(f.label)}${unitHint}</th>`;
+  });
   rowFields.forEach(f => { html += `<th style="color:var(--accent);">${esc(f.label)}</th>`; });
   html += `</tr></thead><tbody>`;
 
@@ -484,10 +518,13 @@ function renderFoldedBody(p, rows, sessionKey) {
     const computed = computeRowFields(p.fields, row.values || {});
     html += `<tr><td style="font-size:12px;color:var(--muted);">${fmtDate(row.row_date)}</td>`;
     colFields.forEach(f => {
-      const val = row.values?.[f.id] ?? '';
-      html += f.type === 'numeric'
-        ? `<td>${val !== '' ? fmtMoney(parseFloat(val)||0, currency) : '—'}</td>`
-        : `<td style="font-size:13px;">${esc(val)}</td>`;
+      const raw = row.values?.[f.id] ?? '';
+      if (f.type === 'numeric' || f.type === 'paired') {
+        const fv = fmtFieldVal(raw, f, currency);
+        html += `<td style="font-weight:600;">${fv !== null ? fv : '<span style="color:var(--muted);">—</span>'}</td>`;
+      } else {
+        html += `<td style="font-size:13px;">${esc(raw)}</td>`;
+      }
     });
     rowFields.forEach(f => {
       const val = computed[f.id];
@@ -499,12 +536,16 @@ function renderFoldedBody(p, rows, sessionKey) {
   html += `</tbody></table></div>`;
 
   // Column totals footer
-  const hasTotals = colFields.some(f => f.type === 'numeric');
+  const hasTotals = colFields.some(f => (f.type === 'numeric' || f.type === 'paired') && !f.excludeFromAggregate);
   if (hasTotals) {
     html += `<div style="display:flex;gap:16px;flex-wrap:wrap;padding:10px 18px 12px;border-top:1px solid var(--border);background:var(--bg3);">`;
-    colFields.filter(f => f.type === 'numeric' && !f.excludeFromAggregate).forEach(f => {
-      const total = rows.reduce((s, r) => s + (parseFloat(r.values?.[f.id]) || 0), 0);
-      html += `<div style="font-size:12px;color:var(--muted);"><span>${esc(f.label)}:</span><strong style="color:var(--text);margin-left:4px;">${fmtMoney(total, currency)}</strong></div>`;
+    colFields.filter(f => (f.type === 'numeric' || f.type === 'paired') && !f.excludeFromAggregate).forEach(f => {
+      const total = rows.reduce((s, r) => {
+        const v = r.values?.[f.id];
+        return s + (typeof v === 'object' ? (parseFloat(v?.num)||0) : (parseFloat(v)||0));
+      }, 0);
+      const totalFmt = fmtFieldVal(total, f, currency) ?? total.toLocaleString('en-US', {maximumFractionDigits:2});
+      html += `<div style="font-size:12px;color:var(--muted);"><span>${esc(f.label)}:</span><strong style="color:var(--text);margin-left:4px;">${totalFmt}</strong></div>`;
     });
     html += `</div>`;
   }
@@ -930,8 +971,24 @@ function _bpOpenFieldModal(fid, forceDir) {
 
       <!-- NUMERIC OPTIONS -->
       <div id="bpfl-panel-numeric" style="display:${isRow||ftype==='numeric'?'block':'none'}">
-        ${isRow ? '' : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;padding:12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);">
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+        ${isRow ? '' : `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;padding:12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);">
+          <div class="fg" style="margin:0;"><label style="font-size:12px;">Unit</label>
+            <select id="bpfl-unittype" onchange="window._bpEngine._bpUnitTypeChange(this.value)">
+              <option value="none" ${(f?.unitType||'none')==='none'?'selected':''}>None</option>
+              <option value="currency" ${f?.unitType==='currency'?'selected':''}>Currency</option>
+              <option value="weight" ${f?.unitType==='weight'?'selected':''}>Weight</option>
+            </select></div>
+          <div class="fg" id="bpfl-unit-currency" style="margin:0;display:${f?.unitType==='currency'?'':'none'};">
+            <label style="font-size:12px;">Currency</label>
+            <select id="bpfl-unitvalue-cur">
+              ${CURRENCIES.map(c=>`<option value="${c}" ${f?.unitType==='currency'&&f?.unitValue===c?'selected':''}>${c}</option>`).join('')}
+            </select></div>
+          <div class="fg" id="bpfl-unit-weight" style="margin:0;display:${f?.unitType==='weight'?'':'none'};">
+            <label style="font-size:12px;">Unit</label>
+            <select id="bpfl-unitvalue-wt">
+              ${WEIGHT_UNITS.map(u=>`<option value="${u}" ${f?.unitType==='weight'&&f?.unitValue===u?'selected':''}>${u}</option>`).join('')}
+            </select></div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;grid-column:1/-1;">
             <input type="checkbox" id="bpfl-excludeagg" ${f?.excludeFromAggregate?'checked':''} style="width:auto;"> Exclude from aggregate</label>
           <div class="fg" style="margin:0;"><label style="font-size:12px;">Add to Ledger</label>
             <select id="bpfl-ledger">${Object.entries(LEDGER_FX).map(([k,v])=>`<option value="${k}" ${(f?.ledgerEffect||'')===k?'selected':''}>${v}</option>`).join('')}</select>
@@ -957,8 +1014,26 @@ function _bpOpenFieldModal(fid, forceDir) {
           <div class="fg"><label>Text Label</label><input id="bpfl-textlabel" value="${esc(f?.textLabel||'Item')}" placeholder="Item"></div>
           <div class="fg"><label>Number Label</label><input id="bpfl-numlabel" value="${esc(f?.numericLabel||'Amount')}" placeholder="Amount"></div>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:12px;">
-          <input type="checkbox" id="bpfl-excludeagg-p" ${f?.excludeFromAggregate?'checked':''} style="width:auto;"> Exclude from aggregate</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;padding:12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);">
+          <div class="fg" style="margin:0;"><label style="font-size:12px;">Unit</label>
+            <select id="bpfl-unittype-p" onchange="window._bpEngine._bpUnitTypeChangeP(this.value)">
+              <option value="none" ${(f?.unitType||'none')==='none'?'selected':''}>None</option>
+              <option value="currency" ${f?.unitType==='currency'?'selected':''}>Currency</option>
+              <option value="weight" ${f?.unitType==='weight'?'selected':''}>Weight</option>
+            </select></div>
+          <div class="fg" id="bpfl-unit-currency-p" style="margin:0;display:${f?.unitType==='currency'?'':'none'};">
+            <label style="font-size:12px;">Currency</label>
+            <select id="bpfl-unitvalue-cur-p">
+              ${CURRENCIES.map(c=>`<option value="${c}" ${f?.unitType==='currency'&&f?.unitValue===c?'selected':''}>${c}</option>`).join('')}
+            </select></div>
+          <div class="fg" id="bpfl-unit-weight-p" style="margin:0;display:${f?.unitType==='weight'?'':'none'};">
+            <label style="font-size:12px;">Unit</label>
+            <select id="bpfl-unitvalue-wt-p">
+              ${WEIGHT_UNITS.map(u=>`<option value="${u}" ${f?.unitType==='weight'&&f?.unitValue===u?'selected':''}>${u}</option>`).join('')}
+            </select></div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;grid-column:1/-1;">
+            <input type="checkbox" id="bpfl-excludeagg-p" ${f?.excludeFromAggregate?'checked':''} style="width:auto;"> Exclude from aggregate</label>
+        </div>
       </div>
 
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;border-top:1px solid var(--border);padding-top:16px;">
@@ -971,6 +1046,14 @@ function _bpOpenFieldModal(fid, forceDir) {
 }
 
 // ── Field modal helpers ───────────────────────────────────────────
+function _bpUnitTypeChange(val) {
+  document.getElementById('bpfl-unit-currency').style.display = val === 'currency' ? '' : 'none';
+  document.getElementById('bpfl-unit-weight').style.display   = val === 'weight'   ? '' : 'none';
+}
+function _bpUnitTypeChangeP(val) {
+  document.getElementById('bpfl-unit-currency-p').style.display = val === 'currency' ? '' : 'none';
+  document.getElementById('bpfl-unit-weight-p').style.display   = val === 'weight'   ? '' : 'none';
+}
 function _bpTypeChange(val) {
   ['text','numeric','paired'].forEach(t => {
     const el = document.getElementById('bpfl-panel-' + t);
@@ -1079,22 +1162,35 @@ async function _bpSaveField(fid) {
   });
 
   let field;
+  // Read unit for numeric/paired (not for row fields — they use panel currency)
+  const _readUnit = (suffix) => {
+    const ut = document.getElementById('bpfl-unittype' + suffix)?.value || 'none';
+    const uv = ut === 'currency' ? (document.getElementById('bpfl-unitvalue-cur' + suffix)?.value || 'USD')
+             : ut === 'weight'   ? (document.getElementById('bpfl-unitvalue-wt' + suffix)?.value  || 'kg')
+             : '';
+    return { unitType: ut, unitValue: uv };
+  };
+
   if (type === 'text') {
     field = { id: fid || uuid(), label, type, direction: 'column', calculators: [] };
   } else if (type === 'paired') {
+    const { unitType, unitValue } = _readUnit('-p');
     field = {
       id: fid || uuid(), label, type, direction: 'column',
       textLabel: document.getElementById('bpfl-textlabel')?.value.trim() || 'Item',
       numericLabel: document.getElementById('bpfl-numlabel')?.value.trim() || 'Amount',
       excludeFromAggregate: document.getElementById('bpfl-excludeagg-p')?.checked || false,
+      unitType, unitValue,
       calculators: []
     };
   } else {
+    const { unitType, unitValue } = isRow ? { unitType:'none', unitValue:'' } : _readUnit('');
     field = {
       id: fid || uuid(), label, type, direction: isRow ? 'row' : 'column',
       excludeFromAggregate: document.getElementById('bpfl-excludeagg')?.checked || false,
       ledgerEffect: document.getElementById('bpfl-ledger')?.value || null,
       runSchedule: document.getElementById('bpfl-schedule')?.value || '',
+      unitType, unitValue,
       calculators: _bpFldCalcs.filter(c => c.operation)
     };
   }
@@ -1149,7 +1245,7 @@ export function exposeBpEngine() {
     openCreateModal, _doCreate,
     openPanel, backToList,
     openFieldBuilder, openAddFieldChoice,
-    _bpOpenFieldModal, _bpTypeChange, _bpRenderCalcList, _bpAddCalc, _bpUpdCalc, _bpRemCalc, _bpCalcOpChange, _bpSaveField,
+    _bpOpenFieldModal, _bpTypeChange, _bpUnitTypeChange, _bpUnitTypeChangeP, _bpRenderCalcList, _bpAddCalc, _bpUpdCalc, _bpRemCalc, _bpCalcOpChange, _bpSaveField,
     _bpMoveField, _bpDeleteField,
     openAddRowModal, _previewRow, _doAddRow,
     openEditRowModal, _doSaveRow, _doDeleteRow,
