@@ -113,3 +113,80 @@ export async function listArchivedRows(panelId) {
   if (error) console.error('[listArchivedRows]', error.message);
   return data || [];
 }
+// ── Panel Members ─────────────────────────────────────────────────
+
+/** Returns all members for a panel (owner-only query) */
+export async function listPanelMembers(panelId) {
+  const { data, error } = await supabase
+    .from('business_panel_members')
+    .select('*, member:member_user_id(id, email, display_name)')
+    .eq('panel_id', panelId)
+    .order('added_at', { ascending: true });
+  if (error) console.error('[listPanelMembers]', error.message);
+  return data || [];
+}
+
+/** Look up a user by email (for invite flow) */
+export async function findUserByEmail(email) {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, email, display_name')
+    .eq('email', email.toLowerCase().trim())
+    .maybeSingle();
+  if (error) console.error('[findUserByEmail]', error.message);
+  return data;
+}
+
+/** Add a member to a panel */
+export async function addPanelMember(panelId, memberUserId, { canAdd = true, canEdit = false } = {}) {
+  const { data, error } = await supabase
+    .from('business_panel_members')
+    .upsert({ panel_id: panelId, member_user_id: memberUserId, can_add: canAdd, can_edit: canEdit },
+             { onConflict: 'panel_id,member_user_id' })
+    .select()
+    .single();
+  if (error) console.error('[addPanelMember]', error.message);
+  return { data, error };
+}
+
+/** Update a member's permissions */
+export async function updatePanelMember(memberId, { canAdd, canEdit }) {
+  const { error } = await supabase
+    .from('business_panel_members')
+    .update({ can_add: canAdd, can_edit: canEdit })
+    .eq('id', memberId);
+  if (error) console.error('[updatePanelMember]', error.message);
+  return !error;
+}
+
+/** Remove a member from a panel */
+export async function removePanelMember(memberId) {
+  const { error } = await supabase
+    .from('business_panel_members')
+    .delete()
+    .eq('id', memberId);
+  if (error) console.error('[removePanelMember]', error.message);
+  return !error;
+}
+
+/** Returns the current user's membership on a panel (null = not a member / is owner) */
+export async function getMyMembership(panelId, userId) {
+  const { data, error } = await supabase
+    .from('business_panel_members')
+    .select('*')
+    .eq('panel_id', panelId)
+    .eq('member_user_id', userId)
+    .maybeSingle();
+  if (error) console.error('[getMyMembership]', error.message);
+  return data;
+}
+
+/** List panels the current user is a MEMBER of (not owner) */
+export async function listSharedPanels(userId) {
+  const { data, error } = await supabase
+    .from('business_panel_members')
+    .select('panel:panel_id(*), can_add, can_edit')
+    .eq('member_user_id', userId);
+  if (error) console.error('[listSharedPanels]', error.message);
+  return (data || []).map(r => ({ ...r.panel, _membership: { can_add: r.can_add, can_edit: r.can_edit } }));
+}

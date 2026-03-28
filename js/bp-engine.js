@@ -5,7 +5,9 @@ import { CALC_OPS, _isNumericField, _isPairedField, _isCalcField } from './templ
 import {
   listPanels, getPanel, createPanel, updatePanel, deletePanel,
   listRows, addRow, updateRow, deleteRow,
-  archiveSessionRows, listArchivedRows
+  archiveSessionRows, listArchivedRows,
+  listPanelMembers, findUserByEmail, addPanelMember, updatePanelMember, removePanelMember,
+  getMyMembership, listSharedPanels
 } from './business-panels.js';
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -250,8 +252,9 @@ function computeSessionPnL(fields, rows) {
 let _userId = null;
 let _navFn  = null;
 let _toastFn = null;
-let _curPanel = null;
-let _curRows  = [];
+let _curPanel      = null;
+let _curRows       = [];
+let _curMembership = null; // null = owner; { can_add, can_edit } = member
 let _bpFldCalcs    = [];
 let _bpFldDir      = 'column';
 let _bpRowPrefix   = 'bpr';   // 'bpr' for Add modal, 'bped' for Edit modal
@@ -318,14 +321,30 @@ export async function renderBusinessPage(el) {
     return;
   }
 
-  const panels = await listPanels(_userId);
+  const [panels, sharedPanels] = await Promise.all([
+    listPanels(_userId),
+    listSharedPanels(_userId)
+  ]);
 
   let html = `<div class="page-header">
     <h2 style="margin:0;">Business Panels</h2>
     <button class="btn btn-primary btn-sm" onclick="window._bpEngine.openCreateModal()">+ New Panel</button>
   </div>`;
 
-  if (!panels.length) {
+  const _panelCard = (p, badge) => `<div class="card" style="cursor:pointer;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;"
+    onclick="window._bpEngine.openPanel('${p.id}')">
+    <div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:4px;">${esc(p.title)}${badge ? ` <span style="font-size:11px;background:rgba(99,102,241,.15);color:var(--accent);padding:1px 7px;border-radius:10px;font-weight:600;margin-left:6px;">${badge}</span>` : ''}</div>
+      <div style="font-size:12px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;">
+        <span>${p.currency}</span><span>·</span>
+        <span>${p.session_type === 'weekly' ? '📅 Weekly' : '📆 Monthly'}</span><span>·</span>
+        <span>${(p.fields||[]).length} field${(p.fields||[]).length !== 1 ? 's' : ''}</span>
+      </div>
+    </div>
+    <span style="font-size:22px;color:var(--muted);">›</span>
+  </div>`;
+
+  if (!panels.length && !sharedPanels.length) {
     html += `<div class="card" style="text-align:center;padding:48px 24px;">
       <div style="font-size:48px;margin-bottom:12px;">📊</div>
       <div style="font-size:16px;font-weight:600;margin-bottom:8px;">No business panels yet</div>
@@ -334,22 +353,11 @@ export async function renderBusinessPage(el) {
     </div>`;
   } else {
     html += `<div style="display:grid;gap:12px;">`;
-    panels.forEach(p => {
-      html += `<div class="card" style="cursor:pointer;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;"
-        onclick="window._bpEngine.openPanel('${p.id}')">
-        <div>
-          <div style="font-size:16px;font-weight:700;margin-bottom:4px;">${esc(p.title)}</div>
-          <div style="font-size:12px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;">
-            <span>${p.currency}</span>
-            <span>·</span>
-            <span>${p.session_type === 'weekly' ? '📅 Weekly sessions' : '📆 Monthly sessions'}</span>
-            <span>·</span>
-            <span>${(p.fields||[]).length} field${(p.fields||[]).length !== 1 ? 's' : ''}</span>
-          </div>
-        </div>
-        <span style="font-size:22px;color:var(--muted);">›</span>
-      </div>`;
-    });
+    panels.forEach(p => { html += _panelCard(p, ''); });
+    if (sharedPanels.length) {
+      html += `<div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:8px 0 4px;">Shared with you</div>`;
+      sharedPanels.forEach(p => { html += _panelCard(p, 'Shared'); });
+    }
     html += `</div>`;
   }
 
@@ -413,13 +421,16 @@ async function _doCreate() {
 async function openPanel(panelId) {
   const el = document.getElementById('content');
   el.innerHTML = '<p style="color:var(--muted);padding:24px;">Loading…</p>';
-  const [panel, rows] = await Promise.all([
+  const [panel, rows, membership] = await Promise.all([
     getPanel(panelId),
-    listRows(panelId)
+    listRows(panelId),
+    getMyMembership(panelId, _userId)
   ]);
   if (!panel) { toast('Panel not found.', 'error'); return; }
-  _curPanel = panel;
-  _curRows  = rows;
+  _curPanel      = panel;
+  _curRows       = rows;
+  // null = owner; { can_add, can_edit } = shared member
+  _curMembership = panel.user_id === _userId ? null : (membership || { can_add: false, can_edit: false });
   renderPanelView(el);
 }
 
@@ -449,16 +460,21 @@ function renderPanelView(el) {
   const colFields = fields.filter(f => f.direction !== 'row');
   const rowFields = fields.filter(f => f.direction === 'row');
 
+  const isOwner  = !_curMembership;
+  const canAdd   = isOwner || _curMembership?.can_add;
+  const canEdit  = isOwner || _curMembership?.can_edit;
+
   let html = `<div class="page-header">
     <div>
       <button class="gh sm" onclick="window._bpEngine.backToList()" style="margin-bottom:6px;">← Business Panels</button>
       <h2 style="margin:0;">${esc(p.title)}</h2>
-      <div style="font-size:12px;color:var(--muted);margin-top:3px;">${p.currency} · ${p.session_type === 'weekly' ? 'Weekly' : 'Monthly'} sessions</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:3px;">${p.currency} · ${p.session_type === 'weekly' ? 'Weekly' : 'Monthly'} sessions${!isOwner ? ' · <span style="color:var(--accent);">Shared with you</span>' : ''}</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="bs sm" onclick="window._bpEngine.openFieldBuilder()">⚙ Fields</button>
-      <button class="bs sm" onclick="window._bpEngine.openArchiveView('${p.id}')">🗂 Archive</button>
-      <button class="btn btn-primary btn-sm" onclick="window._bpEngine.openAddRowModal('${todayKey}')">+ Add Row</button>
+      ${isOwner ? `<button class="bs sm" onclick="window._bpEngine.openFieldBuilder()">⚙ Fields</button>
+      <button class="bs sm" onclick="window._bpEngine.openMembersModal()">👥 Members</button>
+      <button class="bs sm" onclick="window._bpEngine.openArchiveView('${p.id}')">🗂 Archive</button>` : ''}
+      ${canAdd ? `<button class="btn btn-primary btn-sm" onclick="window._bpEngine.openAddRowModal('${todayKey}')">+ Add Row</button>` : ''}
     </div>
   </div>`;
 
@@ -530,7 +546,7 @@ function renderOpenSession(p, rows, colFields, rowFields, sessionKey, label) {
           const fv = fmtFieldValC(raw, f, currency);
           const isAuto = (f.calculators||[]).length > 0;
           const fClr = f.outputColor || (isAuto ? 'var(--accent)' : '');
-          html += `<td style="font-weight:600;${fClr?'color:'+fClr+';':''}">${fv !== null ? fv : '<span style="color:var(--muted);">—</span>'}</td>`;
+          html += `<td style="font-weight:600;white-space:nowrap;${fClr?'color:'+fClr+';':''}">${fv !== null ? fv : '<span style="color:var(--muted);">—</span>'}</td>`;
         } else {
           html += `<td style="font-size:13px;">${esc(raw)}</td>`;
         }
@@ -538,10 +554,11 @@ function renderOpenSession(p, rows, colFields, rowFields, sessionKey, label) {
       rowFields.forEach(f => {
         const val = rowComputed[f.id];
         const rfClr = f.outputColor || 'var(--accent)';
-        html += `<td style="font-weight:700;color:${rfClr};">${val !== undefined ? fmtMoneyC(val, currency) : '—'}</td>`;
+        html += `<td style="font-weight:700;white-space:nowrap;color:${rfClr};">${val !== undefined ? fmtMoneyC(val, currency) : '—'}</td>`;
       });
+      const _canEd = !_curMembership || _curMembership.can_edit;
       html += `<td style="text-align:right;white-space:nowrap;">
-        <button class="bs sm" onclick="window._bpEngine.openEditRowModal('${row.id}')" style="font-size:11px;padding:3px 8px;white-space:nowrap;">Edit</button>
+        ${_canEd ? `<button class="bs sm" onclick="window._bpEngine.openEditRowModal('${row.id}')" style="font-size:11px;padding:3px 8px;white-space:nowrap;">Edit</button>` : ''}
       </td></tr>`;
     });
 
@@ -634,7 +651,7 @@ function renderFoldedBody(p, rows, sessionKey) {
         const fv = fmtFieldValC(raw, f, currency);
         const isAuto = (f.calculators||[]).length > 0;
         const fClr = f.outputColor || (isAuto ? 'var(--accent)' : '');
-        html += `<td style="font-weight:600;${fClr?'color:'+fClr+';':''}">${fv !== null ? fv : '<span style="color:var(--muted);">—</span>'}</td>`;
+        html += `<td style="font-weight:600;white-space:nowrap;${fClr?'color:'+fClr+';':''}">${fv !== null ? fv : '<span style="color:var(--muted);">—</span>'}</td>`;
       } else {
         html += `<td style="font-size:13px;">${esc(raw)}</td>`;
       }
@@ -642,7 +659,7 @@ function renderFoldedBody(p, rows, sessionKey) {
     rowFields.forEach(f => {
       const val = rowComputed[f.id];
       const rfClr = f.outputColor || 'var(--accent)';
-      html += `<td style="font-weight:700;color:${rfClr};">${val !== undefined ? fmtMoneyC(val, currency) : '—'}</td>`;
+      html += `<td style="font-weight:700;white-space:nowrap;color:${rfClr};">${val !== undefined ? fmtMoneyC(val, currency) : '—'}</td>`;
     });
     html += `</tr>`;
   });
@@ -1540,9 +1557,103 @@ async function _bpDeleteField(fid) {
 
 // ── Back to list ──────────────────────────────────────────────────
 function backToList() {
-  _curPanel = null;
-  _curRows  = [];
+  _curPanel      = null;
+  _curRows       = [];
+  _curMembership = null;
   renderBusinessPage(document.getElementById('content'));
+}
+
+// ── Members Modal ─────────────────────────────────────────────────
+async function openMembersModal() {
+  const p = _curPanel;
+  if (!p) return;
+  const members = await listPanelMembers(p.id);
+
+  const memberRows = members.length ? members.map(m => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
+      <div>
+        <div style="font-size:13px;font-weight:600;">${esc(m.member?.display_name || m.member?.email || '?')}</div>
+        <div style="font-size:11px;color:var(--muted);">${esc(m.member?.email || '')}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+          <input type="checkbox" class="bpm-canadd" data-mid="${m.id}" ${m.can_add ? 'checked' : ''} style="width:auto;">
+          Add rows
+        </label>
+        <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+          <input type="checkbox" class="bpm-canedit" data-mid="${m.id}" ${m.can_edit ? 'checked' : ''} style="width:auto;">
+          Edit rows
+        </label>
+        <button class="bs sm" style="color:var(--red);font-size:11px;" onclick="window._bpEngine._bpmRemove('${m.id}')">✕</button>
+      </div>
+    </div>`).join('') : `<p style="color:var(--muted);font-size:13px;padding:12px 0;">No members yet. Add someone below.</p>`;
+
+  const html = `<div class="modal-bg" id="bpMembersBg" onclick="if(event.target===this)this.remove()">
+    <div class="modal" style="max-width:560px;" onclick="event.stopPropagation()">
+      <div class="modal-title">👥 Panel Members — ${esc(p.title)}</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Members can view this panel. Control whether they can add or edit rows.</p>
+      <div id="bpm-list">${memberRows}</div>
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Invite by Email</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+          <input id="bpm-email" placeholder="user@example.com" style="flex:1;" type="email">
+          <label style="font-size:12px;display:flex;align-items:center;gap:4px;white-space:nowrap;">
+            <input type="checkbox" id="bpm-canadd-new" checked style="width:auto;"> Add rows
+          </label>
+          <label style="font-size:12px;display:flex;align-items:center;gap:4px;white-space:nowrap;">
+            <input type="checkbox" id="bpm-canedit-new" style="width:auto;"> Edit rows
+          </label>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="window._bpEngine._bpmAdd('${p.id}')">Add Member</button>
+        <span id="bpm-msg" style="font-size:12px;color:var(--muted);margin-left:10px;"></span>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;border-top:1px solid var(--border);padding-top:14px;">
+        <button class="bs" onclick="document.getElementById('bpMembersBg').remove()">Close</button>
+        <button class="btn btn-primary" onclick="window._bpEngine._bpmSaveAll()">Save Permissions</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+async function _bpmAdd(panelId) {
+  const email   = document.getElementById('bpm-email')?.value.trim();
+  const canAdd  = document.getElementById('bpm-canadd-new')?.checked ?? true;
+  const canEdit = document.getElementById('bpm-canedit-new')?.checked ?? false;
+  const msg     = document.getElementById('bpm-msg');
+  if (!email) { if (msg) msg.textContent = 'Enter an email address.'; return; }
+  if (msg) msg.textContent = 'Looking up user…';
+  const user = await findUserByEmail(email);
+  if (!user) { if (msg) msg.textContent = 'No account found for that email.'; return; }
+  if (user.id === _userId) { if (msg) msg.textContent = "That's you — you're already the owner."; return; }
+  const { error } = await addPanelMember(panelId, user.id, { canAdd, canEdit });
+  if (error) { if (msg) msg.textContent = 'Error: ' + error.message; return; }
+  toast('Member added');
+  document.getElementById('bpMembersBg')?.remove();
+  openMembersModal();
+}
+
+async function _bpmRemove(memberId) {
+  if (!confirm('Remove this member?')) return;
+  await removePanelMember(memberId);
+  toast('Member removed');
+  document.getElementById('bpMembersBg')?.remove();
+  openMembersModal();
+}
+
+async function _bpmSaveAll() {
+  const rows = document.querySelectorAll('.bpm-canadd');
+  const saves = [];
+  rows.forEach(cb => {
+    const mid    = cb.dataset.mid;
+    const canAdd = cb.checked;
+    const editCb = document.querySelector(`.bpm-canedit[data-mid="${mid}"]`);
+    const canEdit = editCb?.checked ?? false;
+    saves.push(updatePanelMember(mid, { canAdd, canEdit }));
+  });
+  await Promise.all(saves);
+  toast('Permissions saved');
+  document.getElementById('bpMembersBg')?.remove();
 }
 
 // ── Expose to window ──────────────────────────────────────────────
@@ -1557,6 +1668,7 @@ export function exposeBpEngine() {
     openAddRowModal, _recomputeColPreview, _previewRow, _doAddRow,
     openEditRowModal, _doSaveRow, _doDeleteRow,
     toggleFoldedSession, archiveSession,
-    openArchiveView
+    openArchiveView,
+    openMembersModal, _bpmAdd, _bpmRemove, _bpmSaveAll
   };
 }

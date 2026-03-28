@@ -965,7 +965,12 @@ function _modsKey() { return 'mxi_modules_' + (currentUser?.id || 'default'); }
 function _getModules() {
   try {
     const raw = localStorage.getItem(_modsKey());
-    return raw ? JSON.parse(raw) : {};
+    if (raw) return JSON.parse(raw);
+    // First visit for this user — default all modules ON and persist it
+    const defaults = {};
+    OPTIONAL_MODULES.forEach(m => { defaults[m.id] = true; });
+    try { localStorage.setItem(_modsKey(), JSON.stringify(defaults)); } catch(_) {}
+    return defaults;
   } catch(e) { return {}; }
 }
 
@@ -2229,7 +2234,7 @@ window.saveMarkPaid = async function(entryId, currency) {
         currency,
         date:           payDate,
         note:           note || null,
-        status:         'paid',
+        status:         'posted',
         paid_amount:    amountCents,
         outstanding_amount: 0,
         entry_number:   null
