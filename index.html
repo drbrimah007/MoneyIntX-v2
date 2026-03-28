@@ -334,17 +334,16 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
 <!-- Landing / Auth -->
-<div id="landing" style="min-height:100vh;background:#080b12;color:#e2e8f0;display:none;overflow-x:hidden;font-family:inherit;">
+<div id="landing" style="min-height:100vh;background:#07111f;color:#eef4ff;display:none;overflow-x:hidden;font-family:inherit;">
 
   <!-- ═══ NAV BAR ═══ -->
-  <nav style="display:flex;align-items:center;justify-content:space-between;padding:16px 28px;position:sticky;top:0;z-index:100;background:rgba(8,11,18,.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.06);">
+  <nav style="display:flex;align-items:center;justify-content:space-between;padding:18px 28px;position:sticky;top:0;z-index:100;background:rgba(7,17,31,.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.07);">
     <div style="display:flex;align-items:center;gap:10px;">
-      <img src="money.png" style="height:32px;width:auto;border-radius:8px;object-fit:contain;" onerror="this.style.display='none';">
-      <span style="font-size:16px;font-weight:800;background:linear-gradient(135deg,#fff 30%,#e020b0 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Money IntX</span>
+      <img src="money_green.png" style="height:36px;width:auto;object-fit:contain;" onerror="this.style.display='none';">
     </div>
-    <div style="display:flex;gap:10px;">
-      <button class="lp-btn-secondary" style="padding:8px 18px;font-size:13px;" onclick="showAuthTab('login');document.getElementById('auth-section').scrollIntoView({behavior:'smooth'})">Log In</button>
-      <button class="lp-btn-primary" style="padding:8px 18px;font-size:13px;" onclick="showAuthTab('signup');document.getElementById('auth-section').scrollIntoView({behavior:'smooth'})">Sign Up Free</button>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <button class="lp-btn-secondary" style="padding:8px 18px;font-size:13px;border-color:rgba(255,255,255,.12);color:#eef4ff;" onclick="showAuthTab('login');document.getElementById('auth-section').scrollIntoView({behavior:'smooth'})">Log In</button>
+      <button class="lp-btn-primary" style="padding:8px 18px;font-size:13px;background:#f7fbff;color:#08111d;" onclick="showAuthTab('signup');document.getElementById('auth-section').scrollIntoView({behavior:'smooth'})">Start free</button>
     </div>
   </nav>
 
@@ -352,95 +351,92 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
   <div style="position:relative;overflow:hidden;padding:80px 24px 64px;text-align:center;">
     <!-- Glow backgrounds -->
     <div style="position:absolute;inset:0;pointer-events:none;overflow:hidden;">
-      <div style="position:absolute;top:-120px;left:50%;transform:translateX(-50%);width:700px;height:500px;background:radial-gradient(ellipse at center,rgba(8,11,83,.55) 0%,transparent 70%);"></div>
-      <div style="position:absolute;top:60px;right:-100px;width:400px;height:400px;background:radial-gradient(ellipse at center,rgba(224,32,176,.08) 0%,transparent 70%);"></div>
+      <div style="position:absolute;top:-100px;right:20%;width:600px;height:400px;background:radial-gradient(ellipse at center,rgba(127,224,208,.08) 0%,transparent 65%);"></div>
     </div>
 
     <!-- Label pill -->
-    <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(224,32,176,.12);border:1px solid rgba(224,32,176,.28);border-radius:100px;padding:5px 14px;font-size:12px;font-weight:600;color:#e020b0;margin-bottom:24px;letter-spacing:.02em;">
-      ✦ Personal &amp; Commercial Financial Tracker
+    <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(127,224,208,.12);border:1px solid rgba(127,224,208,.18);border-radius:100px;padding:7px 14px;font-size:12px;font-weight:700;color:#b8f4ea;margin-bottom:24px;letter-spacing:.06em;text-transform:uppercase;">
+      <span style="width:7px;height:7px;border-radius:50%;background:#7fe0d0;"></span> Shared money, made clear
     </div>
 
     <!-- Main headline -->
-    <h1 style="font-size:clamp(32px,6.5vw,62px);font-weight:900;line-height:1.08;margin-bottom:20px;letter-spacing:-.02em;">
-      <span style="color:#ffffff;">Know exactly</span><br>
-      <span style="background:linear-gradient(135deg,#e020b0 0%,#a78bfa 60%,#080b53 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">who owes you</span>
-      <span style="color:#ffffff;"> —<br>and what you owe.</span>
+    <h1 style="font-size:clamp(38px,6vw,64px);font-weight:800;line-height:1.04;margin-bottom:18px;letter-spacing:-.04em;max-width:700px;margin-left:auto;margin-right:auto;">
+      No more <span style="color:#b8f4ea;">"I thought I paid you."</span>
     </h1>
 
     <!-- Sub headline -->
-    <p style="font-size:clamp(18px,2.8vw,24px);color:#8892a4;max-width:400px;margin:0 auto 36px;line-height:1.5;font-weight:600;letter-spacing:.01em;">Record. Manage. Grow.</p>
+    <p style="font-size:18px;color:#96a3ba;max-width:540px;margin:0 auto 28px;line-height:1.68;">Track who owes what, what was agreed, and what's been paid — in one shared place everyone can see.</p>
 
     <!-- CTAs -->
-    <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:48px;">
-      <button class="lp-btn-primary" style="padding:15px 32px;font-size:16px;font-weight:700;border-radius:14px;letter-spacing:.01em;" onclick="showAuthTab('signup');document.getElementById('auth-section').scrollIntoView({behavior:'smooth'})">
-        Start Tracking Free →
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;">
+      <button class="lp-btn-primary" style="padding:14px 28px;font-size:15px;font-weight:700;border-radius:13px;background:#f7fbff;color:#08111d;" onclick="showAuthTab('signup');document.getElementById('auth-section').scrollIntoView({behavior:'smooth'})">
+        Start free — takes 2 minutes
       </button>
-      <button class="lp-btn-secondary" style="padding:15px 32px;font-size:16px;font-weight:600;border-radius:14px;" onclick="showAuthTab('login');document.getElementById('auth-section').scrollIntoView({behavior:'smooth'})">
-        Sign in
+      <button class="lp-btn-secondary" style="padding:14px 28px;font-size:15px;font-weight:600;border-radius:13px;border-color:rgba(255,255,255,.12);color:#eef4ff;" onclick="showAuthTab('login');document.getElementById('auth-section').scrollIntoView({behavior:'smooth'})">
+        See how it works
       </button>
     </div>
 
-    <!-- Social proof tags -->
-    <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:56px;">
-      <span style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:100px;padding:5px 14px;font-size:12px;color:#8892a4;">✓ Free to use</span>
-      <span style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:100px;padding:5px 14px;font-size:12px;color:#8892a4;">✓ No ads, ever</span>
-      <span style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:100px;padding:5px 14px;font-size:12px;color:#8892a4;">✓ Real-time sync</span>
-      <span style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:100px;padding:5px 14px;font-size:12px;color:#8892a4;">✓ Cross-device</span>
-      <span style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:100px;padding:5px 14px;font-size:12px;color:#8892a4;">✓ Encrypted data</span>
+    <p style="font-size:13px;color:#96a3ba;margin-bottom:24px;">Built for real-life money between friends, teams, and small businesses.</p>
+
+    <!-- Trust tags -->
+    <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:24px;">
+      <span style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:100px;padding:8px 14px;font-size:13px;color:#96a3ba;">No credit card</span>
+      <span style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:100px;padding:8px 14px;font-size:13px;color:#96a3ba;">Private</span>
+      <span style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:100px;padding:8px 14px;font-size:13px;color:#96a3ba;">2-minute setup</span>
+    </div>
+
+    <!-- Social proof -->
+    <div style="max-width:520px;margin:0 auto;padding:14px 16px;border-radius:16px;border:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.02));font-size:13px;color:#96a3ba;text-align:left;">
+      <strong style="display:block;color:#fff;margin-bottom:4px;font-size:14px;">No more guessing who paid.</strong>
+      Everything is written down, visible, and easy to check later.
     </div>
 
     <!-- Dashboard mockup card -->
-    <div style="max-width:520px;margin:0 auto;background:linear-gradient(160deg,#111422 0%,#0d1020 100%);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:24px;box-shadow:0 32px 80px rgba(0,0,0,.7),0 0 0 1px rgba(8,11,83,.4);text-align:left;">
+    <div style="max-width:520px;margin:0 auto;background:linear-gradient(180deg,#0c1528,#091121);border:1px solid rgba(255,255,255,.1);border-radius:24px;padding:24px;box-shadow:0 32px 80px rgba(0,0,0,.6);text-align:left;">
       <!-- Mock top bar -->
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.07);">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div style="width:8px;height:8px;border-radius:50%;background:#e020b0;box-shadow:0 0 8px #e020b0;"></div>
-          <span style="font-size:13px;font-weight:700;color:#e2e8f0;">Dashboard</span>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.06);">
+        <div>
+          <div style="font-size:10px;color:#74829b;">Good morning, Lara</div>
+          <div style="font-size:15px;font-weight:700;letter-spacing:-.02em;">Dashboard</div>
         </div>
-        <span style="font-size:11px;color:#4b5563;">Updated just now</span>
+        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#17304d,#7fe0d0);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff;">L</div>
       </div>
-      <!-- 3 stat cards -->
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
-        <div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:12px;padding:14px 12px;">
-          <div style="font-size:10px;font-weight:700;color:#6ee7b7;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">They Owe Me</div>
-          <div style="font-size:22px;font-weight:900;color:#10b981;">₦142,500</div>
-          <div style="font-size:10px;color:#6b7280;margin-top:3px;">6 contacts</div>
+      <!-- Balance card -->
+      <div style="padding:16px;border-radius:18px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);margin-bottom:14px;">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#74829b;">Net balance</div>
+        <div style="font-size:40px;font-weight:800;letter-spacing:-.04em;margin:6px 0 2px;">$6,240</div>
+        <div style="font-size:11px;color:#74829b;">10 active records</div>
+      </div>
+      <!-- Stat row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+        <div style="padding:14px;border-radius:14px;background:rgba(255,255,255,.02);border:1px solid rgba(127,224,208,.16);">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#74829b;">They owe you</div>
+          <div style="font-size:22px;font-weight:800;letter-spacing:-.03em;margin:4px 0 2px;color:#7fe0d0;">$8,420</div>
+          <div style="font-size:11px;color:#74829b;">7 records</div>
         </div>
-        <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.18);border-radius:12px;padding:14px 12px;">
-          <div style="font-size:10px;font-weight:700;color:#fca5a5;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">I Owe Them</div>
-          <div style="font-size:22px;font-weight:900;color:#ef4444;">₦38,000</div>
-          <div style="font-size:10px;color:#6b7280;margin-top:3px;">2 contacts</div>
-        </div>
-        <div style="background:rgba(8,11,83,.4);border:1px solid rgba(224,32,176,.25);border-radius:12px;padding:14px 12px;">
-          <div style="font-size:10px;font-weight:700;color:#c4b5fd;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Net Balance</div>
-          <div style="font-size:22px;font-weight:900;background:linear-gradient(135deg,#e020b0,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">₦104,500</div>
-          <div style="font-size:10px;color:#6b7280;margin-top:3px;">In your favour</div>
+        <div style="padding:14px;border-radius:14px;background:rgba(255,255,255,.02);border:1px solid rgba(231,201,143,.16);">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#74829b;">You owe</div>
+          <div style="font-size:22px;font-weight:800;letter-spacing:-.03em;margin:4px 0 2px;color:#e7c98f;">$2,180</div>
+          <div style="font-size:11px;color:#74829b;">3 records</div>
         </div>
       </div>
-      <!-- Mock recent entries -->
-      <div style="font-size:11px;font-weight:700;color:#4b5563;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Recent</div>
+      <!-- Recent entries -->
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#74829b;margin-bottom:8px;">Recent activity</div>
       <div style="display:flex;flex-direction:column;gap:8px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.03);border-radius:10px;padding:10px 12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:14px;padding:12px 13px;">
           <div style="display:flex;align-items:center;gap:10px;">
-            <div style="width:28px;height:28px;border-radius:50%;background:#3730a3;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#a5b4fc;">A</div>
-            <div><div style="font-size:12px;font-weight:600;">Ade Bello</div><div style="font-size:10px;color:#6b7280;">Loan · Apr 1</div></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#e7c98f;"></div>
+            <div><div style="font-size:13px;font-weight:600;">James invoice <span style="display:inline-flex;padding:0 7px;height:20px;align-items:center;border-radius:999px;font-size:10px;font-weight:700;background:rgba(231,201,143,.1);border:1px solid rgba(231,201,143,.18);color:#e7c98f;">Due soon</span></div><div style="font-size:11px;color:#74829b;margin-top:1px;">Awaiting payment</div></div>
           </div>
-          <span style="font-size:13px;font-weight:700;color:#10b981;">+₦50,000</span>
+          <strong style="font-size:14px;">$8,000</strong>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.03);border-radius:10px;padding:10px 12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:14px;padding:12px 13px;">
           <div style="display:flex;align-items:center;gap:10px;">
-            <div style="width:28px;height:28px;border-radius:50%;background:#7c3aed;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#ddd6fe;">K</div>
-            <div><div style="font-size:12px;font-weight:600;">Kemi Fashola</div><div style="font-size:10px;color:#6b7280;">Invoice · Mar 28</div></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#7fe0d0;"></div>
+            <div><div style="font-size:13px;font-weight:600;">Nadia balance <span style="display:inline-flex;padding:0 7px;height:20px;align-items:center;border-radius:999px;font-size:10px;font-weight:700;background:rgba(127,224,208,.1);border:1px solid rgba(127,224,208,.18);color:#b8f4ea;">Settled</span></div><div style="font-size:11px;color:#74829b;margin-top:1px;">Paid and confirmed</div></div>
           </div>
-          <span style="font-size:13px;font-weight:700;color:#ef4444;">-₦38,000</span>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.03);border-radius:10px;padding:10px 12px;">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <div style="width:28px;height:28px;border-radius:50%;background:#065f46;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#6ee7b7;">T</div>
-            <div><div style="font-size:12px;font-weight:600;">Tunde Okafor</div><div style="font-size:10px;color:#6b7280;">Settlement · Mar 25</div></div>
-          </div>
-          <span style="font-size:13px;font-weight:700;color:#10b981;">+₦25,000</span>
+          <strong style="font-size:14px;">$1,250</strong>
         </div>
       </div>
     </div>
@@ -449,8 +445,8 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
   <!-- ═══ FEATURES ═══ -->
   <div style="padding:72px 24px 64px;max-width:960px;margin:0 auto;">
     <div style="text-align:center;margin-bottom:48px;">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:#e020b0;font-weight:700;margin-bottom:10px;">Everything you need</div>
-      <h2 style="font-size:clamp(22px,4vw,36px);font-weight:900;color:#fff;line-height:1.2;">Built for real money, real people</h2>
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#b8f4ea;font-weight:700;margin-bottom:10px;">Why people use it</div>
+      <h2 style="font-size:clamp(22px,4vw,36px);font-weight:800;color:#fff;line-height:1.2;letter-spacing:-.03em;">Clear records. Less confusion. Better follow-through.</h2>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;">
       <!-- Card 1 -->
@@ -494,23 +490,23 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
 
   <!-- ═══ HOW IT WORKS ═══ -->
   <div style="padding:16px 24px 72px;max-width:680px;margin:0 auto;text-align:center;">
-    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:#e020b0;font-weight:700;margin-bottom:10px;">Simple by design</div>
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#b8f4ea;font-weight:700;margin-bottom:10px;">Simple by design</div>
     <h2 style="font-size:clamp(20px,3.5vw,32px);font-weight:900;margin-bottom:40px;color:#fff;">Three steps to full clarity</h2>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;position:relative;">
       <!-- Connector line (desktop only) -->
-      <div style="position:absolute;top:28px;left:calc(16.6% + 8px);right:calc(16.6% + 8px);height:1px;background:linear-gradient(90deg,transparent,rgba(224,32,176,.4),transparent);pointer-events:none;"></div>
+      <div style="position:absolute;top:28px;left:calc(16.6% + 8px);right:calc(16.6% + 8px);height:1px;background:linear-gradient(90deg,transparent,rgba(127,224,208,.3),transparent);pointer-events:none;"></div>
       <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:24px 16px;">
-        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#080b53,#e020b0);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff;margin:0 auto 14px;box-shadow:0 4px 16px rgba(224,32,176,.3);">1</div>
+        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#0d182b,#7fe0d0);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff;margin:0 auto 14px;box-shadow:0 4px 16px rgba(127,224,208,.2);">1</div>
         <div style="font-size:14px;font-weight:700;margin-bottom:6px;color:#fff;">Add Contacts</div>
         <div style="font-size:12px;color:#8892a4;line-height:1.5;">People you transact with personally or in business</div>
       </div>
       <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:24px 16px;">
-        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#e020b0,#a78bfa);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff;margin:0 auto 14px;box-shadow:0 4px 16px rgba(167,139,250,.3);">2</div>
+        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#7fe0d0,#0d182b);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff;margin:0 auto 14px;box-shadow:0 4px 16px rgba(127,224,208,.2);">2</div>
         <div style="font-size:14px;font-weight:700;margin-bottom:6px;color:#fff;">Record Entries</div>
         <div style="font-size:12px;color:#8892a4;line-height:1.5;">Log debts, invoices, advances, and payments instantly</div>
       </div>
       <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:24px 16px;">
-        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#a78bfa,#10b981);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff;margin:0 auto 14px;box-shadow:0 4px 16px rgba(16,185,129,.2);">3</div>
+        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#0d182b,#e7c98f);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff;margin:0 auto 14px;box-shadow:0 4px 16px rgba(231,201,143,.2);">3</div>
         <div style="font-size:14px;font-weight:700;margin-bottom:6px;color:#fff;">Track &amp; Settle</div>
         <div style="font-size:12px;color:#8892a4;line-height:1.5;">View balances, send reminders, and mark things settled</div>
       </div>
@@ -550,12 +546,11 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
   </div>
 
   <!-- ═══ FOOTER ═══ -->
-  <div style="background:#060810;border-top:1px solid rgba(255,255,255,.06);padding:28px 24px;text-align:center;">
-    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;">
-      <img src="money.png" style="height:22px;border-radius:6px;object-fit:contain;" onerror="this.style.display='none';">
-      <span style="font-size:13px;font-weight:700;color:#6b7280;">Money IntX</span>
+  <div style="background:#060a14;border-top:1px solid rgba(255,255,255,.07);padding:24px 24px;text-align:center;">
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;">
+      <img src="money_green.png" style="height:22px;object-fit:contain;" onerror="this.style.display='none';">
     </div>
-    <p style="font-size:11px;color:#374151;max-width:400px;margin:0 auto;">Personal &amp; Commercial Financial Tracking. Not a bank, not a payment processor, not a financial advisor.</p>
+    <p style="font-size:11px;color:#74829b;max-width:400px;margin:0 auto;">&copy; 2026 Money IntX &middot; Making Money Matters Memorable</p>
   </div>
 
 </div>
