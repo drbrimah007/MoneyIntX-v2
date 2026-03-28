@@ -2,13 +2,20 @@
 // Body: { email }
 // Generates a reset token and sends it via email.
 
-const { sql }                  = require('../../lib/db');
-const { sendPasswordReset }    = require('../../lib/email');
-const crypto                   = require('crypto');
+let sql, sendPasswordReset;
+try {
+  sql = require('../../lib/db').sql;
+  sendPasswordReset = require('../../lib/email').sendPasswordReset;
+} catch(e) {
+  console.error('[reset-request] Module load failed:', e.message);
+}
+const crypto = require('crypto');
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST')   return res.status(405).json({ ok: false, error: 'Method not allowed' });
+  if (!sql) return res.status(500).json({ ok: false, error: 'Database not configured. Check DATABASE_URL env var.' });
+  if (!sendPasswordReset) return res.status(500).json({ ok: false, error: 'Email not configured. Check RESEND_API_KEY env var.' });
 
   try {
     const { email } = req.body || {};
