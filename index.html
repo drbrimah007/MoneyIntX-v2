@@ -6097,7 +6097,7 @@ window.sendTestEmail = async function() {
       body: JSON.stringify({
         to: toEmail,
         subject: 'Money IntX — Email Test',
-        html: '<p style="font-family:sans-serif;font-size:15px;color:#1e293b;">This is a test email from <strong>Money IntX</strong>. If you can see this, your email configuration is working correctly. ✅</p><p style="font-size:12px;color:#64748b;">Sent from: hello@moneyintx.com via Resend</p>'
+        html: '<p style="font-family:sans-serif;font-size:15px;color:#1e293b;">This is a test email from <strong>Money IntX</strong>. If you can see this, your email configuration is working correctly. ✅</p><p style="font-size:12px;color:#64748b;">Sent from: noreply@moneyintx.com via Resend</p>'
       })
     });
     const data = await res.json();
