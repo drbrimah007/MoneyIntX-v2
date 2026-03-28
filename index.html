@@ -557,7 +557,7 @@ import { listTrustees, createTrustee, deleteTrustee, verifyTrustee, activateTrus
 import { initBpEngine, exposeBpEngine, renderBusinessPage } from './js/bp-engine.js';
 import { listRecurring, createRecurring, deleteRecurring, toggleRecurring, processDueRecurring, FREQUENCIES } from './js/recurring.js';
 import { toast, esc, navigate, statusBadge, TX_LABELS, TX_COLORS, TX_CREATE_LABELS, DIRECTION_SIGN, fmtDate, fmtRelative, openModal, closeModal } from './js/ui.js';
-import { sendNotificationEmail, sendInvoiceEmail, sendOtpEmail, sendInviteEmail, logEmail } from './js/email.js';
+import { sendNotificationEmail, sendInvoiceEmail, sendOtpEmail, sendInviteEmail, sendAppInviteEmail, logEmail } from './js/email.js';
 
 let currentUser = null;
 let currentProfile = null;
@@ -6122,14 +6122,29 @@ window.sendTestEmail = async function() {
   }
 };
 
-window.sendEmailInvite = function() {
-  const email = document.getElementById('s-invite-email')?.value.trim();
+window.sendEmailInvite = async function() {
+  const emailInput = document.getElementById('s-invite-email');
+  const email = emailInput?.value.trim();
   if (!email) return toast('Enter an email address first.', 'error');
-  const inviteLink = `${window.location.origin}${window.location.pathname}?ref=${currentUser?.id || ''}`;
+  const btn = emailInput?.nextElementSibling;
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+  const inviteLink = `${window.location.origin}${window.location.pathname}?register=1&ref=${currentUser?.id || ''}`;
   const name = currentProfile?.display_name || 'A friend';
-  const subject = encodeURIComponent(`${name} invited you to Money IntX`);
-  const body = encodeURIComponent(`Hi,\n\n${name} has invited you to join Money IntX — a smart financial record-keeping app.\n\nClick here to sign up:\n${inviteLink}\n\nMoney IntX lets you track who owes you, send invoices, manage currencies and more.\n\n— Money IntX`);
-  window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
+  try {
+    const result = await sendAppInviteEmail(currentUser.id, {
+      to: email, fromName: name, inviteLink
+    });
+    if (result?.ok !== false) {
+      toast('Invite sent to ' + email + '!', 'success');
+      if (emailInput) emailInput.value = '';
+    } else {
+      toast('Failed to send: ' + (result?.error || 'Unknown error'), 'error');
+    }
+  } catch(e) {
+    toast('Failed to send invite.', 'error');
+    console.error('[sendEmailInvite]', e);
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '📧 Send Invite'; }
 };
 
 window.saveBranding = async function() {
