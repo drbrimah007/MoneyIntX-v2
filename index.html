@@ -309,19 +309,36 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
 
   <!-- Feature strip -->
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:rgba(255,255,255,.05);border-top:1px solid rgba(255,255,255,.07);border-bottom:1px solid rgba(255,255,255,.07);max-width:100%;">
-    ${[
-      ['📋','Invoice Builder','Custom templates with auto-calculators'],
-      ['💳','Debt Tracker','Who owes you, who you owe — net balance'],
-      ['👥','Groups','Savings circles, ajo, chamas & ventures'],
-      ['📈','Investments','ROI tracking with multiple partners'],
-      ['🔔','Notifications','Reminders, alerts &amp; contact notifications'],
-      ['🔐','Trusted Access','Designate trusted contact for your records'],
-    ].map(([icon,title,desc]) => `
-      <div style="background:#0f1117;padding:22px 18px;text-align:center;">
-        <div style="font-size:26px;margin-bottom:8px;">${icon}</div>
-        <div style="font-size:13px;font-weight:700;margin-bottom:4px;">${title}</div>
-        <div style="font-size:11px;color:#6b7280;line-height:1.5;">${desc}</div>
-      </div>`).join('')}
+    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
+      <div style="font-size:26px;margin-bottom:8px;">📋</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Invoice Builder</div>
+      <div style="font-size:11px;color:#6b7280;line-height:1.5;">Custom templates with auto-calculators</div>
+    </div>
+    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
+      <div style="font-size:26px;margin-bottom:8px;">💳</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Debt Tracker</div>
+      <div style="font-size:11px;color:#6b7280;line-height:1.5;">Who owes you, who you owe — net balance</div>
+    </div>
+    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
+      <div style="font-size:26px;margin-bottom:8px;">👥</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Groups</div>
+      <div style="font-size:11px;color:#6b7280;line-height:1.5;">Savings circles, ajo, chamas &amp; ventures</div>
+    </div>
+    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
+      <div style="font-size:26px;margin-bottom:8px;">📈</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Investments</div>
+      <div style="font-size:11px;color:#6b7280;line-height:1.5;">ROI tracking with multiple partners</div>
+    </div>
+    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
+      <div style="font-size:26px;margin-bottom:8px;">🔔</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Notifications</div>
+      <div style="font-size:11px;color:#6b7280;line-height:1.5;">Reminders, alerts &amp; contact notifications</div>
+    </div>
+    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
+      <div style="font-size:26px;margin-bottom:8px;">🔐</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Trusted Access</div>
+      <div style="font-size:11px;color:#6b7280;line-height:1.5;">Designate trusted contact for your records</div>
+    </div>
   </div>
 
   <!-- How it works -->
@@ -538,7 +555,7 @@ window.handleForgotPassword = window.handleForgotPassword || function() { alert(
 import { supabase, getCurrentUser, getProfile } from './js/supabase.js';
 import { signUp, logIn, logOut, onAuthChange } from './js/auth.js';
 import { listContacts, createContact, deleteContact } from './js/contacts.js';
-import { listEntries, recentEntries, createEntry, deleteEntry, updateEntry, getEntry, getDashboardTotals, getLedgerSummary, fmtMoney, toCents, toDollars, voidEntry, archiveEntry, unarchiveEntry, restoreEntry, listArchivedEntries, invalidateEntryCache } from './js/entries.js';
+import { listEntries, recentEntries, createEntry, deleteEntry, updateEntry, getEntry, getDashboardTotals, getLedgerSummary, getCurrencyLedger, fmtMoney, toCents, toDollars, voidEntry, archiveEntry, unarchiveEntry, restoreEntry, listArchivedEntries, invalidateEntryCache } from './js/entries.js';
 import { listSettlements, createSettlement, reviewSettlement, deleteSettlement } from './js/settlements.js';
 import { listNotifications, getUnreadCount, markAllRead, subscribeToNotifications } from './js/notifications.js';
 import { createShareToken, getShareByToken, listSentShares, listReceivedShares, confirmShare, dismissShare, expireShare, getShareUrl } from './js/sharing.js';
@@ -851,29 +868,21 @@ function navTo(page) {
 // ── Dashboard ─────────────────────────────────────────────────────
 async function renderDash(el) {
   el.innerHTML = '<div class="page-header"><h2>Dashboard</h2></div><p style="color:var(--muted);">Loading...</p>';
-  const [totals, recent, contacts, unread, ledger] = await Promise.all([
+  const [totals, recent, contacts, unread, ledger, currencyRows] = await Promise.all([
     getDashboardTotals(currentUser.id),
-    recentEntries(currentUser.id, 50),
+    recentEntries(currentUser.id, 15),
     listContacts(currentUser.id),
     getUnreadCount(currentUser.id),
-    getLedgerSummary(currentUser.id)
+    getLedgerSummary(currentUser.id),
+    getCurrencyLedger(currentUser.id)   // lean DB aggregate — accurate across ALL entries
   ]);
   const toy = totals.total_they_owe_me || 0;
   const yot = totals.total_i_owe_them || 0;
   const net = totals.total_net || 0;
 
-  // ── Build per-currency ledgers from recent entries (fast, no extra query) ──
-  const currencyMap = {};
-  (recent || []).filter(e => !e.no_ledger && !['voided','cancelled'].includes(e.status)).forEach(e => {
-    const cur = e.currency || 'USD';
-    if (!currencyMap[cur]) currencyMap[cur] = { owed: 0, owing: 0, count: 0 };
-    const rem = e.amount - (e.settled_amount || 0);
-    if (rem <= 0) return;
-    if (['they_owe_you','invoice'].includes(e.tx_type)) currencyMap[cur].owed += rem;
-    else if (['you_owe_them','bill'].includes(e.tx_type)) currencyMap[cur].owing += rem;
-    currencyMap[cur].count++;
-  });
-  const allCurrencies = Object.keys(currencyMap).filter(c => currencyMap[c].count > 0);
+  // ── Currency ledger data from DB view (replaces client-side computation) ──
+  // Only show the multi-currency section when there are 2+ distinct currencies
+  const allCurrencies = (currencyRows || []).map(r => r.currency);
   const userName = currentProfile?.display_name?.split(' ')[0] || 'there';
 
   let html = `<div class="page-header">
@@ -928,6 +937,7 @@ async function renderDash(el) {
   </div>`;
 
   // ── Currency Ledgers (only show if multi-currency) ─────────────────
+  // Data comes from getCurrencyLedger() — a DB-side aggregate, accurate for all entries
   if (allCurrencies.length > 1) {
     const CURRENCY_ICONS = { USD:'🇺🇸', EUR:'🇪🇺', GBP:'🇬🇧', NGN:'🇳🇬', CAD:'🇨🇦', AUD:'🇦🇺', JPY:'🇯🇵', KES:'🇰🇪', ZAR:'🇿🇦', GHS:'🇬🇭', INR:'🇮🇳', AED:'🇦🇪', SAR:'🇸🇦', BRL:'🇧🇷', EGP:'🇪🇬', MAD:'🇲🇦' };
     html += `<div class="card card-sm" style="margin-bottom:14px;">
@@ -936,15 +946,17 @@ async function renderDash(el) {
         <span style="font-size:11px;color:var(--muted);">${allCurrencies.length} currencies</span>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;">`;
-    allCurrencies.forEach(cur => {
-      const d = currencyMap[cur];
-      const net = d.owed - d.owing;
-      const grad = net > 0 ? 'linear-gradient(135deg,#064e3b,#065f46)' : net < 0 ? 'linear-gradient(135deg,#7f1d1d,#991b1b)' : 'linear-gradient(135deg,#1e293b,#334155)';
+    (currencyRows || []).forEach(row => {
+      const cur = row.currency;
+      const owed = row.owed_to_me || 0;   // cents
+      const owing = row.i_owe || 0;       // cents
+      const netCur = owed - owing;
+      const grad = netCur > 0 ? 'linear-gradient(135deg,#064e3b,#065f46)' : netCur < 0 ? 'linear-gradient(135deg,#7f1d1d,#991b1b)' : 'linear-gradient(135deg,#1e293b,#334155)';
       const icon = CURRENCY_ICONS[cur] || '💰';
-      html += `<div style="background:${grad};border-radius:12px;padding:12px;color:#fff;" onclick="navTo('entries')" style="cursor:pointer;">
+      html += `<div style="background:${grad};border-radius:12px;padding:12px;color:#fff;cursor:pointer;" onclick="navTo('entries')">
         <div style="font-size:11px;opacity:.75;font-weight:700;">${icon} ${esc(cur)}</div>
-        <div style="font-size:18px;font-weight:900;margin-top:2px;">${net >= 0 ? '+' : ''}${_fmtAmt(Math.abs(net)/100, cur)}</div>
-        <div style="font-size:10px;opacity:.65;margin-top:4px;">Owed ${_fmtAmt(d.owed/100, cur)} · Due ${_fmtAmt(d.owing/100, cur)}</div>
+        <div style="font-size:18px;font-weight:900;margin-top:2px;">${netCur >= 0 ? '+' : ''}${_fmtAmt(Math.abs(netCur)/100, cur)}</div>
+        <div style="font-size:10px;opacity:.65;margin-top:4px;">Owed ${_fmtAmt(owed/100, cur)} · Due ${_fmtAmt(owing/100, cur)}</div>
       </div>`;
     });
     html += `</div></div>`;
@@ -1190,16 +1202,29 @@ function _cpEntriesTable(entries, page) {
 }
 
 window.openContactDetail = async function(id) {
-  const [contact, entries, allLedger] = await Promise.all([
+  // 2 queries instead of 3 — balance computed client-side from entries
+  // using the same logic as the ledger_summary view (start_toy/start_yot + entry sums)
+  const [contact, entries] = await Promise.all([
     supabase.from('contacts').select('*').eq('id', id).single(),
-    listEntries(currentUser.id, { contactId: id }),
-    getLedgerSummary(currentUser.id)
+    listEntries(currentUser.id, { contactId: id })
   ]);
   if (!contact.data) return;
   const c = contact.data;
-  const ledger = allLedger.find(l => l.contact_id === id) || {};
-  const toy = ledger.they_owe_me || 0;
-  const yot = ledger.i_owe_them || 0;
+
+  // Mirror ledger_summary view logic:
+  //   they_owe_me = start_toy + SUM(they_owe / invoice / bill entries) - SUM(they_paid_you entries)
+  //   i_owe_them  = start_yot + SUM(you_owe_them entries) - SUM(you_paid_them entries)
+  const ACTIVE = e => !['voided','cancelled'].includes(e.status) && !e.no_ledger;
+  const toy = (c.start_toy || 0)
+    + entries.filter(e => ['they_owe_you','invoice','bill'].includes(e.tx_type) && ACTIVE(e))
+             .reduce((s, e) => s + e.amount, 0)
+    - entries.filter(e => e.tx_type === 'they_paid_you' && ACTIVE(e))
+             .reduce((s, e) => s + e.amount, 0);
+  const yot = (c.start_yot || 0)
+    + entries.filter(e => e.tx_type === 'you_owe_them' && ACTIVE(e))
+             .reduce((s, e) => s + e.amount, 0)
+    - entries.filter(e => e.tx_type === 'you_paid_them' && ACTIVE(e))
+             .reduce((s, e) => s + e.amount, 0);
   const net = toy - yot;
   const col = contactColor(id);
 
@@ -3391,8 +3416,74 @@ async function renderAdmin(el) {
     </tr>`;
   });
   html += `</tbody></table></div></div>`;
+
+  // Reconciliation section
+  html += `<div class="card" style="margin-top:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h3 style="font-size:16px;font-weight:700;">Balance Reconciliation</h3>
+      <button class="bp sm" onclick="runReconciliation()" id="recon-btn">Run Reconciliation</button>
+    </div>
+    <div id="recon-results"><p style="font-size:13px;color:var(--muted);">Click "Run Reconciliation" to compare balances between all linked user pairs.</p></div>
+  </div>`;
+
   el.innerHTML = html;
 }
+
+window.runReconciliation = async function() {
+  const btn = document.getElementById('recon-btn');
+  const el = document.getElementById('recon-results');
+  if (btn) { btn.disabled = true; btn.textContent = 'Running...'; }
+  el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Checking all linked pairs...</p>';
+  try {
+    const resp = await API.fetch('/api/reconcile');
+    const data = await resp.json();
+    if (!data.ok) { el.innerHTML = `<p style="color:var(--red);">${esc(data.error || 'Failed')}</p>`; return; }
+
+    const { pairs, mismatches, total } = data;
+    let html = `<div class="grid3" style="margin-bottom:14px;">
+      <div class="stat-card"><div class="stat-lbl">Linked Pairs</div><div class="stat-val">${total}</div></div>
+      <div class="stat-card"><div class="stat-lbl">Mismatches</div><div class="stat-val" style="color:${mismatches > 0 ? 'var(--red)' : 'var(--green)'};">${mismatches}</div></div>
+      <div class="stat-card"><div class="stat-lbl">Balanced</div><div class="stat-val" style="color:var(--green);">${total - mismatches}</div></div>
+    </div>`;
+
+    if (pairs.length === 0) {
+      html += '<p style="font-size:13px;color:var(--muted);">No linked user pairs found. Share records with other platform users to create linked pairs.</p>';
+    } else {
+      html += `<div class="tbl-wrap"><table><thead><tr>
+        <th>User A</th><th>User B</th>
+        <th>A→B (Owed)</th><th>B→A (Owed)</th>
+        <th>Difference</th><th>Status</th><th>Shares</th>
+      </tr></thead><tbody>`;
+      pairs.forEach(p => {
+        const nameA = esc(p.userA.name || p.userA.email || '?');
+        const nameB = esc(p.userB.name || p.userB.email || '?');
+        const diff = p.difference.toFixed(2);
+        const statusBadge = p.mismatch
+          ? `<span class="badge badge-red">Mismatch</span>`
+          : `<span class="badge badge-green">Balanced</span>`;
+        html += `<tr style="${p.mismatch ? 'background:var(--red-bg,#fff5f5);' : ''}">
+          <td style="font-weight:600;font-size:13px;">${nameA}</td>
+          <td style="font-weight:600;font-size:13px;">${nameB}</td>
+          <td style="font-size:13px;">$${p.balanceA.toy.toFixed(2)} / $${p.balanceA.yot.toFixed(2)}</td>
+          <td style="font-size:13px;">$${p.balanceB.toy.toFixed(2)} / $${p.balanceB.yot.toFixed(2)}</td>
+          <td style="font-size:13px;font-weight:700;color:${p.mismatch ? 'var(--red)' : 'var(--green)'};">$${diff}</td>
+          <td>${statusBadge}</td>
+          <td style="font-size:13px;text-align:center;">${p.tokens}</td>
+        </tr>`;
+        if (p.warning) {
+          html += `<tr><td colspan="7" style="font-size:11px;color:var(--amber);padding:4px 12px;">⚠ ${esc(p.warning)}</td></tr>`;
+        }
+      });
+      html += `</tbody></table></div>`;
+    }
+    el.innerHTML = html;
+  } catch(e) {
+    console.error('[reconciliation]', e);
+    el.innerHTML = `<p style="color:var(--red);">Error: ${esc(e.message || 'Network error')}</p>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Reconciliation'; }
+  }
+};
 
 window.changeUserRole = async function(userId, role) {
   await updateUserRole(userId, role);
