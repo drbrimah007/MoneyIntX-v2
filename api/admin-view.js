@@ -6,7 +6,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://nczneamvffmzdbeuvloo.supabase.co';
-const ANON_KEY    = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const ANON_KEY    = process.env.SUPABASE_ANON_KEY || 'sb_publishable_fzv-ZnSvv6p-Udo8ygJN9g_VekzqguV';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
 
 export default async function handler(req, res) {
