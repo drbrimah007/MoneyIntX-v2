@@ -3,20 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Money IntX — Personal & Commercial Financial Tracker</title>
-<meta name="description" content="Track who owes you, send invoices, manage groups and investments. The smart financial record-keeping app for personal and commercial use.">
+<title>Money IntX — Know Exactly Who Owes You</title>
+<meta name="description" content="Track who owes you and what you owe. Send invoices, schedule reminders, manage groups and investments — free for personal and commercial use.">
 <!-- Favicon -->
-<link rel="icon" type="image/png" href="money.png">
-<link rel="apple-touch-icon" href="money.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="favicon.png">
 <!-- Open Graph -->
 <meta property="og:type" content="website">
-<meta property="og:title" content="Money IntX — Smart Financial Tracker">
-<meta property="og:description" content="Track debts, send invoices, manage savings groups and investments. Real-time sync. Free to use.">
-<meta property="og:image" content="money.png">
+<meta property="og:url" content="https://moneyintx.com/">
 <meta property="og:site_name" content="Money IntX">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Money IntX">
-<meta name="twitter:description" content="Track who owes you, send invoices, manage your money intelligently.">
+<meta property="og:title" content="Money IntX — Know Exactly Who Owes You">
+<meta property="og:description" content="Track who owes you and what you owe. Send invoices, schedule reminders, manage savings groups and investments. Free to use. No ads, ever.">
+<meta property="og:image" content="https://moneyintx.com/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Money IntX — Financial tracking dashboard showing balances and recent entries">
+<!-- Twitter / X -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@moneyintx">
+<meta name="twitter:title" content="Money IntX — Know Exactly Who Owes You">
+<meta name="twitter:description" content="Track debts, send invoices, schedule reminders. Free personal &amp; commercial financial tracker.">
+<meta name="twitter:image" content="https://moneyintx.com/og-image.png">
+<meta name="twitter:image:alt" content="Money IntX dashboard">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -325,87 +334,197 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
 <!-- Landing / Auth -->
-<div id="landing" style="min-height:100vh;background:#0a0d14;color:#e2e8f0;display:none;overflow-x:hidden;">
+<div id="landing" style="min-height:100vh;background:#080b12;color:#e2e8f0;display:none;overflow-x:hidden;font-family:inherit;">
 
-  <!-- Hero -->
-  <div style="background:linear-gradient(135deg,#0f1117 0%,#12102a 50%,#0f1117 100%);padding:56px 24px 48px;text-align:center;position:relative;overflow:hidden;">
-    <div style="position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(108,99,255,.18) 0%,transparent 70%);pointer-events:none;"></div>
-    <!-- Logo -->
-    <div style="margin-bottom:14px;">
-      <img src="money.png" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" style="height:60px;width:auto;max-width:220px;border-radius:12px;object-fit:contain;box-shadow:0 4px 20px rgba(108,99,255,.4);">
-      <div style="display:none;font-size:52px;">💰</div>
+  <!-- ═══ NAV BAR ═══ -->
+  <nav style="display:flex;align-items:center;justify-content:space-between;padding:16px 28px;position:sticky;top:0;z-index:100;background:rgba(8,11,18,.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.06);">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <img src="money.png" style="height:32px;width:auto;border-radius:8px;object-fit:contain;" onerror="this.style.display='none';">
+      <span style="font-size:16px;font-weight:800;background:linear-gradient(135deg,#fff 30%,#e020b0 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Money IntX</span>
     </div>
-    <h1 style="font-size:clamp(30px,7vw,52px);font-weight:900;line-height:1.1;margin-bottom:14px;background:linear-gradient(135deg,#fff 20%,#a78bfa 60%,#6c63ff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Money IntX</h1>
-    <p style="font-size:clamp(14px,2.5vw,18px);color:#8892a4;max-width:480px;margin:0 auto 28px;line-height:1.7;">The smart financial tracker for personal &amp; commercial use.<br>Track debts, send invoices, manage groups and investments.</p>
-    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
-      <button class="lp-btn-primary" onclick="showAuthTab('signup');document.getElementById('auth-section').scrollIntoView({behavior:'smooth'})">Get Started Free</button>
-      <button class="lp-btn-secondary" onclick="showAuthTab('login');document.getElementById('auth-section').scrollIntoView({behavior:'smooth'})">Sign In</button>
+    <div style="display:flex;gap:10px;">
+      <button class="lp-btn-secondary" style="padding:8px 18px;font-size:13px;" onclick="showAuthTab('login');document.getElementById('auth-section').scrollIntoView({behavior:'smooth'})">Log In</button>
+      <button class="lp-btn-primary" style="padding:8px 18px;font-size:13px;" onclick="showAuthTab('signup');document.getElementById('auth-section').scrollIntoView({behavior:'smooth'})">Sign Up Free</button>
+    </div>
+  </nav>
+
+  <!-- ═══ HERO ═══ -->
+  <div style="position:relative;overflow:hidden;padding:80px 24px 64px;text-align:center;">
+    <!-- Glow backgrounds -->
+    <div style="position:absolute;inset:0;pointer-events:none;overflow:hidden;">
+      <div style="position:absolute;top:-120px;left:50%;transform:translateX(-50%);width:700px;height:500px;background:radial-gradient(ellipse at center,rgba(8,11,83,.55) 0%,transparent 70%);"></div>
+      <div style="position:absolute;top:60px;right:-100px;width:400px;height:400px;background:radial-gradient(ellipse at center,rgba(224,32,176,.08) 0%,transparent 70%);"></div>
+    </div>
+
+    <!-- Label pill -->
+    <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(224,32,176,.12);border:1px solid rgba(224,32,176,.28);border-radius:100px;padding:5px 14px;font-size:12px;font-weight:600;color:#e020b0;margin-bottom:24px;letter-spacing:.02em;">
+      ✦ Personal &amp; Commercial Financial Tracker
+    </div>
+
+    <!-- Main headline -->
+    <h1 style="font-size:clamp(32px,6.5vw,62px);font-weight:900;line-height:1.08;margin-bottom:20px;letter-spacing:-.02em;">
+      <span style="color:#ffffff;">Know exactly</span><br>
+      <span style="background:linear-gradient(135deg,#e020b0 0%,#a78bfa 60%,#080b53 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">who owes you</span>
+      <span style="color:#ffffff;"> —<br>and what you owe.</span>
+    </h1>
+
+    <!-- Sub headline -->
+    <p style="font-size:clamp(18px,2.8vw,24px);color:#8892a4;max-width:400px;margin:0 auto 36px;line-height:1.5;font-weight:600;letter-spacing:.01em;">Record. Manage. Grow.</p>
+
+    <!-- CTAs -->
+    <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:48px;">
+      <button class="lp-btn-primary" style="padding:15px 32px;font-size:16px;font-weight:700;border-radius:14px;letter-spacing:.01em;" onclick="showAuthTab('signup');document.getElementById('auth-section').scrollIntoView({behavior:'smooth'})">
+        Start Tracking Free →
+      </button>
+      <button class="lp-btn-secondary" style="padding:15px 32px;font-size:16px;font-weight:600;border-radius:14px;" onclick="showAuthTab('login');document.getElementById('auth-section').scrollIntoView({behavior:'smooth'})">
+        Sign in
+      </button>
+    </div>
+
+    <!-- Social proof tags -->
+    <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:56px;">
+      <span style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:100px;padding:5px 14px;font-size:12px;color:#8892a4;">✓ Free to use</span>
+      <span style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:100px;padding:5px 14px;font-size:12px;color:#8892a4;">✓ No ads, ever</span>
+      <span style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:100px;padding:5px 14px;font-size:12px;color:#8892a4;">✓ Real-time sync</span>
+      <span style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:100px;padding:5px 14px;font-size:12px;color:#8892a4;">✓ Cross-device</span>
+      <span style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:100px;padding:5px 14px;font-size:12px;color:#8892a4;">✓ Encrypted data</span>
+    </div>
+
+    <!-- Dashboard mockup card -->
+    <div style="max-width:520px;margin:0 auto;background:linear-gradient(160deg,#111422 0%,#0d1020 100%);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:24px;box-shadow:0 32px 80px rgba(0,0,0,.7),0 0 0 1px rgba(8,11,83,.4);text-align:left;">
+      <!-- Mock top bar -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.07);">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:#e020b0;box-shadow:0 0 8px #e020b0;"></div>
+          <span style="font-size:13px;font-weight:700;color:#e2e8f0;">Dashboard</span>
+        </div>
+        <span style="font-size:11px;color:#4b5563;">Updated just now</span>
+      </div>
+      <!-- 3 stat cards -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
+        <div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:12px;padding:14px 12px;">
+          <div style="font-size:10px;font-weight:700;color:#6ee7b7;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">They Owe Me</div>
+          <div style="font-size:22px;font-weight:900;color:#10b981;">₦142,500</div>
+          <div style="font-size:10px;color:#6b7280;margin-top:3px;">6 contacts</div>
+        </div>
+        <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.18);border-radius:12px;padding:14px 12px;">
+          <div style="font-size:10px;font-weight:700;color:#fca5a5;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">I Owe Them</div>
+          <div style="font-size:22px;font-weight:900;color:#ef4444;">₦38,000</div>
+          <div style="font-size:10px;color:#6b7280;margin-top:3px;">2 contacts</div>
+        </div>
+        <div style="background:rgba(8,11,83,.4);border:1px solid rgba(224,32,176,.25);border-radius:12px;padding:14px 12px;">
+          <div style="font-size:10px;font-weight:700;color:#c4b5fd;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Net Balance</div>
+          <div style="font-size:22px;font-weight:900;background:linear-gradient(135deg,#e020b0,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">₦104,500</div>
+          <div style="font-size:10px;color:#6b7280;margin-top:3px;">In your favour</div>
+        </div>
+      </div>
+      <!-- Mock recent entries -->
+      <div style="font-size:11px;font-weight:700;color:#4b5563;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Recent</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.03);border-radius:10px;padding:10px 12px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:28px;height:28px;border-radius:50%;background:#3730a3;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#a5b4fc;">A</div>
+            <div><div style="font-size:12px;font-weight:600;">Ade Bello</div><div style="font-size:10px;color:#6b7280;">Loan · Apr 1</div></div>
+          </div>
+          <span style="font-size:13px;font-weight:700;color:#10b981;">+₦50,000</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.03);border-radius:10px;padding:10px 12px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:28px;height:28px;border-radius:50%;background:#7c3aed;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#ddd6fe;">K</div>
+            <div><div style="font-size:12px;font-weight:600;">Kemi Fashola</div><div style="font-size:10px;color:#6b7280;">Invoice · Mar 28</div></div>
+          </div>
+          <span style="font-size:13px;font-weight:700;color:#ef4444;">-₦38,000</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.03);border-radius:10px;padding:10px 12px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:28px;height:28px;border-radius:50%;background:#065f46;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#6ee7b7;">T</div>
+            <div><div style="font-size:12px;font-weight:600;">Tunde Okafor</div><div style="font-size:10px;color:#6b7280;">Settlement · Mar 25</div></div>
+          </div>
+          <span style="font-size:13px;font-weight:700;color:#10b981;">+₦25,000</span>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Feature strip -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:rgba(255,255,255,.05);border-top:1px solid rgba(255,255,255,.07);border-bottom:1px solid rgba(255,255,255,.07);max-width:100%;">
-    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
-      <div style="font-size:26px;margin-bottom:8px;">📋</div>
-      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Invoice Builder</div>
-      <div style="font-size:11px;color:#6b7280;line-height:1.5;">Custom templates with auto-calculators</div>
+  <!-- ═══ FEATURES ═══ -->
+  <div style="padding:72px 24px 64px;max-width:960px;margin:0 auto;">
+    <div style="text-align:center;margin-bottom:48px;">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:#e020b0;font-weight:700;margin-bottom:10px;">Everything you need</div>
+      <h2 style="font-size:clamp(22px,4vw,36px);font-weight:900;color:#fff;line-height:1.2;">Built for real money, real people</h2>
     </div>
-    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
-      <div style="font-size:26px;margin-bottom:8px;">💳</div>
-      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Debt Tracker</div>
-      <div style="font-size:11px;color:#6b7280;line-height:1.5;">Who owes you, who you owe — net balance</div>
-    </div>
-    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
-      <div style="margin-bottom:8px;display:flex;justify-content:center;"><img src="group-logo.png" alt="Groups" style="width:36px;height:36px;border-radius:8px;object-fit:cover;" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span style="font-size:26px;display:none;">👥</span></div>
-      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Groups</div>
-      <div style="font-size:11px;color:#6b7280;line-height:1.5;">Savings circles, ajo, chamas &amp; ventures</div>
-    </div>
-    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
-      <div style="margin-bottom:8px;display:flex;justify-content:center;"><img src="investment-logo.png" alt="Investments" style="width:36px;height:36px;border-radius:8px;object-fit:cover;" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span style="font-size:26px;display:none;">📈</span></div>
-      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Investments</div>
-      <div style="font-size:11px;color:#6b7280;line-height:1.5;">ROI tracking with multiple partners</div>
-    </div>
-    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
-      <div style="font-size:26px;margin-bottom:8px;">🔔</div>
-      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Notifications</div>
-      <div style="font-size:11px;color:#6b7280;line-height:1.5;">Reminders, alerts &amp; contact notifications</div>
-    </div>
-    <div style="background:#0f1117;padding:22px 18px;text-align:center;">
-      <div style="font-size:26px;margin-bottom:8px;">🔐</div>
-      <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Trusted Access</div>
-      <div style="font-size:11px;color:#6b7280;line-height:1.5;">Designate trusted contact for your records</div>
-    </div>
-  </div>
-
-  <!-- How it works -->
-  <div style="padding:48px 24px;max-width:600px;margin:0 auto;text-align:center;">
-    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#6c63ff;font-weight:700;margin-bottom:8px;">How It Works</div>
-    <h2 style="font-size:22px;font-weight:800;margin-bottom:28px;">Three steps to full financial clarity</h2>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
-      <div style="background:#1a1d27;border:1px solid #2e3348;border-radius:14px;padding:20px 14px;">
-        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#6c63ff,#a78bfa);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;margin:0 auto 10px;">1</div>
-        <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Add Contacts</div>
-        <div style="font-size:11px;color:#8892a4;">People you transact with</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;">
+      <!-- Card 1 -->
+      <div style="background:linear-gradient(160deg,#111422,#0d1020);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:28px 24px;transition:border-color .2s;" onmouseover="this.style.borderColor='rgba(224,32,176,.35)'" onmouseout="this.style.borderColor='rgba(255,255,255,.08)'">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.2);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:16px;">💳</div>
+        <h3 style="font-size:15px;font-weight:700;margin-bottom:8px;">Debt Tracker</h3>
+        <p style="font-size:13px;color:#8892a4;line-height:1.6;">See every contact's balance at a glance. Who owes you, who you owe, and your net position — updated in real time.</p>
       </div>
-      <div style="background:#1a1d27;border:1px solid #2e3348;border-radius:14px;padding:20px 14px;">
-        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#0ea5e9,#6c63ff);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;margin:0 auto 10px;">2</div>
-        <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Record Entries</div>
-        <div style="font-size:11px;color:#8892a4;">Debts, invoices, payments</div>
+      <!-- Card 2 -->
+      <div style="background:linear-gradient(160deg,#111422,#0d1020);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:28px 24px;transition:border-color .2s;" onmouseover="this.style.borderColor='rgba(224,32,176,.35)'" onmouseout="this.style.borderColor='rgba(255,255,255,.08)'">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.2);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:16px;">📋</div>
+        <h3 style="font-size:15px;font-weight:700;margin-bottom:8px;">Custom Invoices</h3>
+        <p style="font-size:13px;color:#8892a4;line-height:1.6;">Build unlimited invoice templates with your logo, auto-calculators, and one-click send via email directly to your contacts.</p>
       </div>
-      <div style="background:#1a1d27;border:1px solid #2e3348;border-radius:14px;padding:20px 14px;">
-        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#10b981,#0ea5e9);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;margin:0 auto 10px;">3</div>
-        <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Track &amp; Settle</div>
-        <div style="font-size:11px;color:#8892a4;">See balances, send reminders</div>
+      <!-- Card 3 -->
+      <div style="background:linear-gradient(160deg,#111422,#0d1020);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:28px 24px;transition:border-color .2s;" onmouseover="this.style.borderColor='rgba(224,32,176,.35)'" onmouseout="this.style.borderColor='rgba(255,255,255,.08)'">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:16px;">🔔</div>
+        <h3 style="font-size:15px;font-weight:700;margin-bottom:8px;">Smart Reminders</h3>
+        <p style="font-size:13px;color:#8892a4;line-height:1.6;">Schedule automatic reminders for due dates and repayments. Notify contacts, yourself, or both — with full control over timing.</p>
+      </div>
+      <!-- Card 4 -->
+      <div style="background:linear-gradient(160deg,#111422,#0d1020);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:28px 24px;transition:border-color .2s;" onmouseover="this.style.borderColor='rgba(224,32,176,.35)'" onmouseout="this.style.borderColor='rgba(255,255,255,.08)'">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(14,165,233,.1);border:1px solid rgba(14,165,233,.2);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:16px;">👥</div>
+        <h3 style="font-size:15px;font-weight:700;margin-bottom:8px;">Groups &amp; Circles</h3>
+        <p style="font-size:13px;color:#8892a4;line-height:1.6;">Manage ajo, chamas, savings circles, and business ventures. Track contributions and payouts for every member.</p>
+      </div>
+      <!-- Card 5 -->
+      <div style="background:linear-gradient(160deg,#111422,#0d1020);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:28px 24px;transition:border-color .2s;" onmouseover="this.style.borderColor='rgba(224,32,176,.35)'" onmouseout="this.style.borderColor='rgba(255,255,255,.08)'">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:16px;">📈</div>
+        <h3 style="font-size:15px;font-weight:700;margin-bottom:8px;">Investment ROI</h3>
+        <p style="font-size:13px;color:#8892a4;line-height:1.6;">Record investments with multiple partners, track returns, and see exactly what each person is owed or due.</p>
+      </div>
+      <!-- Card 6 -->
+      <div style="background:linear-gradient(160deg,#111422,#0d1020);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:28px 24px;transition:border-color .2s;" onmouseover="this.style.borderColor='rgba(224,32,176,.35)'" onmouseout="this.style.borderColor='rgba(255,255,255,.08)'">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(8,11,83,.6);border:1px solid rgba(224,32,176,.25);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:16px;">🔐</div>
+        <h3 style="font-size:15px;font-weight:700;margin-bottom:8px;">Trusted Access</h3>
+        <p style="font-size:13px;color:#8892a4;line-height:1.6;">Designate a trusted contact to receive your financial records if something happens to you — with full audit control.</p>
       </div>
     </div>
   </div>
 
-  <!-- Auth section -->
-  <div id="auth-section" style="display:flex;justify-content:center;padding:0 20px 48px;">
-  <div class="landing-card" style="background:#1a1d27;border:1px solid #2e3348;border-radius:18px;padding:32px 28px;max-width:420px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.5);">
-    <div style="text-align:center;margin-bottom:18px;">
-      <div style="font-size:13px;font-weight:700;color:#8892a4;text-transform:uppercase;letter-spacing:.06em;">Your account</div>
+  <!-- ═══ HOW IT WORKS ═══ -->
+  <div style="padding:16px 24px 72px;max-width:680px;margin:0 auto;text-align:center;">
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:#e020b0;font-weight:700;margin-bottom:10px;">Simple by design</div>
+    <h2 style="font-size:clamp(20px,3.5vw,32px);font-weight:900;margin-bottom:40px;color:#fff;">Three steps to full clarity</h2>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;position:relative;">
+      <!-- Connector line (desktop only) -->
+      <div style="position:absolute;top:28px;left:calc(16.6% + 8px);right:calc(16.6% + 8px);height:1px;background:linear-gradient(90deg,transparent,rgba(224,32,176,.4),transparent);pointer-events:none;"></div>
+      <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:24px 16px;">
+        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#080b53,#e020b0);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff;margin:0 auto 14px;box-shadow:0 4px 16px rgba(224,32,176,.3);">1</div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:6px;color:#fff;">Add Contacts</div>
+        <div style="font-size:12px;color:#8892a4;line-height:1.5;">People you transact with personally or in business</div>
+      </div>
+      <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:24px 16px;">
+        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#e020b0,#a78bfa);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff;margin:0 auto 14px;box-shadow:0 4px 16px rgba(167,139,250,.3);">2</div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:6px;color:#fff;">Record Entries</div>
+        <div style="font-size:12px;color:#8892a4;line-height:1.5;">Log debts, invoices, advances, and payments instantly</div>
+      </div>
+      <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:24px 16px;">
+        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#a78bfa,#10b981);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff;margin:0 auto 14px;box-shadow:0 4px 16px rgba(16,185,129,.2);">3</div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:6px;color:#fff;">Track &amp; Settle</div>
+        <div style="font-size:12px;color:#8892a4;line-height:1.5;">View balances, send reminders, and mark things settled</div>
+      </div>
     </div>
+  </div>
+
+  <!-- ═══ AUTH SECTION ═══ -->
+  <div id="auth-section" style="background:linear-gradient(180deg,transparent 0%,rgba(8,11,83,.15) 100%);padding:0 20px 72px;">
+  <div style="max-width:440px;margin:0 auto;">
+    <div style="text-align:center;margin-bottom:28px;">
+      <h2 style="font-size:24px;font-weight:900;color:#fff;margin-bottom:8px;">Start for free today</h2>
+      <p style="font-size:14px;color:#8892a4;">No credit card required. No hidden fees.</p>
+    </div>
+  <div class="landing-card" style="background:linear-gradient(160deg,#111422,#0d1020);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:32px 28px;box-shadow:0 24px 60px rgba(0,0,0,.6),0 0 0 1px rgba(224,32,176,.08);">
     <div class="landing-tabs">
       <button class="landing-tab active" onclick="showAuthTab('login')">Log In</button>
       <button class="landing-tab" onclick="showAuthTab('signup')">Sign Up</button>
@@ -415,7 +534,7 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
       <div id="login-form">
         <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="you@example.com" autocomplete="email"></div>
         <div class="form-group"><label>Password</label><input type="password" id="login-pass" placeholder="Your password" autocomplete="current-password"></div>
-        <button class="btn btn-primary" style="width:100%;margin-top:8px;padding:13px;font-size:15px;" onclick="handleLogin()">Log In</button>
+        <button class="btn btn-primary" style="width:100%;margin-top:8px;padding:14px;font-size:15px;font-weight:700;border-radius:12px;" onclick="handleLogin()">Log In →</button>
         <p style="text-align:center;margin-top:12px;font-size:13px;"><a href="#" onclick="handleForgotPassword();return false;">Forgot password?</a></p>
       </div>
       <!-- Signup form (hidden) -->
@@ -423,23 +542,22 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
         <div class="form-group"><label>Display Name</label><input type="text" id="signup-name" placeholder="Your name" autocomplete="name"></div>
         <div class="form-group"><label>Email</label><input type="email" id="signup-email" placeholder="you@example.com" autocomplete="email"></div>
         <div class="form-group"><label>Password</label><input type="password" id="signup-pass" placeholder="Choose a strong password" autocomplete="new-password"></div>
-        <button class="btn btn-primary" style="width:100%;margin-top:8px;padding:13px;font-size:15px;" onclick="handleSignup()">Create Free Account</button>
+        <button class="btn btn-primary" style="width:100%;margin-top:8px;padding:14px;font-size:15px;font-weight:700;border-radius:12px;" onclick="handleSignup()">Create Free Account →</button>
       </div>
     </div>
   </div>
   </div>
-
-  <!-- Trust bar -->
-  <div style="background:#0f1117;border-top:1px solid #1e2235;padding:24px 20px;text-align:center;">
-    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:20px;font-size:12px;color:#6b7280;margin-bottom:12px;">
-      <span>✓ Free to use</span>
-      <span>✓ Real-time sync</span>
-      <span>✓ Cross-device</span>
-      <span>✓ Encrypted data</span>
-      <span>✓ No ads, ever</span>
-    </div>
-    <p style="font-size:11px;color:#4b5563;">Money IntX — Personal &amp; Commercial Financial Tracking. Not a bank or payment processor.</p>
   </div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <div style="background:#060810;border-top:1px solid rgba(255,255,255,.06);padding:28px 24px;text-align:center;">
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;">
+      <img src="money.png" style="height:22px;border-radius:6px;object-fit:contain;" onerror="this.style.display='none';">
+      <span style="font-size:13px;font-weight:700;color:#6b7280;">Money IntX</span>
+    </div>
+    <p style="font-size:11px;color:#374151;max-width:400px;margin:0 auto;">Personal &amp; Commercial Financial Tracking. Not a bank, not a payment processor, not a financial advisor.</p>
+  </div>
+
 </div>
 
 <!-- App Shell -->
@@ -1167,19 +1285,55 @@ async function renderDash(el) {
 
   // (Currency ledgers now embedded inside hero card — no separate section needed)
 
-  // Quick Actions — colorful pill buttons
-  html += `<div class="card card-sm" style="margin-bottom:14px;">
-    <div class="section-title" style="margin-bottom:10px;">Quick Actions</div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;">
-      <button class="btn sm" onclick="openNewEntryModal('owe-me')" style="background:linear-gradient(135deg,#16a34a,#15803d);">💚 They Owe Me</button>
-      <button class="btn sm" onclick="openNewEntryModal('i-owe')" style="background:linear-gradient(135deg,#dc2626,#b91c1c);">❤️ I Owe Them</button>
-      <button class="btn sm" onclick="openNewEntryModal('advance')" style="background:linear-gradient(135deg,#d97706,#b45309);">⏳ Advances</button>
-      <button class="btn sm" onclick="navTo('templates')" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);">📄 New Invoice</button>
-      <button class="bs sm" onclick="openNewContactModal()">+ Contact</button>
-      <button class="bs sm" onclick="navTo('groups')">👥 Groups</button>
-      <button class="bs sm" onclick="navTo('investments')">📈 Invest</button>
-      <button class="bs sm" onclick="navTo('recurring')">🔁 Recurring</button>
-      <button class="bs sm" onclick="navTo('nok')">🔐 Trusted</button>
+  // Quick Actions — canvas-style pill tab strip
+  const _qaBtnBase = 'display:inline-flex;align-items:center;gap:6px;border-radius:100px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;border:1px solid;letter-spacing:.01em;transition:filter .15s;';
+  html += `<div style="margin-bottom:14px;overflow-x:auto;padding-bottom:2px;">
+    <div style="display:flex;gap:8px;min-width:max-content;">
+      <button onclick="openNewEntryModal('owe-me')"
+        style="${_qaBtnBase}background:rgba(22,163,74,.18);border-color:rgba(22,163,74,.45);color:#4ade80;"
+        onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">
+        <span style="width:7px;height:7px;border-radius:50%;background:#4ade80;flex-shrink:0;"></span> They Owe Me
+      </button>
+      <button onclick="openNewEntryModal('i-owe')"
+        style="${_qaBtnBase}background:rgba(220,38,38,.18);border-color:rgba(220,38,38,.45);color:#f87171;"
+        onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">
+        <span style="width:7px;height:7px;border-radius:50%;background:#f87171;flex-shrink:0;"></span> I Owe Them
+      </button>
+      <button onclick="openNewEntryModal('advance')"
+        style="${_qaBtnBase}background:rgba(217,119,6,.16);border-color:rgba(217,119,6,.42);color:#fbbf24;"
+        onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">
+        <span style="width:7px;height:7px;border-radius:50%;background:#fbbf24;flex-shrink:0;"></span> Advances
+      </button>
+      <button onclick="navTo('templates')"
+        style="${_qaBtnBase}background:rgba(14,165,233,.15);border-color:rgba(14,165,233,.4);color:#38bdf8;"
+        onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">
+        <span style="width:7px;height:7px;border-radius:50%;background:#38bdf8;flex-shrink:0;"></span> New Invoice
+      </button>
+      <button onclick="openNewContactModal()"
+        style="${_qaBtnBase}background:transparent;border-color:rgba(255,255,255,.15);color:var(--muted);"
+        onmouseover="this.style.borderColor='rgba(255,255,255,.3)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.color='var(--muted)'">
+        + Contact
+      </button>
+      <button onclick="navTo('groups')"
+        style="${_qaBtnBase}background:transparent;border-color:rgba(255,255,255,.15);color:var(--muted);"
+        onmouseover="this.style.borderColor='rgba(255,255,255,.3)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.color='var(--muted)'">
+        Groups
+      </button>
+      <button onclick="navTo('investments')"
+        style="${_qaBtnBase}background:transparent;border-color:rgba(255,255,255,.15);color:var(--muted);"
+        onmouseover="this.style.borderColor='rgba(255,255,255,.3)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.color='var(--muted)'">
+        Invest
+      </button>
+      <button onclick="navTo('recurring')"
+        style="${_qaBtnBase}background:transparent;border-color:rgba(255,255,255,.15);color:var(--muted);"
+        onmouseover="this.style.borderColor='rgba(255,255,255,.3)';this.style.color='var(--text)'" onmouseover="this.style.borderColor='rgba(255,255,255,.3)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.color='var(--muted)'">
+        Recurring
+      </button>
+      <button onclick="navTo('nok')"
+        style="${_qaBtnBase}background:transparent;border-color:rgba(255,255,255,.15);color:var(--muted);"
+        onmouseover="this.style.borderColor='rgba(255,255,255,.3)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.color='var(--muted)'">
+        Trusted
+      </button>
     </div>
   </div>`;
 
@@ -5905,6 +6059,32 @@ async function renderSettings(el) {
   // ── Profile ────────────────────────────────────────────────────
   html += `<div class="card">
     <h3 style="font-size:16px;font-weight:700;margin-bottom:16px;">Profile</h3>
+
+    <!-- Profile Photo -->
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);">
+      <div style="position:relative;flex-shrink:0;">
+        <div id="s-avatar-ring" style="width:72px;height:72px;border-radius:50%;background:var(--bg3);border:2px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;">
+          ${p.photo_url
+            ? `<img id="s-avatar-img" src="${esc(p.photo_url)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';document.getElementById('s-avatar-initials').style.display='flex';">`
+            : ''}
+          <div id="s-avatar-initials" style="width:100%;height:100%;display:${p.photo_url ? 'none' : 'flex'};align-items:center;justify-content:center;font-size:26px;font-weight:800;color:var(--accent);">${(p.display_name || p.email || '?').charAt(0).toUpperCase()}</div>
+        </div>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px;">Profile Photo</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;">
+            📷 Upload Photo
+            <input type="file" id="s-photo-file" accept="image/*" style="display:none;" onchange="uploadProfilePhoto(this)">
+          </label>
+          ${p.photo_url ? `<button class="bs sm" onclick="clearProfilePhoto()" style="color:var(--red);font-size:12px;">✕ Remove</button>` : ''}
+        </div>
+        <div id="s-photo-upload-status" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">Max 2 MB · JPG, PNG, WebP</div>
+        <input type="hidden" id="s-photourl" value="${esc(p.photo_url || '')}">
+      </div>
+    </div>
+
     <div class="form-row">
       <div class="form-group"><label>Display Name</label><input type="text" id="s-name" value="${esc(p.display_name || '')}"></div>
       <div class="form-group"><label>Email</label><input type="email" value="${esc(p.email || '')}" disabled style="opacity:0.6;"></div>
@@ -5943,6 +6123,7 @@ async function renderSettings(el) {
             <input type="file" id="s-logo-file" accept="image/*" style="display:none;" onchange="uploadLogoFile(this)">
           </label>
           <div id="s-logo-upload-status" style="font-size:11px;color:var(--muted);"></div>
+          <div style="font-size:11px;color:var(--muted);">Max 5 MB · JPG, PNG, WebP, SVG</div>
         </div>
         ${p.logo_url ? `<button class="bs sm" onclick="clearLogo()" style="color:var(--red);font-size:12px;">✕ Remove</button>` : ''}
       </div>
@@ -6121,7 +6302,8 @@ async function renderSettings(el) {
 }
 
 window.saveSettings = async function() {
-  const { error } = await supabase.from('users').update({
+  const photoUrl = (document.getElementById('s-photourl')?.value || '').trim();
+  const updates = {
     display_name:  document.getElementById('s-name').value.trim(),
     phone:         document.getElementById('s-phone').value.trim(),
     city:          document.getElementById('s-city').value.trim(),
@@ -6129,10 +6311,15 @@ window.saveSettings = async function() {
     default_currency: document.getElementById('s-currency').value,
     is_searchable: document.getElementById('s-searchable').checked,
     updated_at:    new Date().toISOString()
-  }).eq('id', currentUser.id);
+  };
+  if (photoUrl !== undefined) updates.photo_url = photoUrl;
+  const { error } = await supabase.from('users').update(updates).eq('id', currentUser.id);
   if (error) return toast(error.message, 'error');
   currentProfile = await getProfile(currentUser.id);
   document.getElementById('sidebar-user-name').textContent = currentProfile.display_name;
+  // Update sidebar avatar if it exists
+  const sidebarAvatar = document.getElementById('sidebar-avatar-img');
+  if (sidebarAvatar && photoUrl) { sidebarAvatar.src = photoUrl; sidebarAvatar.style.display = ''; }
   toast('Profile saved.', 'success');
 };
 
@@ -6156,6 +6343,11 @@ window.uploadLogoFile = async function(input) {
   const statusEl = document.getElementById('s-logo-upload-status');
   const previewEl = document.getElementById('s-logo-preview');
   const imgEl    = document.getElementById('s-logo-img');
+  if (file.size > 5 * 1024 * 1024) {
+    statusEl.textContent = '❌ File too large — max 5 MB';
+    input.value = '';
+    return;
+  }
   statusEl.textContent = '⏳ Uploading…';
   const ext  = file.name.split('.').pop();
   const path = `${currentUser.id}/logo.${ext}`;
@@ -6168,6 +6360,50 @@ window.uploadLogoFile = async function(input) {
   imgEl.style.display = '';
   previewEl.style.display = '';
   statusEl.textContent = '✅ Uploaded';
+};
+
+window.uploadProfilePhoto = async function(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('s-photo-upload-status');
+  if (file.size > 2 * 1024 * 1024) {
+    statusEl.textContent = '❌ File too large — max 2 MB';
+    input.value = '';
+    return;
+  }
+  statusEl.textContent = '⏳ Uploading…';
+  const ext  = file.name.split('.').pop();
+  const path = `${currentUser.id}/avatar.${ext}`;
+  const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+  if (error) { statusEl.textContent = '❌ ' + error.message; return; }
+  const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+  const url = data.publicUrl + '?t=' + Date.now();
+  document.getElementById('s-photourl').value = url;
+  // Update preview ring
+  let imgEl = document.getElementById('s-avatar-img');
+  const ring = document.getElementById('s-avatar-ring');
+  const initials = document.getElementById('s-avatar-initials');
+  if (!imgEl) {
+    imgEl = document.createElement('img');
+    imgEl.id = 's-avatar-img';
+    imgEl.style = 'width:100%;height:100%;object-fit:cover;';
+    imgEl.onerror = function() { this.style.display='none'; if(initials) initials.style.display='flex'; };
+    if (ring) ring.insertBefore(imgEl, ring.firstChild);
+  }
+  imgEl.src = url;
+  imgEl.style.display = '';
+  if (initials) initials.style.display = 'none';
+  statusEl.textContent = '✅ Photo uploaded — click Save Profile to apply';
+};
+
+window.clearProfilePhoto = function() {
+  document.getElementById('s-photourl').value = '';
+  const imgEl = document.getElementById('s-avatar-img');
+  const initials = document.getElementById('s-avatar-initials');
+  if (imgEl) { imgEl.src = ''; imgEl.style.display = 'none'; }
+  if (initials) initials.style.display = 'flex';
+  const statusEl = document.getElementById('s-photo-upload-status');
+  if (statusEl) statusEl.textContent = 'Photo removed — click Save Profile to apply';
 };
 
 window.clearLogo = function() {

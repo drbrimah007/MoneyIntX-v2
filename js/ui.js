@@ -104,21 +104,21 @@ export function fmtRelative(ts) {
 
 // ── Status badge ──────────────────────────────────────────────────
 const STATUS_COLORS = {
-  draft: { bg: '#f3f4f6', color: '#6b7280' },
-  posted: { bg: '#dbeafe', color: '#1e40af' },
-  sent: { bg: '#e0e7ff', color: '#4338ca' },
-  viewed: { bg: '#ede9fe', color: '#6d28d9' },
-  accepted: { bg: '#d1fae5', color: '#065f46' },
-  due: { bg: '#fef3c7', color: '#92400e' },
-  partially_settled: { bg: '#fef3c7', color: '#92400e' },
-  settled: { bg: '#d1fae5', color: '#065f46' },
-  fulfilled: { bg: '#d1fae5', color: '#065f46' },
-  overdue: { bg: '#fee2e2', color: '#991b1b' },
-  disputed: { bg: '#fee2e2', color: '#991b1b' },
-  voided: { bg: '#f3f4f6', color: '#6b7280' },
-  cancelled: { bg: '#f3f4f6', color: '#6b7280' },
-  closed: { bg: '#f3f4f6', color: '#6b7280' },
-  payment: { bg: '#d1fae5', color: '#065f46' },
+  draft:             { bg: 'rgba(107,114,128,.18)', color: '#9ca3af', border: 'rgba(107,114,128,.3)' },
+  posted:            { bg: 'rgba(96,165,250,.14)',  color: '#60a5fa', border: 'rgba(96,165,250,.3)' },
+  sent:              { bg: 'rgba(139,92,246,.16)',  color: '#a78bfa', border: 'rgba(139,92,246,.3)' },
+  viewed:            { bg: 'rgba(167,139,250,.14)', color: '#c4b5fd', border: 'rgba(167,139,250,.28)' },
+  accepted:          { bg: 'rgba(52,211,153,.14)',  color: '#34d399', border: 'rgba(52,211,153,.28)' },
+  due:               { bg: 'rgba(251,191,36,.14)',  color: '#fbbf24', border: 'rgba(251,191,36,.3)' },
+  partially_settled: { bg: 'rgba(251,191,36,.14)',  color: '#fbbf24', border: 'rgba(251,191,36,.3)' },
+  settled:           { bg: 'rgba(74,222,128,.14)',  color: '#4ade80', border: 'rgba(74,222,128,.28)' },
+  fulfilled:         { bg: 'rgba(74,222,128,.14)',  color: '#4ade80', border: 'rgba(74,222,128,.28)' },
+  overdue:           { bg: 'rgba(248,113,113,.14)', color: '#f87171', border: 'rgba(248,113,113,.3)' },
+  disputed:          { bg: 'rgba(248,113,113,.14)', color: '#f87171', border: 'rgba(248,113,113,.3)' },
+  voided:            { bg: 'rgba(107,114,128,.12)', color: '#6b7280', border: 'rgba(107,114,128,.22)' },
+  cancelled:         { bg: 'rgba(107,114,128,.12)', color: '#6b7280', border: 'rgba(107,114,128,.22)' },
+  closed:            { bg: 'rgba(107,114,128,.12)', color: '#6b7280', border: 'rgba(107,114,128,.22)' },
+  payment:           { bg: 'rgba(52,211,153,.14)',  color: '#34d399', border: 'rgba(52,211,153,.28)' },
 };
 
 const STATUS_LABELS = {
@@ -132,9 +132,9 @@ const STATUS_LABELS = {
 export function statusBadge(status) {
   const s = STATUS_COLORS[status] || STATUS_COLORS.posted;
   const label = STATUS_LABELS[status] || status;
-  return `<span style="display:inline-block;background:${s.bg};color:${s.color};
-    border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;
-    text-transform:uppercase;letter-spacing:0.03em;">${esc(label)}</span>`;
+  return `<span style="display:inline-block;background:${s.bg};color:${s.color};border:1px solid ${s.border || s.bg};
+    border-radius:100px;padding:3px 10px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:0.05em;">${esc(label)}</span>`;
 }
 
 // ── TX Category labels (ledger = past tense; canonical enums per handoff spec) ─
