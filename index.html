@@ -1781,8 +1781,8 @@ window.openEntryDetail = async function(id) {
   const txLabel  = TX_LABELS[_ecat] || _ecat;
   const txColor  = TX_COLORS[_ecat] || 'var(--text)';
   const settlements = entry.settlements || [];
-  const paidAmt  = entry.paid_amount || entry.settled_amount || 0;
-  const remaining = entry.outstanding_amount != null ? entry.outstanding_amount : (entry.amount - paidAmt);
+  const paidAmt  = entry.settled_amount || entry.paid_amount || 0;
+  const remaining = Math.max(0, (entry.amount || 0) - paidAmt);
   const isTerminal = ['settled','voided','cancelled','fulfilled','closed'].includes(entry.status);
   const canMarkPaid = ['owed_to_me','bill_sent','invoice_sent','i_owe','bill_received','invoice_received',
     'they_owe_you','you_owe_them','invoice','bill','advance_paid','advance_received'].includes(_ecat) && !isTerminal;
@@ -2166,9 +2166,8 @@ window.openMarkPaidModal = async function(id) {
   if (!entry) return toast('Entry not found.', 'error');
 
   const cat        = entry.category || entry.tx_type;
-  const paidSoFar  = entry.paid_amount || entry.settled_amount || 0;
-  const outstanding = entry.outstanding_amount != null
-    ? entry.outstanding_amount : (entry.amount - paidSoFar);
+  const paidSoFar  = entry.settled_amount || entry.paid_amount || 0;
+  const outstanding = Math.max(0, (entry.amount || 0) - paidSoFar);
   const outstandingDollars = (outstanding / 100).toFixed(2);
   const currency   = entry.currency || 'USD';
   const cName      = entry.contact?.name || '—';
@@ -2241,79 +2240,45 @@ window.saveMarkPaid = async function(entryId, currency) {
   const amountDollars = parseFloat(document.getElementById('mp-amount').value);
   if (!amountDollars || amountDollars <= 0) return toast('Enter a valid amount.', 'error');
   const amountCents = Math.round(amountDollars * 100);
-  const payDate  = document.getElementById('mp-date').value || new Date().toISOString().slice(0,10);
-  const note     = document.getElementById('mp-note')?.value.trim() || null;
-  const method   = document.getElementById('mp-method')?.value || null;
-  const proofFile= document.getElementById('mp-proof')?.files?.[0] || null;
-  const btn      = document.getElementById('mp-save-btn');
+  const note      = document.getElementById('mp-note')?.value.trim() || '';
+  const method    = document.getElementById('mp-method')?.value || '';
+  const proofFile = document.getElementById('mp-proof')?.files?.[0] || null;
+  const btn       = document.getElementById('mp-save-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
 
   try {
-    // 1. Fetch current entry state
-    const { data: entry, error: fetchErr } = await supabase
-      .from('entries').select('*').eq('id', entryId).single();
-    if (fetchErr || !entry) throw fetchErr || new Error('Entry not found');
-
-    const prevPaid      = entry.paid_amount || 0;
-    const newPaid       = prevPaid + amountCents;
-    const newOutstanding= Math.max(0, (entry.amount || 0) - newPaid);
-    const newStatus     = newOutstanding === 0 ? 'settled' : (newPaid > 0 ? 'partially_settled' : entry.status);
-
-    // 2. Upload proof file if provided
-    let proofUrl = null;
+    // 1. Upload proof file if provided
+    let proofUrl = '';
     if (proofFile) {
       const ext  = proofFile.name.split('.').pop();
-      const path = `payments/${currentUser.id}/${entryId}_${Date.now()}.${ext}`;
+      const path = `settlements/${currentUser.id}/${Date.now()}.${ext}`;
       const { data: upData, error: upErr } = await supabase.storage
-        .from('attachments').upload(path, proofFile, { upsert: true });
+        .from('attachments').upload(path, proofFile, { upsert: false });
       if (!upErr && upData) {
         const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(path);
-        proofUrl = urlData?.publicUrl || null;
+        proofUrl = urlData?.publicUrl || '';
       }
     }
 
-    // 3. Update the original entry (no RPC — pure JS, no constraint risk)
-    const { error: updateErr } = await supabase.from('entries').update({
-      paid_amount:        newPaid,
-      outstanding_amount: newOutstanding,
-      status:             newStatus,
-      updated_at:         new Date().toISOString()
-    }).eq('id', entryId);
-    if (updateErr) throw updateErr;
+    // 2. Insert into settlements table — DB trigger auto-updates entry.settled_amount + status
+    const { data: settlement, error } = await supabase
+      .from('settlements')
+      .insert({
+        entry_id:    entryId,
+        amount:      amountCents,
+        method:      method,
+        note:        note,
+        proof_url:   proofUrl,
+        recorded_by: currentUser.id,
+        status:      'confirmed'
+      })
+      .select()
+      .single();
 
-    // 4. Insert payment record into payments table (best effort)
-    await supabase.from('payments').insert({
-      entry_id:     entryId,
-      user_id:      currentUser.id,
-      amount:       amountCents,
-      currency:     currency,
-      payment_date: payDate,
-      note:         note,
-      method:       method,
-      proof_url:    proofUrl
-    }).then(r => { if (r.error) console.warn('[payments insert]', r.error.message); });
-
-    // 5. Ledger visibility entry (payment_recorded)
-    const paymentSign = entry.direction_sign != null ? -entry.direction_sign : 1;
-    await supabase.from('entries').insert({
-      user_id:            currentUser.id,
-      contact_id:         entry.contact_id,
-      category:           'payment_recorded',
-      direction_sign:     paymentSign,
-      amount:             amountCents,
-      currency,
-      date:               payDate,
-      note,
-      status:             'posted',
-      paid_amount:        amountCents,
-      outstanding_amount: 0
-    }).then(r => { if (r.error) console.warn('[ledger entry]', r.error.message); });
+    if (error) throw error;
 
     closeModal();
-    const statusText = newOutstanding === 0
-      ? 'Fully settled ✓'
-      : `Partially settled — ${fmtMoney(newOutstanding, currency)} still outstanding`;
-    toast(statusText, 'success');
+    toast('Payment recorded ✓', 'success');
     _invalidateEntries(); navTo('entries');
   } catch (err) {
     toast('Error: ' + (err?.message || err), 'error');
