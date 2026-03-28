@@ -1725,7 +1725,7 @@ async function renderEntries(el, page, forceRefresh) {
       const isTerminal = ['settled','voided','cancelled','fulfilled'].includes(e.status);
       const _ecat = e.category || e.tx_type;
       const canSettle = ['owed_to_me','bill_sent','invoice_sent','i_owe','bill_received','invoice_received',
-        'they_owe_you','you_owe_them','invoice','bill'].includes(_ecat) && !isTerminal;
+        'they_owe_you','you_owe_them','invoice','bill','advance_paid','advance_received'].includes(_ecat) && !isTerminal;
       const reminderHtml = e.reminder_count > 0 ? `<span class="badge badge-red" style="margin-left:4px;cursor:pointer;" onclick="openEntryDetail('${e.id}')">🚩${e.reminder_count}</span>` : '';
       const noLedgerHtml = e.no_ledger ? `<span class="badge badge-gray" style="margin-left:4px;" title="Not in ledger">⊘</span>` : '';
       const col = cId ? contactColor(cId) : 'var(--bg3)';
@@ -1785,7 +1785,8 @@ window.openEntryDetail = async function(id) {
   const remaining = entry.outstanding_amount != null ? entry.outstanding_amount : (entry.amount - paidAmt);
   const isTerminal = ['settled','partially_settled','voided','cancelled','fulfilled','closed'].includes(entry.status);
   const canMarkPaid = ['owed_to_me','bill_sent','invoice_sent','i_owe','bill_received','invoice_received',
-    'they_owe_you','you_owe_them','invoice','bill'].includes(_ecat) && !isTerminal;
+    'they_owe_you','you_owe_them','invoice','bill','advance_paid','advance_received'].includes(_ecat) && !isTerminal;
+  const canFulfill  = ['advance_paid','advance_received'].includes(_ecat) && !isTerminal;
 
   let settleHtml = '';
   if (settlements.length > 0) {
@@ -1846,11 +1847,15 @@ window.openEntryDetail = async function(id) {
         </div>
       </div>
     ` : ''}
-    ${entry.note ? `<div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:16px;font-size:14px;">${esc(entry.note)}</div>` : ''}
+    ${entry.note ? `<div style="background:var(--bg3);border-radius:10px;padding:10px 12px;margin-bottom:16px;">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">🔒 Note to self</div>
+      <div style="font-size:13px;">${esc(entry.note)}</div>
+    </div>` : ''}
     ${settleHtml}
     ${canMarkPaid ? `
-    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:10px;flex-direction:column;">
       <button class="btn btn-primary" style="width:100%;padding:13px 16px;font-size:15px;font-weight:700;border-radius:12px;letter-spacing:.01em;box-shadow:0 2px 12px rgba(99,102,241,.25);" onclick="closeModal();openMarkPaidModal('${entry.id}')">💳 Record Payment${remaining > 0 ? ` · ${fmtMoney(remaining, entry.currency || 'USD')} outstanding` : ''}</button>
+      ${canFulfill ? `<button class="bs" style="width:100%;padding:11px 16px;font-size:14px;font-weight:600;border-radius:12px;border-color:var(--green);color:var(--green);" onclick="closeModal();openRecordFulfillmentModal('${entry.id}')">✅ Record Fulfillment</button>` : ''}
     </div>` : ''}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:${canMarkPaid ? '10' : '14'}px;${canMarkPaid ? '' : 'border-top:1px solid var(--border);margin-top:16px;'}">
       <button class="bs sm" onclick="openEditEntryModal('${entry.id}')">Edit</button>
@@ -2248,6 +2253,54 @@ window.saveMarkPaid = async function(entryId, currency) {
   } catch (err) {
     toast('Error: ' + (err?.message || err), 'error');
     if (btn) { btn.disabled = false; btn.textContent = 'Record Payment'; }
+  }
+};
+
+// ── Record Fulfillment (Advance) ──────────────────────────────────
+window.openRecordFulfillmentModal = async function(entryId) {
+  const entry = await getEntry(entryId);
+  if (!entry) return;
+  const cName = entry.contact?.name || 'Contact';
+  const amtLabel = fmtMoney(entry.amount, entry.currency);
+  openModal(`
+    <h3 style="margin:0 0 16px;">✅ Record Fulfillment</h3>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Mark this advance as fulfilled — the obligation has been met (goods delivered, service provided, etc.).</p>
+    <div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:16px;">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Advance with ${esc(cName)}</div>
+      <div style="font-size:18px;font-weight:800;">${amtLabel}</div>
+    </div>
+    <div class="form-group">
+      <label>Note <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <textarea id="rf-note" rows="2" placeholder="e.g. Goods delivered on March 15..."></textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="bs sm" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="rf-save-btn" onclick="saveRecordFulfillment('${entryId}')">✅ Mark Fulfilled</button>
+    </div>
+  `, { maxWidth: '440px' });
+};
+
+window.saveRecordFulfillment = async function(entryId) {
+  const note = document.getElementById('rf-note')?.value.trim() || null;
+  const btn = document.getElementById('rf-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    const updateData = { status: 'fulfilled', updated_at: new Date().toISOString() };
+    if (note) updateData.note = note;
+    const { error } = await supabase.from('entries').update(updateData).eq('id', entryId);
+    if (error) throw error;
+    // Self-notification
+    await supabase.from('notifications').insert({
+      user_id: currentUser.id, type: 'notification',
+      message: `Advance marked as fulfilled${note ? ': ' + note : ''}`,
+      entry_id: entryId, is_read: false
+    });
+    closeModal();
+    toast('Advance marked as fulfilled ✓', 'success');
+    _invalidateEntries(); navTo('entries');
+  } catch (err) {
+    toast('Error: ' + (err?.message || err), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Mark Fulfilled'; }
   }
 };
 
@@ -2809,27 +2862,42 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
     </div>
     <div id="ne-extra-fields"></div>
     <div class="form-group"><label>Issue Date</label><input type="date" id="ne-date" value="${new Date().toISOString().slice(0,10)}"></div>
-    <div class="form-group"><label>Note <span style="font-weight:400;color:var(--muted);">(optional)</span></label><textarea id="ne-note" rows="2" placeholder="Optional note..."></textarea></div>
-
-    <div style="margin-bottom:12px;">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Message <span style="font-weight:400;color:var(--muted);">(optional, sent with notification)</span></div>
-      <textarea id="ne-message" rows="2" placeholder="Add a note for the recipient..." style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;resize:vertical;box-sizing:border-box;"></textarea>
-    </div>
-
-    <div style="margin-bottom:12px;">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Notify</div>
-      <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--border);margin-bottom:10px;">
-        <button id="ne-nw-contact" onclick="setNeNotifyWho('contact')" style="flex:1;padding:8px 4px;font-size:13px;font-weight:600;border:none;background:var(--accent);color:#fff;cursor:pointer;">Contact</button>
-        <button id="ne-nw-you" onclick="setNeNotifyWho('you')" style="flex:1;padding:8px 4px;font-size:13px;font-weight:600;border:none;border-left:1px solid var(--border);border-right:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer;">You</button>
-        <button id="ne-nw-both" onclick="setNeNotifyWho('both')" style="flex:1;padding:8px 4px;font-size:13px;font-weight:600;border:none;background:var(--bg3);color:var(--text);cursor:pointer;">Both</button>
+    <!-- NOTIFY section with ON/OFF toggle -->
+    <div style="margin-bottom:12px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg3);cursor:pointer;" onclick="toggleNeNotify()">
+        <div style="font-size:13px;font-weight:600;">🔔 Notify</div>
+        <div style="display:flex;align-items:center;gap:7px;">
+          <span id="ne-notify-label" style="font-size:12px;color:var(--muted);">Off</span>
+          <div style="width:38px;height:21px;border-radius:11px;background:var(--border);position:relative;transition:background .2s;" id="ne-notify-track">
+            <div id="ne-notify-knob" style="position:absolute;top:3px;left:3px;width:15px;height:15px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3);"></div>
+          </div>
+        </div>
       </div>
-      <div id="ne-notify-email-row" style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:8px;padding:10px 12px;display:none;">
-        <div style="font-size:12px;color:#b45309;margin-bottom:6px;">⚠️ Contact has no email.</div>
-        <input type="email" id="ne-notify-email-override" placeholder="Enter email" style="width:100%;padding:7px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:13px;box-sizing:border-box;">
+      <div id="ne-notify-body" style="display:none;padding:12px 14px;border-top:1px solid var(--border);">
+        <div style="margin-bottom:10px;">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:5px;">Message <span style="font-weight:400;">(sent to recipient)</span></div>
+          <textarea id="ne-message" rows="2" placeholder="Add a note for the recipient..." style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;resize:vertical;box-sizing:border-box;"></textarea>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Notify who</div>
+        <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--border);margin-bottom:10px;">
+          <button id="ne-nw-contact" onclick="setNeNotifyWho('contact')" style="flex:1;padding:7px 4px;font-size:12px;font-weight:600;border:none;background:var(--accent);color:#fff;cursor:pointer;">Contact</button>
+          <button id="ne-nw-you" onclick="setNeNotifyWho('you')" style="flex:1;padding:7px 4px;font-size:12px;font-weight:600;border:none;border-left:1px solid var(--border);border-right:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer;">You</button>
+          <button id="ne-nw-both" onclick="setNeNotifyWho('both')" style="flex:1;padding:7px 4px;font-size:12px;font-weight:600;border:none;background:var(--bg3);color:var(--text);cursor:pointer;">Both</button>
+        </div>
+        <div id="ne-notify-email-row" style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:8px;padding:10px 12px;display:none;">
+          <div style="font-size:12px;color:#b45309;margin-bottom:6px;">⚠️ Contact has no email — enter one to send notification:</div>
+          <input type="email" id="ne-notify-email-override" placeholder="Enter email" style="width:100%;padding:7px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:13px;box-sizing:border-box;">
+        </div>
       </div>
     </div>
     <input type="hidden" id="ne-notify-who" value="contact">
-    <input type="hidden" id="ne-notify" value="1">
+    <input type="hidden" id="ne-notify" value="0">
+
+    <!-- NOTE TO SELF — single-line auto-expand, private -->
+    <div style="margin-bottom:4px;">
+      <label style="font-size:12px;color:var(--muted);">Note to self <span style="font-weight:400;">(optional — private, not shared)</span></label>
+    </div>
+    <textarea id="ne-note" rows="1" placeholder="Private reminder..." oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" style="width:100%;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;resize:none;overflow:hidden;box-sizing:border-box;line-height:1.5;margin-bottom:12px;"></textarea>
 
     ${templates.length > 0 ? `
       <div class="form-group"><label style="color:var(--muted);">Or use a template</label>
@@ -2899,6 +2967,23 @@ window.openNewContactFromEntry = function() {
       <button class="btn btn-primary btn-sm" onclick="saveNewContact(function(c){if(c){window._neContacts=(window._neContacts||[]).concat(c);openNewEntryModal(window._entryDirection,c.id);}else{openNewEntryModal(window._entryDirection);}})">Save &amp; Select</button>
     </div>
   `);
+};
+
+// ── Notify ON/OFF toggle ───────────────────────────────────────────
+window.toggleNeNotify = function() {
+  const inp = document.getElementById('ne-notify');
+  const body = document.getElementById('ne-notify-body');
+  const track = document.getElementById('ne-notify-track');
+  const knob = document.getElementById('ne-notify-knob');
+  const label = document.getElementById('ne-notify-label');
+  if (!inp) return;
+  const isOn = inp.value === '1';
+  const nowOn = !isOn;
+  inp.value = nowOn ? '1' : '0';
+  if (body) body.style.display = nowOn ? '' : 'none';
+  if (track) track.style.background = nowOn ? 'var(--accent)' : 'var(--border)';
+  if (knob) knob.style.left = nowOn ? '20px' : '3px';
+  if (label) { label.textContent = nowOn ? 'On' : 'Off'; label.style.color = nowOn ? 'var(--accent)' : 'var(--muted)'; }
 };
 
 // ── Notify-who tab switcher ────────────────────────────────────────
@@ -3063,7 +3148,7 @@ window.saveNewEntry = async function() {
   const currency   = document.getElementById('ne-currency')?.value || currentProfile?.default_currency || 'USD';
   const date       = document.getElementById('ne-date').value;
   const note       = document.getElementById('ne-note').value.trim();
-  const notifyOn   = true; // notify is always on with the new tab UI
+  const notifyOn   = document.getElementById('ne-notify')?.value === '1';
   const notifyWho  = document.getElementById('ne-notify-who')?.value || 'contact'; // 'contact' | 'you' | 'both'
   const notifyMsgExtra = document.getElementById('ne-message')?.value?.trim() || '';
   const notifyEmailOverride = document.getElementById('ne-notify-email-override')?.value?.trim() || '';
