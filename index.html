@@ -29,24 +29,57 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-/* Theme: Classic Dark (v1 default) */
+/* Theme: Classic Dark — final production tokens */
 :root, [data-theme="classic"] {
   --accent: #6c63ff;
   --accent-hover: #5a52e0;
-  --accent-light: rgba(108,99,255,0.12);
-  --green: #4ade80;
-  --red: #f87171;
-  --amber: #fbbf24;
-  --blue: #60a5fa;
-  --bg: #0b0d14;
-  --bg2: #141722;
-  --bg3: #1b1f2e;
-  --text: #e2e8f0;
-  --muted: #8892a4;
-  --border: #232842;
+  --accent-light: rgba(108,99,255,0.10);
+
+  /* Backgrounds — real black foundation */
+  --bg:       #06080f;
+  --bg2:      #0b1020;
+  --bg3:      #0f1528;
+  --bg-soft:  #0b1020;
+  --panel:    #0b1020;
+  --panel-2:  #0f1528;
+
+  /* Text hierarchy */
+  --text:     #eef2f7;
+  --text-2:   #cfd6e4;
+  --muted:    #8f98ab;
+  --muted-2:  #6f7788;
+
+  /* Borders */
+  --border:   rgba(255,255,255,.05);
+  --line:     rgba(255,255,255,.05);
+  --line-2:   rgba(255,255,255,.08);
+
+  /* Contact name/avatar accent */
+  --contact:  #d88978;
+
+  /* Status tokens */
+  --green:      #63d69a;
+  --green-bg:   rgba(99,214,154,.12);
+  --success:    #63d69a;
+  --success-bg: rgba(99,214,154,.12);
+
+  --red:        #d07878;
+  --red-bg:     rgba(208,120,120,.12);
+
+  --amber:      #d5bb7a;
+  --gold:       #d5bb7a;
+  --partial:    #d5bb7a;
+  --gold-bg:    rgba(213,187,122,.12);
+  --partial-bg: rgba(213,187,122,.12);
+
+  --blue:       #9db2db;
+  --posted:     #9db2db;
+  --blue-bg:    rgba(157,178,219,.12);
+  --posted-bg:  rgba(157,178,219,.12);
+
   --radius: 10px;
-  --shadow: 0 2px 12px rgba(0,0,0,0.4);
-  --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
+  --shadow:    0 2px 12px rgba(0,0,0,.55);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,.55);
 }
 /* Theme: teal light */
 [data-theme="teal"] {
@@ -80,42 +113,99 @@
   --bg: #ffffff; --bg2: #f8fafc; --bg3: #f1f5f9;
   --text: #0f172a; --muted: #64748b; --border: #e2e8f0;
 }
-/* Theme: dark (same as classic but explicit) */
+/* Theme: dark — production navy system */
 [data-theme="dark"] {
   --accent: #6c63ff;
   --accent-hover: #5a52e0;
-  --accent-light: rgba(108,99,255,0.15);
-  --green: #4ade80;
-  --red: #f87171;
-  --amber: #fbbf24;
-  --blue: #60a5fa;
-  --bg: #0b0d14;
-  --bg2: #141722;
-  --bg3: #1b1f2e;
-  --text: #e2e8f0;
-  --muted: #8892a4;
-  --border: #232842;
-  --sidebar-bg: #0b0d14;
-  --sidebar-active: #141722;
+  --accent-light: rgba(108,99,255,0.10);
+
+  /* Backgrounds — 3 layers, same hue, graduated lift */
+  --bg:      #07111f;
+  --bg2:     #0a1528;
+  --bg3:     #0d182b;
+  --bg-soft: #0a1528;
+  --panel:   #0d182b;
+
+  /* Text hierarchy */
+  --text:    #eef4ff;
+  --text-2:  #c7d2e5;
+  --muted:   #8b98b3;
+  --muted-2: #6f7c96;
+
+  /* Borders — barely-there, no competing tone */
+  --border:  rgba(255,255,255,.06);
+  --line:    rgba(255,255,255,.06);
+  --line-2:  rgba(255,255,255,.10);
+
+  /* Status palette */
+  --contact:    #d88978;
+  --green:      #63d69a;
+  --green-bg:   rgba(99,214,154,.12);
+  --success:    #63d69a;
+  --success-bg: rgba(99,214,154,.12);
+  --red:        #d07878;
+  --red-bg:     rgba(208,120,120,.12);
+  --amber:      #d5bb7a;
+  --gold:       #d5bb7a;
+  --partial:    #d5bb7a;
+  --gold-bg:    rgba(213,187,122,.12);
+  --partial-bg: rgba(213,187,122,.12);
+  --blue:       #9db2db;
+  --posted:     #9db2db;
+  --blue-bg:    rgba(157,178,219,.12);
+  --posted-bg:  rgba(157,178,219,.12);
+  --panel-2:    #0d182b;
+
+  --sidebar-bg:     #07111f;
+  --sidebar-active: #0a1528;
+  --radius: 10px;
+  --shadow:    0 2px 12px rgba(0,0,0,.55);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,.55);
 }
-/* Theme: Money IntX Navy — exact logo colors */
+/* Theme: Money IntX Navy — production system, blue-tinted foundation */
 [data-theme="navy"] {
   --accent: #e020b0;
   --accent-hover: #c01898;
-  --accent-light: rgba(224,32,176,0.15);
-  --green: #4ade80;
-  --red: #f87171;
-  --amber: #fbbf24;
-  --blue: #60a5fa;
-  --bg: #03051a;
-  --bg2: #080b53;
-  --bg3: #0f1275;
-  --text: #e2e4f8;
-  --muted: #9090c0;
-  --border: #141980;
+  --accent-light: rgba(224,32,176,0.10);
+
+  --bg:      #050e1b;
+  --bg2:     #081426;
+  --bg3:     #0b1a31;
+  --bg-soft: #081426;
+  --panel:   #0b1a31;
+
+  --text:    #eef4ff;
+  --text-2:  #c7d2e5;
+  --muted:   #8b98b3;
+  --muted-2: #6f7c96;
+
+  --border:  rgba(255,255,255,.06);
+  --line:    rgba(255,255,255,.06);
+  --line-2:  rgba(255,255,255,.10);
+
+  --contact:    #d88978;
+  --green:      #63d69a;
+  --green-bg:   rgba(99,214,154,.12);
+  --success:    #63d69a;
+  --success-bg: rgba(99,214,154,.12);
+  --red:        #d07878;
+  --red-bg:     rgba(208,120,120,.12);
+  --amber:      #d5bb7a;
+  --gold:       #d5bb7a;
+  --partial:    #d5bb7a;
+  --gold-bg:    rgba(213,187,122,.12);
+  --partial-bg: rgba(213,187,122,.12);
+  --blue:       #9db2db;
+  --posted:     #9db2db;
+  --blue-bg:    rgba(157,178,219,.12);
+  --posted-bg:  rgba(157,178,219,.12);
+  --panel-2:    #0b1a31;
+
+  --sidebar-bg:     #050e1b;
+  --sidebar-active: #081426;
   --radius: 10px;
-  --shadow: 0 2px 12px rgba(0,0,0,0.55);
-  --shadow-lg: 0 8px 24px rgba(0,0,0,0.55);
+  --shadow:    0 2px 12px rgba(0,0,0,.55);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,.55);
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 /* Hide scrollbars globally while keeping content scrollable */
@@ -190,28 +280,70 @@ h3 { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
 .gh { background: transparent; color: var(--text); border: none; cursor: pointer; font-size: 14px; padding: 6px 10px; border-radius: 6px; }
 .gh:hover { background: var(--bg3); }
 
-/* Forms */
-input, select, textarea { background: var(--bg3); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 14px; width: 100%; outline: none; font-family: inherit; }
-input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+/* Forms — premium dark style */
+input, select, textarea {
+  background: var(--panel, var(--bg2));
+  color: var(--text);
+  border: 1px solid var(--line, rgba(255,255,255,.06));
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+  width: 100%;
+  outline: none;
+  font-family: inherit;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+input:hover, select:hover, textarea:hover {
+  border-color: var(--line-2, rgba(255,255,255,.10));
+  background: var(--panel-2, var(--bg3));
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: rgba(127,224,208,.35);
+  background: var(--panel-2, var(--bg3));
+  box-shadow: 0 0 0 2px rgba(127,224,208,.08);
+}
+input::placeholder, textarea::placeholder { color: var(--muted-2, #6f7788); }
+input[type="checkbox"], input[type="radio"] {
+  width: auto; padding: 0; border-radius: 4px;
+  accent-color: var(--green, #63d69a);
+}
+select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238f98ab'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
 /* Green text for filled entry form fields */
 .tpl-field:not([readonly]):not(:placeholder-shown) { color: #22c55e !important; }
 input.tpl-field:focus:not([readonly]) { color: #22c55e !important; border-color: #22c55e; }
 textarea.tpl-field:not(:placeholder-shown) { color: #22c55e !important; }
-label { font-size: 13px; color: var(--muted); margin-bottom: 4px; display: block; }
-.form-input { background: var(--bg3); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 14px; width: 100%; outline: none; font-family: inherit; }
-.form-input:focus { border-color: var(--accent); }
-.fg { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
-.form-group { margin-bottom: 14px; }
+label { font-size: 13px; color: var(--muted, #8f98ab); margin-bottom: 6px; display: block; font-weight: 500; }
+.form-input {
+  background: var(--panel, var(--bg2));
+  color: var(--text);
+  border: 1px solid var(--line, rgba(255,255,255,.06));
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+  width: 100%;
+  outline: none;
+  font-family: inherit;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.form-input:hover { border-color: var(--line-2, rgba(255,255,255,.10)); background: var(--panel-2, var(--bg3)); }
+.form-input:focus { border-color: rgba(127,224,208,.35); background: var(--panel-2, var(--bg3)); box-shadow: 0 0 0 2px rgba(127,224,208,.08); }
+.form-input::placeholder { color: var(--muted-2, #6f7788); }
+hr, .divider { border: none; border-top: 1px solid var(--line, rgba(255,255,255,.05)); margin: 16px 0; }
+.fg { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
+.form-group { margin-bottom: 16px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .frow { display: flex; gap: 10px; align-items: flex-end; }
 @media(max-width:640px) { .frow, .form-row { flex-direction: column; grid-template-columns: 1fr; } }
-@media(max-width:640px) { input, select, textarea { font-size: 16px !important; } }
+@media(max-width:640px) { input, select, textarea { font-size: 16px !important; border-radius: 10px !important; } }
 
 /* Tables */
 .tbl-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th { text-align: left; color: var(--muted); font-size: 12px; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: .04em; }
-td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; word-break: break-word; }
+th { text-align: left; color: var(--muted-2, var(--muted)); font-size: 11px; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--line, var(--border)); text-transform: uppercase; letter-spacing: .06em; }
+td { padding: 10px; border-bottom: 1px solid var(--line, var(--border)); vertical-align: middle; word-break: break-word; color: var(--text-2, var(--text)); }
 tr:last-child td { border-bottom: none; }
 tr.row-selected td { background: rgba(108,99,255,.1) !important; }
 .show-mobile { display: none; }
@@ -224,14 +356,14 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
   .other-cur-panel > div { flex-shrink: 0; min-width: 120px; }
 }
 
-/* Badge — v1 style */
-.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
-.badge-green { background: rgba(74,222,128,.15); color: var(--green); }
-.badge-red { background: rgba(248,113,113,.15); color: var(--red); }
-.badge-yellow { background: rgba(251,191,36,.15); color: var(--amber); }
-.badge-purple { background: rgba(108,99,255,.18); color: var(--accent); }
-.badge-blue { background: rgba(96,165,250,.15); color: var(--blue, var(--accent)); }
-.badge-gray { background: var(--bg3); color: var(--muted); }
+/* Badge — calm, production style */
+.badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; border: 1px solid transparent; }
+.badge-green  { background: var(--green-bg,  rgba(127,224,208,.12)); color: var(--green);  border-color: rgba(127,224,208,.18); }
+.badge-red    { background: var(--red-bg,    rgba(208,120,120,.12)); color: var(--red);    border-color: rgba(208,120,120,.18); }
+.badge-yellow { background: var(--gold-bg,   rgba(214,185,122,.12)); color: var(--amber);  border-color: rgba(214,185,122,.18); }
+.badge-purple { background: rgba(108,99,255,.10); color: var(--accent); border-color: rgba(108,99,255,.2); }
+.badge-blue   { background: var(--blue-bg,   rgba(143,168,214,.12)); color: var(--blue, var(--accent)); border-color: rgba(143,168,214,.18); }
+.badge-gray   { background: rgba(255,255,255,.05); color: var(--muted); border-color: rgba(255,255,255,.08); }
 
 /* Action menu — v1 style */
 .action-menu { position: relative; display: inline-block; }
@@ -709,8 +841,25 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
   </div>
 </div>
 
-<!-- Fallback: if module fails, at least show error on button click -->
+<!-- ⚠️ IMPORTANT: This plain script runs BEFORE any module script.
+     Supabase's createClient (imported as a module) will clear the URL hash
+     after parsing the access_token. We must capture the recovery intent
+     HERE — synchronously — before that happens. -->
 <script>
+(function() {
+  var h = window.location.hash || '';
+  if (h.includes('type=recovery') || h.includes('access_token')) {
+    // Store in sessionStorage so module scripts can read it even after hash is cleared
+    window._isRecovery = true;
+    try { sessionStorage.setItem('_mxi_recovery', '1'); } catch(e) {}
+    // Pre-emptively show landing + hide loader so there's no flash of spinner
+    var loader = document.getElementById('auth-loader');
+    var landing = document.getElementById('landing');
+    if (loader)  loader.style.display  = 'none';
+    if (landing) landing.style.display = '';
+  }
+})();
+
 window.handleLogin = window.handleLogin || function() { alert('App loading... If this persists, clear cache and refresh.'); };
 window.handleSignup = window.handleSignup || function() { alert('App loading... If this persists, clear cache and refresh.'); };
 window.showAuthTab = window.showAuthTab || function() {};
@@ -851,7 +1000,8 @@ window.pickCurrency = async function(cur) {
 // ── Invalidate all entry caches (call after any create/update/delete) ─
 function _invalidateEntries() {
   invalidateEntryCache(currentUser?.id);
-  _entriesAll = [];   // force re-fetch next renderEntries call
+  _entriesAll = [];         // force re-fetch next renderEntries call
+  _pendingSharesAll = null; // force re-fetch pending received shares
 }
 
 // ── Currency amount formatter (dollars, not cents) ─────────────────
@@ -909,10 +1059,34 @@ window.handleForgotPassword = function() {
 window.doSendResetEmail = async function() {
   const email = document.getElementById('forgot-email')?.value.trim();
   if (!email) return toast('Enter your email address.', 'error');
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin + (window.location.pathname || '/') + '#reset'
-  });
-  if (error) return toast(error.message, 'error');
+  // Use our Resend-based endpoint so the email comes from Money IntX <hello@moneyintx.com>
+  let resetOk = false;
+  try {
+    const resp = await fetch('/api/send-reset-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const result = await resp.json();
+    resetOk = result.ok !== false;
+    if (!resetOk && result.error) {
+      // If our endpoint fails (e.g. missing service key env var), fall back to Supabase default
+      console.warn('[doSendResetEmail] custom endpoint failed, falling back:', result.error);
+      const { error: sbErr } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/'
+      });
+      if (sbErr) return toast(sbErr.message, 'error');
+      resetOk = true;
+    }
+  } catch(e) {
+    // Network error — fall back to Supabase
+    const { error: sbErr } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/'
+    });
+    if (sbErr) return toast(sbErr.message, 'error');
+    resetOk = true;
+  }
+  if (!resetOk) return;
   const forms = document.getElementById('auth-forms');
   if (forms) forms.innerHTML = `
     <div style="text-align:center;padding:20px 0;">
@@ -924,48 +1098,52 @@ window.doSendResetEmail = async function() {
 };
 
 // Handle password reset from email link
+// NOTE: This is a module script — DOMContentLoaded has already fired when this runs.
+// We inject the reset form directly (no listener needed).
 if (window.location.hash.includes('type=recovery') || window.location.hash.includes('#reset')) {
   window._isRecovery = true;
   // Handle both Supabase recovery and custom API reset token formats
   const hashStr = window.location.hash.substring(1);
-  const hashParams = new URLSearchParams(hashStr.replace(/^reset\?/, ''));
-  const hasToken = hashParams.get('type') === 'recovery' || hashParams.get('access_token') || hashParams.get('token');
+  const _hashParams = new URLSearchParams(hashStr.replace(/^reset\?/, ''));
+  const hasToken = _hashParams.get('type') === 'recovery' || _hashParams.get('access_token') || _hashParams.get('token');
   if (hasToken) {
-    window._resetToken = hashParams.get('token') || hashParams.get('access_token') || '';
-    document.addEventListener('DOMContentLoaded', () => {
-      const landing = document.getElementById('landing');
-      if (landing) {
-        landing.style.display = '';
-        // Find the auth card inner div
-        const authCard = landing.querySelector('#auth-forms') || landing.querySelector('.landing-card');
-        const target = authCard || landing.querySelector('div[style*="border-radius:16px"]');
-        if (target) {
-          const parent = target.closest('div[style*="border-radius:16px"]') || target;
-          parent.innerHTML = `
-            <div style="text-align:center;margin-bottom:20px;">
-              <div style="font-size:40px;margin-bottom:10px;">🔐</div>
-              <h2 style="font-size:22px;font-weight:800;margin-bottom:6px;">Set New Password</h2>
-              <p style="color:#8892a4;font-size:13px;">Choose a strong password for your account</p>
-            </div>
-            <div class="form-group">
-              <label>New Password</label>
-              <input type="password" id="reset-pass" placeholder="Min 6 characters" style="font-size:15px;padding:12px 14px;">
-            </div>
-            <div class="form-group">
-              <label>Confirm Password</label>
-              <input type="password" id="reset-pass2" placeholder="Confirm new password" style="font-size:15px;padding:12px 14px;">
-            </div>
-            <button class="btn btn-primary" style="width:100%;margin-top:8px;padding:14px;font-size:15px;" onclick="doResetPassword()">Update Password</button>
-          `;
-        }
-      }
-    });
+    window._resetToken = _hashParams.get('token') || _hashParams.get('access_token') || '';
+    const _authLoader = document.getElementById('auth-loader');
+    const _landing = document.getElementById('landing');
+    const _authForms = document.getElementById('auth-forms');
+    const _loginForm = document.getElementById('login-form');
+    const _signupForm = document.getElementById('signup-form');
+    if (_authLoader) _authLoader.style.display = 'none';
+    if (_landing) _landing.style.display = '';
+    if (_loginForm) _loginForm.style.display = 'none';
+    if (_signupForm) _signupForm.style.display = 'none';
+    if (_authForms && !document.getElementById('reset-pass')) {
+      const _rf = document.createElement('div');
+      _rf.id = 'reset-form-pw';
+      _rf.innerHTML = `
+        <div style="text-align:center;margin-bottom:20px;">
+          <div style="font-size:40px;margin-bottom:10px;">&#128274;</div>
+          <h2 style="font-size:22px;font-weight:800;margin-bottom:6px;">Set New Password</h2>
+          <p style="color:#8892a4;font-size:13px;">Choose a strong password for your account</p>
+        </div>
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="password" id="reset-pass" placeholder="Min 6 characters" style="font-size:15px;padding:12px 14px;">
+        </div>
+        <div class="form-group">
+          <label>Confirm Password</label>
+          <input type="password" id="reset-pass2" placeholder="Confirm new password" style="font-size:15px;padding:12px 14px;">
+        </div>
+        <button style="width:100%;margin-top:8px;padding:14px;font-size:15px;font-weight:700;border-radius:12px;background:#7fe0d0;color:#07111f;border:none;cursor:pointer;" onclick="doResetPassword()">Update Password</button>
+      `;
+      _authForms.appendChild(_rf);
+    }
   }
 }
 
 window.doResetPassword = async function() {
-  const pass = document.getElementById('reset-pass').value;
-  const pass2 = document.getElementById('reset-pass2').value;
+  const pass = document.getElementById('reset-pass')?.value;
+  const pass2 = document.getElementById('reset-pass2')?.value;
   if (!pass || pass.length < 6) return toast('Password must be at least 6 characters.', 'error');
   if (pass !== pass2) return toast('Passwords do not match.', 'error');
   const token = window._resetToken;
@@ -980,9 +1158,7 @@ window.doResetPassword = async function() {
     if (!data.ok) return toast(data.error || 'Failed to reset password.', 'error');
     toast('Password updated! You can now log in.', 'success');
     window.location.hash = '';
-    setTimeout(() => {
-      window.location.reload();
-    }, 1500);
+    setTimeout(() => window.location.reload(), 1500);
   } catch(e) {
     toast('Network error. Please try again.', 'error');
   }
@@ -1012,6 +1188,21 @@ async function enterApp(user) {
     }, { onConflict: 'id' }).select().single();
     currentProfile = data;
   }
+  // ── Cross-user login linking (SECURITY DEFINER RPC) ─────────────
+  // Direct table updates can't do this — RLS blocks one user from writing
+  // another user's contacts/share_tokens. The RPC runs with elevated
+  // privileges to: (1) set linked_user_id on all contacts that have this
+  // user's email across the whole platform, (2) set recipient_id on all
+  // share_tokens sent to this email, (3) fire in-app notifications for
+  // each newly linked share.
+  if (user.email) {
+    supabase.rpc('on_user_login', { p_email: user.email, p_user_id: user.id })
+      .then(({ data, error }) => {
+        if (error) console.warn('[on_user_login]', error.message);
+        else if (data) console.log('[on_user_login]', data);
+      });
+  }
+
   document.getElementById('auth-loader').style.display = 'none';
   document.getElementById('landing').style.display = 'none';
   document.getElementById('shell').classList.add('active');
@@ -1039,6 +1230,15 @@ async function enterApp(user) {
   // Start realtime notifications
   notifChannel = subscribeToNotifications(user.id, (notif) => {
     updateNotifBadge();
+    // For shared records: invalidate pending cache so it appears immediately wherever user is
+    if (notif.type === 'shared_record') {
+      _pendingSharesAll = null; // force re-fetch on next render
+      const el = document.getElementById('content');
+      if (el) {
+        if (window._currentPage === 'entries') renderEntries(el, 1, true);
+        else if (window._currentPage === 'dash')  renderDash(el);
+      }
+    }
     if (window._currentPage === 'notifications') navTo('notifications');
     toast(notif.message || 'New notification');
   });
@@ -1353,16 +1553,16 @@ async function renderDash(el) {
   // Stat cards row
   const pendingCount = recent.filter(e => !['settled','voided','cancelled','fulfilled'].includes(e.status)).length;
   html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin-bottom:14px;">
-    <div class="stat-card" style="cursor:pointer;background:linear-gradient(135deg,var(--bg2),#1e2035);border-color:#3b4261;" onclick="navTo('contacts')">
+    <div class="stat-card" style="cursor:pointer;border-color:var(--line-2,var(--border));" onclick="navTo('contacts')">
       <div class="stat-lbl">Contacts</div><div class="stat-val" style="color:var(--blue);">${contacts.length}</div>
     </div>
-    <div class="stat-card" style="cursor:pointer;background:linear-gradient(135deg,var(--bg2),#1e2035);border-color:#3b4261;" onclick="navTo('entries')">
+    <div class="stat-card" style="cursor:pointer;border-color:var(--line-2,var(--border));" onclick="navTo('entries')">
       <div class="stat-lbl">Entries</div><div class="stat-val">${recent.length}+</div>
     </div>
-    <div class="stat-card" style="cursor:pointer;background:linear-gradient(135deg,var(--bg2),#1b2314);border-color:#2d4a1e;" onclick="navTo('entries')">
+    <div class="stat-card" style="cursor:pointer;border-color:rgba(214,185,122,.18);" onclick="navTo('entries')">
       <div class="stat-lbl">Pending</div><div class="stat-val" style="color:var(--amber);">${pendingCount}</div>
     </div>
-    ${unread > 0 ? `<div class="stat-card" style="cursor:pointer;background:linear-gradient(135deg,var(--bg2),#1c1334);border-color:var(--accent);" onclick="navTo('notifications')">
+    ${unread > 0 ? `<div class="stat-card" style="cursor:pointer;border-color:rgba(108,99,255,.22);" onclick="navTo('notifications')">
       <div class="stat-lbl">Unread</div><div class="stat-val" style="color:var(--accent);">${unread}</div>
     </div>` : ''}
   </div>`;
@@ -1374,23 +1574,23 @@ async function renderDash(el) {
   html += `<div style="margin-bottom:14px;overflow-x:auto;padding-bottom:2px;">
     <div style="display:flex;gap:8px;min-width:max-content;">
       <button onclick="openNewEntryModal('owe-me')"
-        style="${_qaBtnBase}background:rgba(22,163,74,.18);border-color:rgba(22,163,74,.45);color:#4ade80;"
-        onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">
+        style="${_qaBtnBase}background:rgba(99,214,154,.10);border-color:rgba(99,214,154,.20);color:#63d69a;"
+        onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
         They Owe Me
       </button>
       <button onclick="openNewEntryModal('i-owe')"
-        style="${_qaBtnBase}background:rgba(220,38,38,.18);border-color:rgba(220,38,38,.45);color:#f87171;"
-        onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">
+        style="${_qaBtnBase}background:rgba(208,120,120,.10);border-color:rgba(208,120,120,.20);color:#d07878;"
+        onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
         I Owe Them
       </button>
       <button onclick="openNewEntryModal('advance')"
-        style="${_qaBtnBase}background:rgba(217,119,6,.16);border-color:rgba(217,119,6,.42);color:#fbbf24;"
-        onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">
+        style="${_qaBtnBase}background:rgba(213,187,122,.10);border-color:rgba(213,187,122,.20);color:#d5bb7a;"
+        onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
         Advances
       </button>
       <button onclick="navTo('templates')"
-        style="${_qaBtnBase}background:rgba(14,165,233,.15);border-color:rgba(14,165,233,.4);color:#60a5fa;"
-        onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">
+        style="${_qaBtnBase}background:rgba(157,178,219,.10);border-color:rgba(157,178,219,.20);color:#9db2db;"
+        onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
         New Invoice
       </button>
       <button onclick="openNewContactModal()"
@@ -1459,6 +1659,41 @@ async function renderDash(el) {
     html += `</div>`;
   }
 
+  // ── Pending Shared Records on Dashboard (same as entries page) ────
+  if (_pendingSharesAll === null) {
+    try {
+      const allShares = await listReceivedShares(currentUser.id);
+      _pendingSharesAll = (allShares || []).filter(s => s.status !== 'confirmed' && s.status !== 'dismissed');
+    } catch(e) { _pendingSharesAll = []; }
+  }
+  if (_pendingSharesAll && _pendingSharesAll.length > 0) {
+    html += `<div class="card" style="padding:0;overflow:hidden;border:2px solid rgba(245,158,11,.5);margin-bottom:14px;">
+      <div style="background:rgba(245,158,11,.1);padding:10px 16px;border-bottom:1px solid rgba(245,158,11,.2);display:flex;align-items:center;gap:8px;">
+        <span style="font-size:15px;">⏳</span>
+        <span style="font-weight:700;font-size:13px;color:#f59e0b;">Pending — Records Shared With You (${_pendingSharesAll.length})</span>
+      </div>
+      <div class="tbl-wrap"><table><thead><tr>
+        <th>From</th><th>Amount</th><th class="hide-mobile">Type</th><th>Action</th>
+      </tr></thead><tbody>`;
+    _pendingSharesAll.forEach(s => {
+      const snap = s.entry_snapshot || {};
+      const fromName = snap.from_name || 'Someone';
+      const amt = snap.amount || 0;
+      const cur = snap.currency || 'USD';
+      const txLabel = TX_LABELS[snap.tx_type] || snap.tx_type || '—';
+      html += `<tr data-pending-id="${s.id}">
+        <td style="font-weight:700;">${esc(fromName)}</td>
+        <td style="font-weight:700;color:#f59e0b;">${fmtMoney(amt, cur)}</td>
+        <td class="hide-mobile" style="font-size:12px;color:var(--muted);">${esc(txLabel)}</td>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-primary btn-sm" onclick="doPendingConfirm('${s.id}')" style="padding:5px 14px;font-size:12px;font-weight:700;">✓ Confirm</button>
+          <button class="bs sm" onclick="doPendingReject('${s.id}')" style="margin-left:4px;padding:5px 10px;font-size:12px;color:var(--red);border-color:var(--red);">✕ Reject</button>
+        </td>
+      </tr>`;
+    });
+    html += `</tbody></table></div></div>`;
+  }
+
   // Recent Entries — same format as full entries page
   html += `<div class="card" style="padding:0;overflow:hidden;">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px;border-bottom:1px solid var(--border);">
@@ -1492,7 +1727,7 @@ async function renderDash(el) {
         <td style="min-width:80px;">
           ${cId ? `<span style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;" onclick="openContactDetail('${cId}')">
             <span style="width:24px;height:24px;border-radius:50%;background:${col};display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;color:#fff;">${esc(cName.charAt(0).toUpperCase())}</span>
-            <span style="font-weight:600;color:${col};">${esc(cName)}</span>
+            <span style="font-weight:600;color:var(--contact,#d88978);">${esc(cName)}</span>
           </span>` : `<span style="color:var(--muted);">${esc(cName)}</span>`}
         </td>
         <td style="font-weight:700;cursor:pointer;" onclick="openEntryDetail('${e.id}')">${amtHtml}</td>
@@ -1917,6 +2152,7 @@ window.confirmDeleteContact = async function(id, name) {
 
 // ── Entries ───────────────────────────────────────────────────────
 let _entriesAll = [];
+let _pendingSharesAll = null; // null = not yet loaded; [] = loaded but empty
 let _entriesPage = 1;
 let _entriesFilter = '';
 
@@ -1932,6 +2168,16 @@ async function renderEntries(el, page, forceRefresh) {
       _entriesAll = window._impersonatedData.entries || [];
     } else {
       _entriesAll = await listEntries(currentUser.id);
+    }
+  }
+
+  // Load pending received shares (from other users) — shown inline at top
+  if (_pendingSharesAll === null || forceRefresh) {
+    try {
+      const allShares = await listReceivedShares(currentUser.id);
+      _pendingSharesAll = (allShares || []).filter(s => s.status !== 'confirmed' && s.status !== 'dismissed');
+    } catch(e) {
+      _pendingSharesAll = [];
     }
   }
 
@@ -1958,6 +2204,38 @@ async function renderEntries(el, page, forceRefresh) {
       <button class="bs sm" onclick="doExportEntries()" title="Export CSV">📥</button>
     </div>
   </div>`;
+
+  // ── Pending Shared Records banner (from other users, awaiting confirm/reject) ──
+  if (_pendingSharesAll && _pendingSharesAll.length > 0) {
+    html += `<div class="card" style="padding:0;overflow:hidden;border:2px solid rgba(245,158,11,.5);margin-bottom:14px;">
+      <div style="background:rgba(245,158,11,.1);padding:10px 16px;border-bottom:1px solid rgba(245,158,11,.2);display:flex;align-items:center;gap:8px;">
+        <span style="font-size:15px;">⏳</span>
+        <span style="font-weight:700;font-size:13px;color:#f59e0b;">Pending — Records Shared With You (${_pendingSharesAll.length})</span>
+        <span style="color:var(--muted);font-size:12px;">Confirm to add to your ledger, or reject to dismiss</span>
+      </div>
+      <div class="tbl-wrap"><table><thead><tr>
+        <th>From</th><th>Amount</th><th class="hide-mobile">Type</th><th class="hide-mobile">Date</th><th>Action</th>
+      </tr></thead><tbody>`;
+    _pendingSharesAll.forEach(s => {
+      const snap = s.entry_snapshot || {};
+      const fromName = snap.from_name || 'Someone';
+      const amt = snap.amount || 0;
+      const cur = snap.currency || 'USD';
+      const txLabel = TX_LABELS[snap.tx_type] || snap.tx_type || '—';
+      const note = snap.note ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(snap.note)}</div>` : '';
+      html += `<tr data-pending-id="${s.id}">
+        <td style="font-weight:700;">${esc(fromName)}</td>
+        <td style="font-weight:700;color:#f59e0b;">${fmtMoney(amt, cur)}${note}</td>
+        <td class="hide-mobile" style="font-size:12px;color:var(--muted);">${esc(txLabel)}</td>
+        <td class="hide-mobile" style="font-size:12px;color:var(--muted);">${fmtDate(snap.date)}</td>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-primary btn-sm" onclick="doPendingConfirm('${s.id}')" style="padding:5px 14px;font-size:12px;font-weight:700;">✓ Confirm</button>
+          <button class="bs sm" onclick="doPendingReject('${s.id}')" style="margin-left:4px;padding:5px 10px;font-size:12px;color:var(--red);border-color:var(--red);">✕ Reject</button>
+        </td>
+      </tr>`;
+    });
+    html += `</tbody></table></div></div>`;
+  }
 
   // Bulk action bar
   if (_sm && window._selectedEntries.size > 0) {
@@ -2004,7 +2282,7 @@ async function renderEntries(el, page, forceRefresh) {
         <td style="min-width:80px;">
           ${cId ? `<span style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;" onclick="openContactDetail('${cId}')">
             <span style="width:24px;height:24px;border-radius:50%;background:${col};display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;color:#fff;">${esc(cName.charAt(0).toUpperCase())}</span>
-            <span style="font-weight:600;color:${col};">${esc(cName)}</span>
+            <span style="font-weight:600;color:var(--contact,#d88978);">${esc(cName)}</span>
           </span>` : `<span style="color:var(--muted);">${esc(cName)}</span>`}
         </td>
         <td style="font-weight:700;cursor:pointer;" onclick="openEntryDetail('${e.id}')">${amtHtml}</td>
@@ -2687,11 +2965,20 @@ window.copyNotifLink = async function(entryId) {
   if (!entry) return;
   let shareUrl = '';
   try {
-    const { data } = await supabase.from('share_tokens').select('token').eq('entry_id', entryId).maybeSingle();
-    if (data?.token) {
-      shareUrl = window.location.origin + '/view?t=' + data.token;
+    const { data: existing } = await supabase.from('share_tokens').select('token').eq('entry_id', entryId).maybeSingle();
+    if (existing?.token) {
+      shareUrl = window.location.origin + '/view?t=' + existing.token;
     } else {
-      const res = await createShareToken(currentUser.id, entryId);
+      const snapshot = {
+        amount: entry.amount, currency: entry.currency, tx_type: entry.tx_type,
+        date: entry.date, note: entry.note, invoice_number: entry.invoice_number,
+        status: entry.status, from_name: currentProfile?.display_name || '',
+        from_email: currentUser.email
+      };
+      const contactEmail = entry.contact?.email || '';
+      const res = await createShareToken(currentUser.id, entryId, {
+        recipientEmail: contactEmail, entrySnapshot: snapshot
+      });
       if (res?.token) shareUrl = window.location.origin + '/view?t=' + res.token;
     }
   } catch(_) {}
@@ -2705,11 +2992,20 @@ window.copyNotifMessage = async function(entryId) {
   const msg = document.getElementById('notif-msg')?.value?.trim() || '';
   let shareUrl = '';
   try {
-    const { data } = await supabase.from('share_tokens').select('token').eq('entry_id', entryId).maybeSingle();
-    if (data?.token) {
-      shareUrl = window.location.origin + '/view?t=' + data.token;
+    const { data: existing } = await supabase.from('share_tokens').select('token').eq('entry_id', entryId).maybeSingle();
+    if (existing?.token) {
+      shareUrl = window.location.origin + '/view?t=' + existing.token;
     } else {
-      const res = await createShareToken(currentUser.id, entryId);
+      const snapshot = {
+        amount: entry.amount, currency: entry.currency, tx_type: entry.tx_type,
+        date: entry.date, note: entry.note, invoice_number: entry.invoice_number,
+        status: entry.status, from_name: currentProfile?.display_name || '',
+        from_email: currentUser.email
+      };
+      const contactEmail = entry.contact?.email || '';
+      const res = await createShareToken(currentUser.id, entryId, {
+        recipientEmail: contactEmail, entrySnapshot: snapshot
+      });
       if (res?.token) shareUrl = window.location.origin + '/view?t=' + res.token;
     }
   } catch(_) {}
@@ -2887,12 +3183,14 @@ window.doShareEntry = async function(entryId) {
   const url = getShareUrl(token.token);
 
   // Notify linked recipient if email provided
+  // NOTE: We use an RPC (find_user_id_by_email) instead of a direct table
+  // query because RLS on `users` prevents one user from reading another's row.
   if (email) {
-    const { data: recipientUser } = await supabase.from('users').select('id').eq('email', email).single();
-    if (recipientUser) {
-      await supabase.from('share_tokens').update({ recipient_id: recipientUser.id, status: 'sent' }).eq('id', token.id);
+    const { data: recipientId } = await supabase.rpc('find_user_id_by_email', { p_email: email });
+    if (recipientId) {
+      await supabase.from('share_tokens').update({ recipient_id: recipientId, status: 'sent' }).eq('id', token.id);
       await supabase.from('notifications').insert({
-        user_id: recipientUser.id,
+        user_id: recipientId,
         type: 'shared_record',
         message: `${currentProfile?.display_name || 'Someone'} shared a record with you: ${fmtMoney(entry.amount, entry.currency)}`,
         entry_id: entryId,
@@ -2990,20 +3288,84 @@ window.openSharedWithMe = async function() {
 };
 
 window.doConfirmShare = async function(tokenId) {
-  const entry = await confirmShare(tokenId, currentUser.id);
-  if (entry) {
-    toast('Record confirmed and tracked!', 'success');
-    openSharedWithMe();
-  } else {
-    toast('Failed to confirm.', 'error');
+  const { data, error } = await supabase.rpc('confirm_share_for_recipient', {
+    p_token_id: tokenId,
+    p_recipient_id: currentUser.id
+  });
+  if (error) {
+    console.error('[doConfirmShare]', error.message);
+    toast('Failed to confirm: ' + error.message, 'error');
+    return;
   }
+  if (data?.entry_id) {
+    toast('Record confirmed and added to your ledger!', 'success');
+    _refreshPendingInPlace(tokenId, true);
+  } else {
+    toast('Failed to confirm — please try again.', 'error');
+  }
+};
+
+// Inline confirm/reject from entries list — updates IN PLACE, no page jump
+window.doPendingConfirm = async function(tokenId) {
+  // Disable the row's buttons immediately for feedback
+  const row = document.querySelector(`[data-pending-id="${tokenId}"]`);
+  if (row) {
+    row.querySelectorAll('button').forEach(b => { b.disabled = true; });
+    const confirmBtn = row.querySelector('.btn-primary');
+    if (confirmBtn) confirmBtn.textContent = '…';
+  }
+  const { data, error } = await supabase.rpc('confirm_share_for_recipient', {
+    p_token_id: tokenId,
+    p_recipient_id: currentUser.id
+  });
+  if (error) {
+    console.error('[doPendingConfirm]', error.message);
+    toast('Failed to confirm: ' + error.message, 'error');
+    if (row) row.querySelectorAll('button').forEach(b => { b.disabled = false; });
+    return;
+  }
+  if (data?.entry_id) {
+    toast('Record confirmed and added to your ledger!', 'success');
+    _refreshPendingInPlace(tokenId, true);
+  } else {
+    toast('Could not confirm — please try again.', 'error');
+    if (row) row.querySelectorAll('button').forEach(b => { b.disabled = false; });
+  }
+};
+
+window.doPendingReject = async function(tokenId) {
+  const row = document.querySelector(`[data-pending-id="${tokenId}"]`);
+  if (row) row.querySelectorAll('button').forEach(b => { b.disabled = true; });
+  await dismissShare(tokenId);
+  toast('Record rejected.', 'success');
+  _refreshPendingInPlace(tokenId, false);
 };
 
 window.doDismissShare = async function(tokenId) {
   await dismissShare(tokenId);
   toast('Record dismissed.', 'success');
-  openSharedWithMe();
+  _refreshPendingInPlace(tokenId, false);
 };
+
+// ── In-place refresh after confirm/reject (no page navigation) ────
+async function _refreshPendingInPlace(tokenId, wasConfirmed) {
+  // 1. Remove from the pending cache immediately
+  if (_pendingSharesAll) {
+    _pendingSharesAll = _pendingSharesAll.filter(s => s.id !== tokenId);
+  }
+  // 2. Force re-fetch of the entries list (new confirmed entry is now in DB)
+  invalidateEntryCache(currentUser?.id);
+  _entriesAll = [];
+  // 3. Re-render current page in-place — no navigation
+  const el = document.getElementById('content');
+  if (!el) return;
+  if (window._currentPage === 'dash') {
+    await renderDash(el);
+  } else {
+    // entries page (or any other page) — re-render entries
+    await renderEntries(el, 1, true);
+  }
+}
 
 // ── Enhanced Send Reminder with scheduling ────────────────────────
 window.openSendReminderModal = async function(id) {
@@ -3733,6 +4095,43 @@ window.saveNewEntry = async function() {
   toast('Entry created.', 'success');
   _invalidateEntries(); navTo('entries');
 
+  // ── Auto-share to linked platform user (runs regardless of notify toggle) ──
+  // If the contact is a registered platform user (linked_user_id is set),
+  // automatically create a share token so the entry lands in their "Shared With Me".
+  if (entry?.id && contactId) {
+    try {
+      const { data: cRow } = await supabase.from('contacts')
+        .select('email, linked_user_id').eq('id', contactId).single();
+      if (cRow?.linked_user_id) {
+        // Only create if no token already exists for this entry
+        const { data: existTok } = await supabase.from('share_tokens')
+          .select('id').eq('entry_id', entry.id).maybeSingle();
+        if (!existTok) {
+          const fromName = currentProfile?.display_name || currentProfile?.company_name || 'Someone';
+          const autoSnap = {
+            amount: parseFloat(amount), currency, tx_type: category,
+            date, note, invoice_number: invNumber || '',
+            from_name: fromName, from_email: currentUser.email
+          };
+          const tok = await createShareToken(currentUser.id, entry.id, {
+            recipientEmail: cRow.email || '', entrySnapshot: autoSnap
+          });
+          if (tok?.id) {
+            await supabase.from('share_tokens')
+              .update({ recipient_id: cRow.linked_user_id, status: 'sent' })
+              .eq('id', tok.id);
+            await supabase.from('notifications').insert({
+              user_id: cRow.linked_user_id, type: 'shared_record',
+              message: `${fromName} shared a record with you: ${fmtMoney(parseFloat(amount), currency)}`,
+              entry_id: entry.id, contact_name: fromName,
+              amount: parseFloat(amount), currency, read: false
+            });
+          }
+        }
+      }
+    } catch(e) { console.warn('[auto-share linked]', e); }
+  }
+
   // ── Post-save notifications (only when Notify toggle is ON) ─────
   if (!notifyOn) return;
   try {
@@ -3878,13 +4277,16 @@ async function renderNotifications(el) {
       <th>Contact</th><th>Amount</th><th class="hide-mobile">Message</th><th>Date</th><th>Event</th><th></th>
     </tr></thead><tbody>`;
     notifs.forEach(n => {
+      const actionBtn = n.type === 'shared_record'
+        ? `<button onclick="navTo('entries')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View in Entries →</button>`
+        : '';
       html += `<tr>
         <td style="font-weight:600;font-size:13px;">${esc(n.contact_name || '—')}</td>
         <td style="font-weight:700;font-size:13px;">${n.amount ? fmtMoney(n.amount, n.currency || 'USD') : '—'}</td>
         <td class="hide-mobile" style="font-size:13px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(n.message)}">${esc(n.message)}</td>
         <td style="font-size:12px;color:var(--muted);">${fmtRelative(n.created_at)}</td>
         <td>${typeBadge(n.type)}</td>
-        <td><button onclick="deleteNotif('${n.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;">✕</button></td>
+        <td style="white-space:nowrap;">${actionBtn}<button onclick="deleteNotif('${n.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;">✕</button></td>
       </tr>`;
     });
     html += `</tbody></table></div></div>`;
@@ -6975,15 +7377,51 @@ async function checkAuth() {
   }
   if (_authChecked) return;
   _authChecked = true;
+  // Check recovery flag from sessionStorage (set by pre-module script before Supabase cleared hash)
+  const _storedRecovery = (() => { try { return sessionStorage.getItem('_mxi_recovery') === '1'; } catch(e) { return false; } })();
+  if (_storedRecovery) window._isRecovery = true;
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
-    // session check (debug logging removed for production)
     if (session?.user) {
-      // Only call enterApp if onAuthStateChange hasn't already handled it
-      if (!currentUser && !window._isRecovery) { enterApp(session.user); }
-      else if (window._isRecovery) {
+      if (window._isRecovery || _storedRecovery) {
+        // Password recovery — let PASSWORD_RECOVERY event handle the form injection.
+        // Just ensure the loader is hidden and landing is visible.
         document.getElementById('auth-loader').style.display = 'none';
         document.getElementById('landing').style.display = '';
+        // If PASSWORD_RECOVERY event hasn't injected the form yet, wait briefly then inject
+        setTimeout(() => {
+          if (!document.getElementById('reset-pass')) {
+            const _lf = document.getElementById('login-form');
+            const _sf = document.getElementById('signup-form');
+            const _af = document.getElementById('auth-forms');
+            if (_lf) _lf.style.display = 'none';
+            if (_sf) _sf.style.display = 'none';
+            if (_af && !document.getElementById('reset-pass')) {
+              const _rf = document.createElement('div');
+              _rf.id = 'reset-form-pw';
+              _rf.innerHTML = `
+                <div style="text-align:center;margin-bottom:20px;">
+                  <div style="font-size:40px;margin-bottom:10px;">🔐</div>
+                  <h2 style="font-size:22px;font-weight:800;margin-bottom:6px;">Set New Password</h2>
+                  <p style="color:#8892a4;font-size:13px;">Choose a strong password for your account</p>
+                </div>
+                <div class="form-group">
+                  <label>New Password</label>
+                  <input type="password" id="reset-pass" placeholder="Min 6 characters" style="font-size:15px;padding:12px 14px;">
+                </div>
+                <div class="form-group">
+                  <label>Confirm Password</label>
+                  <input type="password" id="reset-pass2" placeholder="Confirm new password" style="font-size:15px;padding:12px 14px;">
+                </div>
+                <button class="btn btn-primary" style="width:100%;margin-top:8px;padding:14px;font-size:15px;" onclick="doResetPassword()">Update Password</button>
+              `;
+              _af.appendChild(_rf);
+            }
+          }
+        }, 200);
+      } else if (!currentUser) {
+        // Normal login — enter the app
+        enterApp(session.user);
       }
       // If currentUser already set by onAuthStateChange, enterApp hid the loader — nothing to do
     } else {
@@ -7032,17 +7470,34 @@ onAuthChange(async (event, session) => {
     }
   } else if (event === 'PASSWORD_RECOVERY') {
     window._isRecovery = true;
+    document.getElementById('auth-loader').style.display = 'none';
     document.getElementById('shell').classList.remove('active');
     document.getElementById('landing').style.display = '';
     if (!document.getElementById('reset-pass')) {
-      document.getElementById('login-form').style.display = 'none';
+      const _lf = document.getElementById('login-form');
       const _sf = document.getElementById('signup-form');
+      if (_lf) _lf.style.display = 'none';
       if (_sf) _sf.style.display = 'none';
       const _af = document.getElementById('auth-forms');
       if (_af) {
         const _rf = document.createElement('div');
         _rf.id = 'reset-form-pw';
-        _rf.innerHTML = '<h2 style="margin:0 0 1rem">Set New Password</h2><div class="form-group"><label>New Password</label><input id="reset-pass" type="password" class="form-control" placeholder="Min 6 characters" style="width:100%"></div><div class="form-group" style="margin-top:.5rem"><label>Confirm Password</label><input id="reset-pass2" type="password" class="form-control" placeholder="Confirm password" style="width:100%"></div><button class="btn btn-primary btn-block" style="margin-top:1rem;width:100%" onclick="doResetPassword()">Update Password</button>';
+        _rf.innerHTML = `
+          <div style="text-align:center;margin-bottom:20px;">
+            <div style="font-size:40px;margin-bottom:10px;">🔐</div>
+            <h2 style="font-size:22px;font-weight:800;margin-bottom:6px;">Set New Password</h2>
+            <p style="color:#8892a4;font-size:13px;">Choose a strong password for your account</p>
+          </div>
+          <div class="form-group">
+            <label>New Password</label>
+            <input id="reset-pass" type="password" placeholder="Min 6 characters" style="font-size:15px;padding:12px 14px;">
+          </div>
+          <div class="form-group">
+            <label>Confirm Password</label>
+            <input id="reset-pass2" type="password" placeholder="Confirm password" style="font-size:15px;padding:12px 14px;">
+          </div>
+          <button class="btn btn-primary" style="width:100%;margin-top:8px;padding:14px;font-size:15px;" onclick="doResetPassword()">Update Password</button>
+        `;
         _af.appendChild(_rf);
       }
     }

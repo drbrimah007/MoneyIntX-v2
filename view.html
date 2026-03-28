@@ -126,15 +126,33 @@ async function loadRecord() {
 }
 
 window.confirmRecord = async function(shareId) {
+  // This page is for external viewers only.
+  // Registered platform users should open Money IntX and confirm via "Shared With Me".
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
-    alert('Please sign in first to track this record.');
-    window.location.href = '/';
+    document.getElementById('view-card').innerHTML = `
+      <div style="text-align:center;padding:30px;">
+        <div style="font-size:40px;margin-bottom:12px;">🔐</div>
+        <p style="font-size:18px;font-weight:700;margin-bottom:8px;">Sign in to track this</p>
+        <p style="font-size:14px;color:#8892a4;margin-bottom:20px;">Create a free Money IntX account to confirm and track this record in your ledger.</p>
+        <a href="/" style="display:inline-block;padding:10px 24px;background:#6c63ff;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;margin-right:8px;">Sign In / Sign Up →</a>
+      </div>`;
     return;
   }
-  await supabase.from('share_tokens').update({ status:'confirmed', confirmed_at:new Date().toISOString(), recipient_id:session.user.id }).eq('id', shareId);
-  alert('Record confirmed! It will appear in your entries.');
-  window.location.reload();
+
+  // Logged-in user: mark as viewed/acknowledged and redirect to app
+  await supabase.from('share_tokens')
+    .update({ status: 'sent', recipient_id: session.user.id })
+    .eq('id', shareId)
+    .eq('status', 'created'); // only update if still in created state
+
+  document.getElementById('view-card').innerHTML = `
+    <div style="text-align:center;padding:30px;">
+      <div style="font-size:40px;margin-bottom:12px;">✅</div>
+      <p style="font-size:18px;font-weight:700;margin-bottom:8px;">You're all set!</p>
+      <p style="font-size:14px;color:#8892a4;margin-bottom:20px;">Open Money IntX and go to <strong>Shared With Me</strong> to confirm or dismiss this record.</p>
+      <a href="/" style="display:inline-block;padding:10px 24px;background:#6c63ff;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">Open Money IntX →</a>
+    </div>`;
 };
 
 window.dismissRecord = async function(shareId) {
