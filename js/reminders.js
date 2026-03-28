@@ -1,5 +1,6 @@
 // Money IntX v2 — Reminders Module
 import { supabase } from './supabase.js';
+import { sendNotificationEmail } from './email.js';
 
 // ── Create scheduled reminder ─────────────────────────────────────
 export async function createScheduledReminder(userId, entryId, {
@@ -61,11 +62,16 @@ export async function processDueReminders(userId) {
   const now = new Date().toISOString();
   const { data: due, error } = await supabase
     .from('scheduled_reminders')
-    .select('*, entry:entries(id, amount, currency, tx_type, status, contact:contacts(id, name, linked_user_id))')
+    .select('*, entry:entries(id, amount, currency, tx_type, status, contact:contacts(id, name, email, linked_user_id))')
     .eq('user_id', userId)
     .eq('active', true)
     .lte('next_send_at', now);
   if (error || !due?.length) return [];
+
+  // Fetch sender's display name for email
+  const { data: senderProfile } = await supabase
+    .from('profiles').select('display_name, company_name').eq('id', userId).single();
+  const senderName = senderProfile?.display_name || senderProfile?.company_name || 'Someone';
 
   const processed = [];
   for (const rem of due) {
@@ -82,17 +88,31 @@ export async function processDueReminders(userId) {
     }
     // Create notification for recipient
     const contactName = rem.entry?.contact?.name || 'Someone';
+    const contactEmail = rem.entry?.contact?.email || '';
     const linkedUserId = rem.entry?.contact?.linked_user_id;
     if (linkedUserId) {
       await supabase.from('notifications').insert({
         user_id: linkedUserId,
         type: 'reminder',
-        message: rem.message || `Reminder from ${contactName}`,
+        message: rem.message || `Reminder from ${senderName}`,
         entry_id: rem.entry_id,
-        contact_name: contactName,
+        contact_name: senderName,
         amount: rem.entry?.amount,
         currency: rem.entry?.currency
       });
+    }
+    // Send email to contact if they have an email address
+    if (contactEmail) {
+      sendNotificationEmail(userId, {
+        to: contactEmail,
+        fromName: senderName,
+        txType: rem.entry?.tx_type,
+        amount: rem.entry?.amount,
+        currency: rem.entry?.currency || 'USD',
+        message: rem.message || '',
+        entryId: rem.entry_id,
+        isReminder: true
+      }).catch(e => console.warn('[processDueReminders] Email send failed:', e));
     }
     // Self notification
     await supabase.from('notifications').insert({

@@ -32,8 +32,8 @@ const BRAND = {
   text: '#1e293b',
   muted: '#64748b',
   border: '#e2e8f0',
-  logoUrl: 'https://moneyintx-v2.vercel.app/money.png',
-  siteUrl: 'https://moneyintx-v2.vercel.app'
+  logoUrl: 'https://v2.moneyinteractions.com/money.png',
+  siteUrl: 'https://v2.moneyinteractions.com'
 };
 
 // ── Base email wrapper ─────────────────────────────────────────────────────────
@@ -97,12 +97,12 @@ export async function logEmail(userId, { type, recipient, subject, status = 'sen
 }
 
 // ── Send via /api/send-email serverless function ───────────────────────────────
-async function callSendEmail({ to, subject, html }) {
+async function callSendEmail({ to, subject, html, text }) {
   try {
     const res = await fetch('/api/send-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, subject, html })
+      body: JSON.stringify({ to, subject, html, text })
     });
     const data = await res.json();
     if (!data.ok) {
@@ -161,7 +161,9 @@ export async function sendNotificationEmail(userId, {
     body
   });
 
-  const result = await callSendEmail({ to, subject, html });
+  const text = `${fromName} ${isReminder ? 'is following up on a record' : 'has a new record'} with you on Money IntX.\n\nType: ${label}\nAmount: ${currency} ${amount}${message ? '\nMessage: ' + message : ''}\n\nView at: ${BRAND.siteUrl}`;
+
+  const result = await callSendEmail({ to, subject, html, text });
   const status = result.ok ? 'sent' : 'failed';
 
   await logEmail(userId, {
@@ -231,7 +233,9 @@ export async function sendInvoiceEmail(userId, {
     body
   });
 
-  const result = await callSendEmail({ to, subject, html });
+  const text = `Invoice ${invoiceNumber} from ${companyName || fromName}\n\nAmount: ${currency} ${Number(amount).toLocaleString('en-US', {minimumFractionDigits:2})}${dueDate ? '\nDue: ' + dueDate : ''}${message ? '\nNote: ' + message : ''}\n\nView at: ${BRAND.siteUrl}`;
+
+  const result = await callSendEmail({ to, subject, html, text });
   const status = result.ok ? 'sent' : 'failed';
 
   await logEmail(userId, {
