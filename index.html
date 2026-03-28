@@ -11,11 +11,11 @@
 <link rel="apple-touch-icon" sizes="180x180" href="favicon.png">
 <!-- Open Graph -->
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://moneyintx.com/">
+<meta property="og:url" content="https://moneyinteractions.com/">
 <meta property="og:site_name" content="Money IntX">
 <meta property="og:title" content="Money IntX — Know Exactly Who Owes You">
 <meta property="og:description" content="Track who owes you and what you owe. Send invoices, schedule reminders, manage savings groups and investments. Free to use. No ads, ever.">
-<meta property="og:image" content="https://moneyintx.com/og-image.png">
+<meta property="og:image" content="https://moneyinteractions.com/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Money IntX — Financial tracking dashboard showing balances and recent entries">
@@ -24,7 +24,7 @@
 <meta name="twitter:site" content="@moneyintx">
 <meta name="twitter:title" content="Money IntX — Know Exactly Who Owes You">
 <meta name="twitter:description" content="Track debts, send invoices, schedule reminders. Free personal &amp; commercial financial tracker.">
-<meta name="twitter:image" content="https://moneyintx.com/og-image.png">
+<meta name="twitter:image" content="https://moneyinteractions.com/og-image.png">
 <meta name="twitter:image:alt" content="Money IntX dashboard">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -2486,6 +2486,12 @@ window.saveMarkPaid = async function(entryId, currency) {
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
 
   try {
+    // 0. Fetch entry for contact details
+    const entry = await getEntry(entryId);
+    const contactName = entry?.contact?.name || 'Contact';
+    const contactEmail = entry?.contact?.email || '';
+    const linkedUserId = entry?.contact?.linked_user_id || null;
+
     // 1. Upload proof file if provided
     let proofUrl = '';
     if (proofFile) {
@@ -2515,6 +2521,41 @@ window.saveMarkPaid = async function(entryId, currency) {
       .single();
 
     if (error) throw error;
+
+    const fmtAmt = fmtMoney(amountDollars, currency || entry?.currency || 'USD');
+    const fromName = currentProfile?.display_name || currentProfile?.full_name || 'Someone';
+
+    // 3. Self-notification
+    await supabase.from('notifications').insert({
+      user_id: currentUser.id, type: 'notification',
+      message: `Payment of ${fmtAmt} recorded for ${contactName}${note ? ' — ' + note : ''}`,
+      amount: amountDollars, currency: currency || entry?.currency || 'USD',
+      contact_name: contactName, entry_id: entryId, read: false
+    });
+
+    // 4. In-app notification to linked contact
+    if (linkedUserId) {
+      await supabase.from('notifications').insert({
+        user_id: linkedUserId, type: 'notification',
+        message: `${fromName} recorded a payment of ${fmtAmt}${note ? ' — ' + note : ''}`,
+        amount: amountDollars, currency: currency || entry?.currency || 'USD',
+        contact_name: fromName, entry_id: entryId, read: false
+      });
+    }
+
+    // 5. Email to contact (non-blocking)
+    if (contactEmail) {
+      try {
+        await sendNotificationEmail(currentUser.id, {
+          to: contactEmail, fromName,
+          txType: 'payment_recorded', amount: amountDollars,
+          currency: currency || entry?.currency || 'USD',
+          message: note, entryId, isReminder: false,
+          logoUrl: currentProfile?.logo_url, siteUrl: 'https://moneyinteractions.com',
+          isSelf: false, contactName
+        });
+      } catch(e) { /* non-blocking */ }
+    }
 
     closeModal();
     toast('Payment recorded ✓', 'success');
@@ -2562,7 +2603,7 @@ window.saveRecordFulfillment = async function(entryId) {
     await supabase.from('notifications').insert({
       user_id: currentUser.id, type: 'notification',
       message: `Advance marked as fulfilled${note ? ': ' + note : ''}`,
-      entry_id: entryId, is_read: false
+      entry_id: entryId, read: false
     });
     closeModal();
     toast('Advance marked as fulfilled ✓', 'success');
@@ -2682,7 +2723,7 @@ window.sendInvoiceNotification = async function(entryId) {
           currency: entry.currency, message, entryId, isReminder: false,
           logoUrl: currentProfile?.logo_url,
           fromEmail: currentProfile?.company_email || currentUser?.email,
-          siteUrl: 'https://moneyintx.com'
+          siteUrl: 'https://moneyinteractions.com'
         });
         if (!result?.ok) toast('Notification sent (email failed: ' + (result?.error || 'check Settings → Email Diagnostics') + ')', 'info');
       } catch(e) { console.warn('Email send failed:', e); toast('Email failed: ' + e.message, 'error'); }
@@ -2712,7 +2753,7 @@ window.sendInvoiceNotification = async function(entryId) {
       await sendNotificationEmail(currentUser.id, {
         to: currentUser.email, fromName, txType: entry.category || entry.tx_type,
         amount: entry.amount, currency: entry.currency, message, entryId, isReminder: false,
-        logoUrl: currentProfile?.logo_url, siteUrl: 'https://moneyintx.com',
+        logoUrl: currentProfile?.logo_url, siteUrl: 'https://moneyinteractions.com',
         isSelf: true, contactName: cName
       });
     } catch(e) { console.warn('[self-email invoice notif]', e); }
@@ -3119,7 +3160,7 @@ window.doSendReminder = async function(entryId) {
             currency: entry.currency, message, entryId, isReminder: true,
             logoUrl: currentProfile?.logo_url,
             fromEmail: currentProfile?.company_email || currentUser?.email,
-            siteUrl: 'https://moneyintx.com'
+            siteUrl: 'https://moneyinteractions.com'
           });
           if (!result?.ok) toast('Reminder sent (email failed: ' + (result?.error || 'check Settings → Email Diagnostics') + ')', 'info');
         } catch(e) { console.warn('Email reminder failed:', e); toast('Reminder email failed: ' + e.message, 'error'); }
@@ -3133,7 +3174,7 @@ window.doSendReminder = async function(entryId) {
         await sendNotificationEmail(currentUser.id, {
           to: currentUser.email, fromName: fromNameSelf, txType: entry.category || entry.tx_type,
           amount: entry.amount, currency: entry.currency, message, entryId, isReminder: true,
-          logoUrl: currentProfile?.logo_url, siteUrl: 'https://moneyintx.com',
+          logoUrl: currentProfile?.logo_url, siteUrl: 'https://moneyinteractions.com',
           isSelf: true, contactName: cName
         });
       } catch(e) { console.warn('[self-email reminder]', e); }
@@ -3677,7 +3718,7 @@ window.saveNewEntry = async function() {
         user_id: currentUser.id, type: 'notification',
         message: `${txLabel} with ${contactName} — ${amtLabel}${combinedMsg ? '. ' + combinedMsg : ''}`,
         amount: parseFloat(amount), currency, contact_name: contactName,
-        entry_id: entryId, is_read: false
+        entry_id: entryId, read: false
       });
       // Self-email copy
       if (currentUser?.email) {
@@ -3686,7 +3727,7 @@ window.saveNewEntry = async function() {
             to: currentUser.email, fromName,
             txType: category, amount: parseFloat(amount), currency,
             message: combinedMsg || note, entryId, isReminder: false,
-            logoUrl: currentProfile?.logo_url, siteUrl: 'https://moneyintx.com',
+            logoUrl: currentProfile?.logo_url, siteUrl: 'https://moneyinteractions.com',
             isSelf: true, contactName
           });
         } catch(e) { console.warn('[self-email entry]', e); }
@@ -3713,7 +3754,7 @@ window.saveNewEntry = async function() {
         user_id: linkedUserId, type: 'notification',
         message: `${fromName}: ${mirrorLabel} — ${amtLabel}${combinedMsg ? '. ' + combinedMsg : ''}`,
         amount: parseFloat(amount), currency, contact_name: fromName,
-        entry_id: entryId, is_read: false
+        entry_id: entryId, read: false
       });
     }
 
@@ -3742,7 +3783,7 @@ window.saveNewEntry = async function() {
           message: combinedMsg || note, entryId,
           logoUrl: currentProfile?.logo_url,
           fromEmail: currentProfile?.company_email || currentUser?.email,
-          siteUrl: 'https://moneyintx.com'
+          siteUrl: 'https://moneyinteractions.com'
         });
       }
       if (emailResult?.ok) {
@@ -4984,7 +5025,7 @@ window.doCreateTrustee = async function() {
       to: email, fromName: currentProfile?.display_name || currentProfile?.company_name || 'Someone',
       recipientName: name, relationship: document.getElementById('nk-rel').value.trim(),
       accessLevel: document.getElementById('nk-access').value,
-      logoUrl: currentProfile?.logo_url, siteUrl: 'https://moneyintx.com'
+      logoUrl: currentProfile?.logo_url, siteUrl: 'https://moneyinteractions.com'
     });
   } catch(e) { console.warn('[NOK] Verification email failed:', e); }
   closeModal(); toast('Trustee added & notified.', 'success'); navTo('nok');
@@ -5009,7 +5050,7 @@ window.doActivateTrustee = async function(id) {
         recipientName: trustee.trustee_name, relationship: trustee.relationship,
         accessLevel: trustee.access_level, releaseType: trustee.release_type,
         triggerReason: reason ? 'manual' : 'manual',
-        logoUrl: currentProfile?.logo_url, siteUrl: 'https://moneyintx.com'
+        logoUrl: currentProfile?.logo_url, siteUrl: 'https://moneyinteractions.com'
       });
     } catch(e) { console.warn('[NOK] Activation email failed:', e); }
   }
@@ -6902,7 +6943,7 @@ async function checkAuth() {
   _authChecked = true;
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
-    console.log('[checkAuth] session:', !!session, error?.message || 'ok');
+    // session check (debug logging removed for production)
     if (session?.user) {
       // Only call enterApp if onAuthStateChange hasn't already handled it
       if (!currentUser && !window._isRecovery) { enterApp(session.user); }

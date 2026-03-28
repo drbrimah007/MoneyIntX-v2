@@ -15,12 +15,12 @@ export function fmtMoney(cents, currency = 'USD') {
   }
 }
 
-// ── In-memory cache (60-second TTL) ──────────────────────────────
+// ── In-memory cache (15-second TTL) ──────────────────────────────
 const _cache = {};
 function _cacheGet(key) {
   const v = _cache[key];
   if (!v) return null;
-  if (Date.now() - v.ts > 60000) { delete _cache[key]; return null; }
+  if (Date.now() - v.ts > 15000) { delete _cache[key]; return null; }
   return v.data;
 }
 function _cacheSet(key, data) { _cache[key] = { ts: Date.now(), data }; }

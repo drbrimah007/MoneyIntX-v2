@@ -32,7 +32,7 @@ export function subscribeToNotifications(userId, onNew) {
 
 export function subscribeToSettlements(userId, onNew) {
   const ch = supabase.channel('settlements:' + userId)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'settlements' }, p => onNew(p.new))
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'settlements', filter: 'recorded_by=eq.' + userId }, p => onNew(p.new))
     .subscribe();
   channels.push(ch);
   return ch;
