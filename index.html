@@ -841,8 +841,25 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
   </div>
 </div>
 
-<!-- Fallback: if module fails, at least show error on button click -->
+<!-- ⚠️ IMPORTANT: This plain script runs BEFORE any module script.
+     Supabase's createClient (imported as a module) will clear the URL hash
+     after parsing the access_token. We must capture the recovery intent
+     HERE — synchronously — before that happens. -->
 <script>
+(function() {
+  var h = window.location.hash || '';
+  if (h.includes('type=recovery') || h.includes('access_token')) {
+    // Store in sessionStorage so module scripts can read it even after hash is cleared
+    window._isRecovery = true;
+    try { sessionStorage.setItem('_mxi_recovery', '1'); } catch(e) {}
+    // Pre-emptively show landing + hide loader so there's no flash of spinner
+    var loader = document.getElementById('auth-loader');
+    var landing = document.getElementById('landing');
+    if (loader)  loader.style.display  = 'none';
+    if (landing) landing.style.display = '';
+  }
+})();
+
 window.handleLogin = window.handleLogin || function() { alert('App loading... If this persists, clear cache and refresh.'); };
 window.handleSignup = window.handleSignup || function() { alert('App loading... If this persists, clear cache and refresh.'); };
 window.showAuthTab = window.showAuthTab || function() {};
@@ -1122,15 +1139,17 @@ if (window.location.hash.includes('type=recovery') || window.location.hash.inclu
 }
 
 window.doResetPassword = async function() {
-  const pass = document.getElementById('reset-pass').value;
-  const pass2 = document.getElementById('reset-pass2').value;
+  const pass = document.getElementById('reset-pass')?.value;
+  const pass2 = document.getElementById('reset-pass2')?.value;
   if (!pass || pass.length < 6) return toast('Password must be at least 6 characters.', 'error');
   if (pass !== pass2) return toast('Passwords do not match.', 'error');
   const { error } = await supabase.auth.updateUser({ password: pass });
   if (error) return toast(error.message, 'error');
+  // Clear recovery flag and reload into the app
+  try { sessionStorage.removeItem('_mxi_recovery'); } catch(e) {}
+  window._isRecovery = false;
   toast('Password updated! Logging you in...', 'success');
-  window.location.hash = '';
-  setTimeout(() => window.location.reload(), 1500);
+  setTimeout(() => { window.location.hash = ''; window.location.reload(); }, 1500);
 };
 
 async function handleLogOut() {
@@ -7278,15 +7297,51 @@ async function checkAuth() {
   }
   if (_authChecked) return;
   _authChecked = true;
+  // Check recovery flag from sessionStorage (set by pre-module script before Supabase cleared hash)
+  const _storedRecovery = (() => { try { return sessionStorage.getItem('_mxi_recovery') === '1'; } catch(e) { return false; } })();
+  if (_storedRecovery) window._isRecovery = true;
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
-    // session check (debug logging removed for production)
     if (session?.user) {
-      // Only call enterApp if onAuthStateChange hasn't already handled it
-      if (!currentUser && !window._isRecovery) { enterApp(session.user); }
-      else if (window._isRecovery) {
+      if (window._isRecovery || _storedRecovery) {
+        // Password recovery — let PASSWORD_RECOVERY event handle the form injection.
+        // Just ensure the loader is hidden and landing is visible.
         document.getElementById('auth-loader').style.display = 'none';
         document.getElementById('landing').style.display = '';
+        // If PASSWORD_RECOVERY event hasn't injected the form yet, wait briefly then inject
+        setTimeout(() => {
+          if (!document.getElementById('reset-pass')) {
+            const _lf = document.getElementById('login-form');
+            const _sf = document.getElementById('signup-form');
+            const _af = document.getElementById('auth-forms');
+            if (_lf) _lf.style.display = 'none';
+            if (_sf) _sf.style.display = 'none';
+            if (_af && !document.getElementById('reset-pass')) {
+              const _rf = document.createElement('div');
+              _rf.id = 'reset-form-pw';
+              _rf.innerHTML = `
+                <div style="text-align:center;margin-bottom:20px;">
+                  <div style="font-size:40px;margin-bottom:10px;">🔐</div>
+                  <h2 style="font-size:22px;font-weight:800;margin-bottom:6px;">Set New Password</h2>
+                  <p style="color:#8892a4;font-size:13px;">Choose a strong password for your account</p>
+                </div>
+                <div class="form-group">
+                  <label>New Password</label>
+                  <input type="password" id="reset-pass" placeholder="Min 6 characters" style="font-size:15px;padding:12px 14px;">
+                </div>
+                <div class="form-group">
+                  <label>Confirm Password</label>
+                  <input type="password" id="reset-pass2" placeholder="Confirm new password" style="font-size:15px;padding:12px 14px;">
+                </div>
+                <button class="btn btn-primary" style="width:100%;margin-top:8px;padding:14px;font-size:15px;" onclick="doResetPassword()">Update Password</button>
+              `;
+              _af.appendChild(_rf);
+            }
+          }
+        }, 200);
+      } else if (!currentUser) {
+        // Normal login — enter the app
+        enterApp(session.user);
       }
       // If currentUser already set by onAuthStateChange, enterApp hid the loader — nothing to do
     } else {
