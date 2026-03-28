@@ -88,10 +88,15 @@ export async function processDueReminders(userId, { emailFn } = {}) {
       continue;
     }
     // Create notification for recipient
-    const contactName = rem.entry?.contact?.name || 'Someone';
+    const contactName  = rem.entry?.contact?.name || 'Someone';
     const contactEmail = rem.entry?.contact?.email || '';
     const linkedUserId = rem.entry?.contact?.linked_user_id;
-    if (linkedUserId) {
+    const notifyWho    = rem.notify_who || 'them'; // 'them' | 'you' | 'both'
+    const doContact    = notifyWho === 'them' || notifyWho === 'both';
+    const doSelf       = notifyWho === 'you'  || notifyWho === 'both';
+
+    // In-app notification to contact (if they have a linked account)
+    if (doContact && linkedUserId) {
       await supabase.from('notifications').insert({
         user_id: linkedUserId,
         type: 'reminder',
@@ -102,8 +107,8 @@ export async function processDueReminders(userId, { emailFn } = {}) {
         currency: rem.entry?.currency
       });
     }
-    // Send email to contact if they have an email and an email function was provided
-    if (contactEmail && emailFn) {
+    // Email to contact
+    if (doContact && contactEmail && emailFn) {
       emailFn(userId, {
         to: contactEmail,
         fromName: senderName,
@@ -116,9 +121,9 @@ export async function processDueReminders(userId, { emailFn } = {}) {
         logoUrl: senderLogoUrl,
         fromEmail: senderEmail,
         siteUrl: 'https://moneyintx.com'
-      }).catch(e => console.warn('[processDueReminders] Email send failed:', e));
+      }).catch(e => console.warn('[processDueReminders] Contact email failed:', e));
     }
-    // Self notification
+    // Self notification (in-app)
     await supabase.from('notifications').insert({
       user_id: userId,
       type: 'reminder',
@@ -128,6 +133,23 @@ export async function processDueReminders(userId, { emailFn } = {}) {
       amount: rem.entry?.amount,
       currency: rem.entry?.currency
     });
+    // Self-email copy (when notify_who includes sender)
+    if (doSelf && senderEmail && emailFn) {
+      emailFn(userId, {
+        to: senderEmail,
+        fromName: senderName,
+        txType: rem.entry?.tx_type,
+        amount: rem.entry?.amount,
+        currency: rem.entry?.currency || 'USD',
+        message: rem.message || '',
+        entryId: rem.entry_id,
+        isReminder: true,
+        logoUrl: senderLogoUrl,
+        siteUrl: 'https://moneyintx.com',
+        isSelf: true,
+        contactName
+      }).catch(e => console.warn('[processDueReminders] Self email failed:', e));
+    }
     // Increment reminder count on entry
     await supabase.from('entries').update({
       reminder_count: (rem.entry?.reminder_count || 0) + 1,

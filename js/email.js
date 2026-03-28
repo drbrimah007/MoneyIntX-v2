@@ -146,7 +146,8 @@ async function callSendEmail({ to, subject, html, text }) {
 // ── Notification / Reminder email ─────────────────────────────────────────────
 export async function sendNotificationEmail(userId, {
   to, fromName, fromEmail, txType, amount, currency = 'USD', message, entryId,
-  shareLink, isReminder = false, logoUrl, siteUrl, entryStatus
+  shareLink, isReminder = false, logoUrl, siteUrl, entryStatus,
+  isSelf = false, contactName = ''
 }) {
   // Map V2 categories to contact-perspective direction
   const DIR = {
@@ -211,6 +212,36 @@ export async function sendNotificationEmail(userId, {
     amtLabel   = isPartial ? 'Balance Remaining' : 'Amount I Owe';
   }
 
+  // Self-perspective overrides: flip to sender's own POV
+  if (isSelf) {
+    const cLabel = contactName || fromName;
+    if (txType === 'owed_to_me' || dir === 'they_owe_you') {
+      heading    = isReminder ? 'Reminder Sent — They Owe Me' : 'They Owe Me';
+      subject    = isReminder ? `Reminder Sent — They Owe Me · ${cLabel}` : `They Owe Me — your record for ${cLabel}`;
+      subheading = `You have recorded that <strong>${cLabel}</strong> owes you this amount.`;
+      amtLabel   = 'Amount Owed to You';
+    } else if (txType === 'i_owe' || dir === 'you_owe_them') {
+      heading    = isReminder ? 'Reminder Sent — I Owe Them' : 'I Owe Them';
+      subject    = isReminder ? `Reminder Sent — I Owe Them · ${cLabel}` : `I Owe Them — your record for ${cLabel}`;
+      subheading = `You have recorded that you owe <strong>${cLabel}</strong> this amount.`;
+      amtLabel   = 'Amount I Owe';
+    } else if (dir === 'invoice' || txType === 'invoice_sent') {
+      heading    = 'Invoice Sent';
+      subject    = `Invoice Sent — your record for ${cLabel}`;
+      subheading = `You have sent an invoice to <strong>${cLabel}</strong>.`;
+      amtLabel   = 'Invoice Amount';
+    } else if (dir === 'bill' || txType === 'bill_sent') {
+      heading    = 'Bill Sent';
+      subject    = `Bill Sent — your record for ${cLabel}`;
+      subheading = `You have sent a bill to <strong>${cLabel}</strong>.`;
+      amtLabel   = 'Bill Amount';
+    } else {
+      heading    = isReminder ? `Reminder Sent — ${heading}` : heading;
+      subject    = isReminder ? `Reminder Sent: ${subject}` : `Sent: ${subject}`;
+      subheading = `You have recorded this interaction with <strong>${cLabel}</strong>.`;
+    }
+  }
+
   // Format amount using Intl (handles all currencies correctly)
   function _fmt(val) {
     const n = parseFloat(val);
@@ -242,8 +273,8 @@ export async function sendNotificationEmail(userId, {
     ? `<div style="margin-bottom:18px;"><div style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">${amtLabel}</div><strong style="font-size:28px;font-weight:800;color:#080b53;">${fmtAmt}</strong></div>`
     : '';
 
-  // Contact reach line
-  const replyHtml = fromEmail
+  // Contact reach line (hidden on self-copies — you know your own email)
+  const replyHtml = (!isSelf && fromEmail)
     ? `<p style="color:#666;font-size:13px;margin-top:8px;">You can reach them: <a href="mailto:${fromEmail}" style="color:#080b53;">${fromEmail}</a></p>`
     : '';
 

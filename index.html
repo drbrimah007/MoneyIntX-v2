@@ -2486,6 +2486,19 @@ window.sendInvoiceNotification = async function(entryId) {
     currency: entry?.currency
   });
 
+  // Self-email copy
+  if (currentUser?.email) {
+    const fromName = currentProfile?.display_name || currentProfile?.company_name || 'Money IntX';
+    try {
+      await sendNotificationEmail(currentUser.id, {
+        to: currentUser.email, fromName, txType: entry.category || entry.tx_type,
+        amount: entry.amount, currency: entry.currency, message, entryId, isReminder: false,
+        logoUrl: currentProfile?.logo_url, siteUrl: 'https://moneyintx.com',
+        isSelf: true, contactName: cName
+      });
+    } catch(e) { console.warn('[self-email invoice notif]', e); }
+  }
+
   closeModal();
   toast('Notification sent.' + (sendEmail && cEmail ? ' Email queued.' : ''), 'success');
   _invalidateEntries(); navTo('entries');
@@ -2892,6 +2905,19 @@ window.doSendReminder = async function(entryId) {
           if (!result?.ok) toast('Reminder sent (email failed: ' + (result?.error || 'check Settings → Email Diagnostics') + ')', 'info');
         } catch(e) { console.warn('Email reminder failed:', e); toast('Reminder email failed: ' + e.message, 'error'); }
       }
+    }
+
+    // Self-email copy when user wants their own notification
+    if (notifySelf && currentUser?.email) {
+      const fromNameSelf = currentProfile?.display_name || currentProfile?.company_name || 'Money IntX';
+      try {
+        await sendNotificationEmail(currentUser.id, {
+          to: currentUser.email, fromName: fromNameSelf, txType: entry.category || entry.tx_type,
+          amount: entry.amount, currency: entry.currency, message, entryId, isReminder: true,
+          logoUrl: currentProfile?.logo_url, siteUrl: 'https://moneyintx.com',
+          isSelf: true, contactName: cName
+        });
+      } catch(e) { console.warn('[self-email reminder]', e); }
     }
 
     // Log + self-notify in one insert (no double-insert)
@@ -3376,14 +3402,26 @@ window.saveNewEntry = async function() {
     const notifySelf    = (notifyWho === 'you'     || notifyWho === 'both');
     const combinedMsg   = [notifyMsgExtra, combinedNote].filter(Boolean).join(' · ');
 
-    // 1) Self-notification (always if notifyWho includes 'you' or 'both', or default)
-    if (notifySelf || notifyWho === 'contact') {
+    // 1) Self-notification (always if notifyWho includes 'you' or 'both')
+    if (notifySelf) {
       await supabase.from('notifications').insert({
         user_id: currentUser.id, type: 'notification',
         message: `${txLabel} with ${contactName} — ${amtLabel}${combinedMsg ? '. ' + combinedMsg : ''}`,
         amount: parseFloat(amount), currency, contact_name: contactName,
         entry_id: entryId, is_read: false
       });
+      // Self-email copy
+      if (currentUser?.email) {
+        try {
+          await sendNotificationEmail(currentUser.id, {
+            to: currentUser.email, fromName,
+            txType: category, amount: parseFloat(amount), currency,
+            message: combinedMsg || note, entryId, isReminder: false,
+            logoUrl: currentProfile?.logo_url, siteUrl: 'https://moneyintx.com',
+            isSelf: true, contactName
+          });
+        } catch(e) { console.warn('[self-email entry]', e); }
+      }
     }
 
     // 2) Fetch contact details for linked account + email
