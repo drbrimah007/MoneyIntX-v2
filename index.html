@@ -5765,7 +5765,7 @@ async function renderSettings(el) {
   </div>`;
 
   // ── Theme picker ───────────────────────────────────────────────
-  const currentTheme = localStorage.getItem('mxi_theme') || 'classic';
+  const currentTheme = localStorage.getItem('mxi_theme') || '';
   const themes = [
     { id: 'purple', name: 'Purple', color: '#6c63ff' },
     { id: 'teal',   name: 'Teal',   color: '#0d9488' },
