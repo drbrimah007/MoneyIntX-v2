@@ -90,17 +90,14 @@ export async function archiveGroup(id) {
 }
 
 // ── Add member ────────────────────────────────────────────────────
+// userId can be null when adding a contact who is not a platform user
 export async function addGroupMember(groupId, { userId = null, contactId = null, name, role = 'member' }) {
+  const row = { group_id: groupId, name, role, status: 'active' };
+  if (userId) row.user_id = userId;
+  if (contactId) row.contact_id = contactId;
   const { data, error } = await supabase
     .from('group_members')
-    .insert({
-      group_id: groupId,
-      user_id: userId,
-      contact_id: contactId,
-      name,
-      role,
-      status: 'active'
-    })
+    .insert(row)
     .select()
     .single();
   if (error) console.error('[addGroupMember]', error.message);

@@ -27,10 +27,11 @@ export async function getInvestment(id) {
   return data;
 }
 
-export async function createInvestment(userId, { name, description = '', type = 'general', ventureType = 'personal', accessMode = 'private', initialAmount = 0, currency = 'USD', expectedReturn }) {
+export async function createInvestment(userId, { name, description = '', type = 'general', status = 'active', ventureType = 'personal', accessMode = 'private', initialAmount = 0, currency = 'USD', expectedReturn }) {
   const { data, error } = await supabase.from('investments').insert({
-    user_id: userId, name, description, type, venture_type: ventureType,
-    access_mode: accessMode, initial_amount: toCents(initialAmount),
+    user_id: userId, name, description, type, status,
+    venture_type: ventureType, access_mode: accessMode,
+    initial_amount: toCents(initialAmount),
     currency, expected_return: expectedReturn || null
   }).select().single();
   if (error) console.error('[createInvestment]', error.message);
@@ -57,10 +58,12 @@ export async function deleteInvestment(id) {
   return !error;
 }
 
+// userId can be null when adding a contact who is not a platform user
 export async function addInvestmentMember(investmentId, { userId = null, contactId = null, name, role = 'member' }) {
-  const { data, error } = await supabase.from('investment_members').insert({
-    investment_id: investmentId, user_id: userId, contact_id: contactId, name, role
-  }).select().single();
+  const row = { investment_id: investmentId, name, role };
+  if (userId) row.user_id = userId;
+  if (contactId) row.contact_id = contactId;
+  const { data, error } = await supabase.from('investment_members').insert(row).select().single();
   if (error) console.error('[addInvestmentMember]', error.message);
   return data;
 }

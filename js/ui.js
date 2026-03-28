@@ -137,21 +137,72 @@ export function statusBadge(status) {
     text-transform:uppercase;letter-spacing:0.03em;">${esc(label)}</span>`;
 }
 
-// ── TX Type labels ────────────────────────────────────────────────
+// ── TX Category labels (ledger = past tense; canonical enums per handoff spec) ─
+// Internal enums are permanent. UI copy may change.
 export const TX_LABELS = {
-  they_owe_you: 'They Owe Me',
-  you_owe_them: 'I Owe Them',
-  they_paid_you: 'They Settled Me',
-  you_paid_them: 'I Settled Them',
-  invoice: 'Invoice',
-  bill: 'Bill'
+  // ── New canonical categories (v2) ──────────────────────────────
+  owed_to_me:        'Owed to Me',
+  bill_sent:         'Bill Sent',
+  invoice_sent:      'Invoice Sent',
+  i_owe:             'I Owe',
+  bill_received:     'Bill Received',
+  invoice_received:  'Invoice Received',
+  advance_paid:      'Advance Paid',
+  advance_received:  'Advance Received',
+  payment_recorded:  'Payment',
+  // ── Legacy tx_type aliases (backward compat for un-migrated rows) ──
+  they_owe_you:  'Owed to Me',
+  you_owe_them:  'I Owe',
+  they_paid_you: 'Payment',
+  you_paid_them: 'Payment',
+  invoice:       'Invoice Sent',
+  bill:          'Bill Sent'
+};
+
+// UI tab labels (present tense, user-facing) — create actions
+export const TX_CREATE_LABELS = {
+  owed_to_me:       'They owe me',
+  bill_sent:        'Send a bill',
+  invoice_sent:     'Send an invoice',
+  i_owe:            'I owe them',
+  bill_received:    'Receive a bill',
+  invoice_received: 'Receive an invoice',
+  advance_paid:     'Pay in advance',
+  advance_received: 'Receive advance payment'
 };
 
 export const TX_COLORS = {
-  they_owe_you: '#16a34a',
-  you_owe_them: '#dc2626',
-  they_paid_you: '#16a34a',
-  you_paid_them: '#dc2626',
-  invoice: '#6c63ff',
-  bill: '#6c63ff'
+  // Green = receivable / owed to me  (V1 dark theme --green: #4ade80)
+  owed_to_me:       '#4ade80',
+  invoice_sent:     '#4ade80',
+  bill_sent:        '#4ade80',
+  they_owe_you:     '#4ade80',
+  they_paid_you:    '#4ade80',
+  // Red = payable / I owe  (V1 dark theme --red: #f87171)
+  i_owe:            '#f87171',
+  invoice_received: '#f87171',
+  bill_received:    '#f87171',
+  you_owe_them:     '#f87171',
+  you_paid_them:    '#f87171',
+  // Purple = neutral invoice/bill  (V1 --accent #6c63ff, lightened for readability)
+  invoice:          '#818cf8',
+  bill:             '#818cf8',
+  // Teal = payment recorded (neutral settlement)
+  payment_recorded: '#2dd4bf',
+  // Amber / sky for advances
+  advance_paid:     '#fb923c',
+  advance_received: '#60a5fa'
+};
+
+// Direction sign per category (canonical source of truth for new entries)
+export const DIRECTION_SIGN = {
+  owed_to_me:       1,
+  bill_sent:        1,
+  invoice_sent:     1,
+  i_owe:           -1,
+  bill_received:   -1,
+  invoice_received:-1,
+  advance_paid:    -1,
+  advance_received: 1,
+  payment_recorded: 0   // direction set from context
 };

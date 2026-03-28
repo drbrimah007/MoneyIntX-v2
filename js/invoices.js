@@ -3,93 +3,125 @@ import { supabase } from './supabase.js';
 import { fmtMoney } from './entries.js';
 
 // ── Helper: render template_data fields as invoice line items ──────
+// Returns { rows: string, hasFinalTotal: boolean }
+//
+// Stored format (from entry form):
+//   Paired:   tdata[id] = { label, type:'paired', rows:[{text,qty,numeric}], value:<sum> }
+//   Numeric:  tdata[id] = { label, value:<number>, type:'numeric'|'computed' }
+//   Text:     tdata[id] = { label, value:<string>, type:'text' }
+// entry.template_fields may not be present — always read embedded .type from the value.
 function renderTemplateRows(entry, currency) {
   const tdata = entry.template_data;
-  if (!tdata || typeof tdata !== 'object') return '';
-  const fields = entry.template_fields || []; // ordered field definitions
-  let rows = '';
-  let hasFinalTotal = false;
+  if (!tdata || typeof tdata !== 'object') return { rows: '', hasFinalTotal: false };
 
-  // Walk field definitions in order (if available)
-  const keys = fields.length > 0
-    ? fields.map(f => f.id || f.name)
-    : Object.keys(tdata);
-
+  const fields = entry.template_fields || [];
   const fieldMap = {};
   fields.forEach(f => { fieldMap[f.id || f.name] = f; });
 
+  const keys = fields.length > 0
+    ? fields.map(f => f.id || f.name).filter(k => tdata[k] !== undefined)
+    : Object.keys(tdata);
+
+  let rows = '';
+  let hasFinalTotal = false;
+
   keys.forEach(key => {
-    const val = tdata[key];
+    const raw = tdata[key];
+    if (raw === null || raw === undefined) return;
     const fDef = fieldMap[key] || {};
-    const label = fDef.name || key;
-    if (fDef.isFinalTotal) { hasFinalTotal = true; }
 
-    // Skip hidden/private fields
-    if (fDef.visibility === 'private') return;
+    // Unwrap the stored envelope { label, type, value/rows }
+    // All values saved by the form are objects — never bare scalars.
+    let storedType, storedLabel, storedValue, storedRows;
+    if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) {
+      storedType  = raw.type  || fDef.type  || 'text';
+      storedLabel = raw.label || fDef.label || fDef.name || key;
+      storedValue = raw.value;
+      storedRows  = Array.isArray(raw.rows) ? raw.rows : null;
+    } else {
+      // Legacy plain scalar
+      storedType  = fDef.type || 'text';
+      storedLabel = fDef.label || fDef.name || key;
+      storedValue = raw;
+      storedRows  = null;
+    }
 
-    // Paired row: render sub-fields
-    if (fDef.type === 'paired' && typeof val === 'object' && val !== null) {
-      const leftLabel = fDef.leftLabel || 'Item';
-      const rightLabel = fDef.rightLabel || 'Value';
-      const leftVal = val[fDef.leftId] || val.left || '';
-      const rightVal = val[fDef.rightId] || val.right || '';
-      const numericRight = fDef.isNumeric || !isNaN(parseFloat(rightVal));
-      rows += `<tr>
-        <td>${escHtml(String(leftVal || leftLabel))}</td>
-        <td style="text-align:right;">${numericRight && rightVal !== '' ? fmtMoney(parseFloat(rightVal)*100, currency) : escHtml(String(rightVal))}</td>
-      </tr>`;
+    if (fDef.visible === false || fDef.visibility === 'private') return;
+
+    // ── Paired rows: [{text, qty, numeric}] ────────────────────────
+    if (storedType === 'paired' || storedRows) {
+      const rowArr = storedRows || [];
+      if (rowArr.length === 0) return;
+      rowArr.forEach(r => {
+        const desc    = r.text    || '';
+        const qty     = parseFloat(r.qty)     || 1;
+        const unitAmt = parseFloat(r.numeric) || 0;
+        const lineAmt = qty * unitAmt;
+        const rightHtml = qty !== 1
+          ? `${qty} × ${fmtMoney(unitAmt * 100, currency)} = <strong>${fmtMoney(lineAmt * 100, currency)}</strong>`
+          : fmtMoney(lineAmt * 100, currency);
+        rows += `<tr><td>${escHtml(desc)}</td><td style="text-align:right;">${rightHtml}</td></tr>`;
+      });
+      // Subtotal row when there are multiple lines
+      if (rowArr.length > 1) {
+        const tot = parseFloat(storedValue) ||
+          rowArr.reduce((s, r) => s + ((parseFloat(r.qty)||1) * (parseFloat(r.numeric)||0)), 0);
+        rows += `<tr style="background:#f0f9ff;">
+          <td style="font-size:12px;color:#64748b;padding-left:12px;">Subtotal — ${escHtml(storedLabel)}</td>
+          <td style="text-align:right;font-weight:700;">${fmtMoney(tot * 100, currency)}</td>
+        </tr>`;
+      }
+      if (fDef.isFinalTotal) hasFinalTotal = true;
       return;
     }
 
-    // Computed / calculator field
-    if (fDef.isComputed || fDef.isFinalTotal) {
-      const numVal = parseFloat(val);
+    // ── Final Total / computed ─────────────────────────────────────
+    if (fDef.isFinalTotal || storedType === 'computed') {
+      const numVal = parseFloat(storedValue);
       if (!isNaN(numVal)) {
-        rows += `<tr style="background:#f8fafc;">
-          <td style="font-weight:600;">${escHtml(label)}</td>
-          <td style="text-align:right;font-weight:700;">${fmtMoney(numVal*100, currency)}</td>
+        if (fDef.isFinalTotal) hasFinalTotal = true;
+        rows += `<tr style="background:#f8fafc;border-top:2px solid #e2e8f0;">
+          <td style="font-weight:700;font-size:15px;">${escHtml(storedLabel)}</td>
+          <td style="text-align:right;font-weight:900;font-size:15px;">${fmtMoney(numVal * 100, currency)}</td>
         </tr>`;
       }
       return;
     }
 
-    // Numeric field
-    if (fDef.isNumeric || fDef.type === 'number') {
-      const numVal = parseFloat(val);
+    // ── Numeric ────────────────────────────────────────────────────
+    if (storedType === 'numeric' || storedType === 'number' || storedType === 'currency') {
+      const numVal = parseFloat(storedValue);
       if (!isNaN(numVal)) {
         rows += `<tr>
-          <td>${escHtml(label)}</td>
-          <td style="text-align:right;">${fmtMoney(numVal*100, currency)}</td>
+          <td>${escHtml(storedLabel)}</td>
+          <td style="text-align:right;">${fmtMoney(numVal * 100, currency)}</td>
         </tr>`;
       }
       return;
     }
 
-    // Dropdown
-    if (fDef.type === 'dropdown' && val) {
-      const opt = (fDef.options || []).find(o => o.value === val || o.label === val);
-      const dispLabel = opt ? opt.label : val;
-      const dispVal = opt?.numericValue != null ? fmtMoney(parseFloat(opt.numericValue)*100, currency) : '';
-      rows += `<tr>
-        <td>${escHtml(label)}: <em>${escHtml(String(dispLabel))}</em></td>
-        <td style="text-align:right;">${dispVal}</td>
-      </tr>`;
+    // ── Text ───────────────────────────────────────────────────────
+    if (storedType === 'text' || storedType === 'textarea') {
+      const strVal = String(storedValue ?? '').trim();
+      if (strVal) {
+        rows += `<tr><td colspan="2">${escHtml(storedLabel)}: <em>${escHtml(strVal)}</em></td></tr>`;
+      }
       return;
     }
 
-    // Text / default — only show non-empty, non-redundant values
-    if (val !== null && val !== undefined && String(val).trim() !== '') {
-      const strVal = String(val);
+    // ── Fallback: only render non-object scalars (never [object Object]) ──
+    if (storedValue !== null && storedValue !== undefined && typeof storedValue !== 'object') {
+      const strVal = String(storedValue).trim();
+      if (!strVal) return;
       const numVal = parseFloat(strVal);
-      const isNum = !isNaN(numVal);
       rows += `<tr>
-        <td>${escHtml(label)}</td>
-        <td style="text-align:right;">${isNum ? fmtMoney(numVal*100, currency) : escHtml(strVal)}</td>
+        <td>${escHtml(storedLabel)}</td>
+        <td style="text-align:right;">${!isNaN(numVal) ? fmtMoney(numVal * 100, currency) : escHtml(strVal)}</td>
       </tr>`;
     }
   });
 
-  return rows;
+  return { rows, hasFinalTotal };
 }
 
 function escHtml(s) {
@@ -112,10 +144,17 @@ export function generateInvoiceHTML(entry, contact, profile, settlements = []) {
   // Build line items: template fields if available, else single note row
   const tdata = entry.template_data;
   const hasTemplateData = tdata && typeof tdata === 'object' && Object.keys(tdata).length > 0;
-  const templateRows = hasTemplateData ? renderTemplateRows(entry, currency) : '';
+  const { rows: templateRows, hasFinalTotal } = hasTemplateData
+    ? renderTemplateRows(entry, currency)
+    : { rows: '', hasFinalTotal: false };
 
-  // If template has fields, don't show the plain "note" as a separate row to avoid duplication
+  // If template has fields, don't show the plain "note" row (avoid duplication)
   const showNoteRow = !hasTemplateData;
+
+  // When the template itself contains a Final Total field (rendered inside templateRows),
+  // suppress the bottom totals block — the template IS the total.
+  // Only keep the "Balance Due" row if there are partial settlements.
+  const suppressTotalsBlock = hasTemplateData && hasFinalTotal && settled === 0;
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escHtml(entry.invoice_number || 'Record')} — ${escHtml(company)}</title><style>
     * { box-sizing: border-box; }
@@ -200,11 +239,12 @@ export function generateInvoiceHTML(entry, contact, profile, settlements = []) {
         ${templateRows}
       </tbody>
     </table>
+    ${suppressTotalsBlock ? '' : `
     <div class="inv-totals">
       ${hasTemplateData ? '' : `<div class="row"><span>Subtotal</span><span>${fmtMoney(amt, currency)}</span></div>`}
-      ${settled > 0 ? `<div class="row" style="color:#16a34a;"><span>Settled</span><span>−${fmtMoney(settled, currency)}</span></div>` : ''}
+      ${settled > 0 ? `<div class="row" style="color:#16a34a;"><span>Amount Settled</span><span>−${fmtMoney(settled, currency)}</span></div>` : ''}
       <div class="row total"><span>${settled > 0 ? 'Balance Due' : 'Total'}</span><span>${fmtMoney(remaining, currency)}</span></div>
-    </div>
+    </div>`}
 
     ${entry.note && hasTemplateData ? `<div class="inv-note">📝 ${escHtml(entry.note)}</div>` : ''}
 
@@ -219,11 +259,12 @@ export function generateInvoiceHTML(entry, contact, profile, settlements = []) {
 
     <div class="inv-footer">
       <div class="logo-footer">
-        ${logoUrl ? `<img src="${escHtml(logoUrl)}" alt="Logo">` : ''}
-        <strong>${escHtml(company)}</strong>
+        <img src="money.png" alt="Money IntX" onerror="this.style.display='none'" style="width:18px;height:18px;border-radius:4px;">
+        <strong>Money IntX</strong>
+        <span style="opacity:.7;">— Record · Manage · Grow</span>
       </div>
       ${companyEmail ? `<div>${escHtml(companyEmail)}</div>` : ''}
-      <div style="margin-top:6px;color:#cbd5e1;">Generated with Money IntX &bull; moneyintx.com</div>
+      <div style="margin-top:6px;color:#cbd5e1;">moneyinteractions.com &bull; Financial Tracking, Not a Bank or Payment Processor</div>
     </div>
 
     <div class="no-print print-btn">
@@ -235,8 +276,28 @@ export function generateInvoiceHTML(entry, contact, profile, settlements = []) {
 }
 
 export function openInvoiceWindow(html) {
-  const win = window.open('', '_blank');
-  if (!win) { alert('Popup blocked. Please allow popups for this site.'); return; }
-  win.document.write(html);
-  win.document.close();
+  // Use a Blob URL — opens as a real navigable page in a new tab,
+  // not a popup, so it bypasses mobile popup blockers entirely.
+  try {
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const tab = window.open(url, '_blank');
+    if (tab) {
+      // Revoke the blob URL after the tab has had time to load it
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return;
+    }
+    // If window.open returned null (aggressive blocker), try an anchor click
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (e) {
+    console.error('[openInvoiceWindow]', e);
+    alert('Could not open the invoice. Please check your browser settings.');
+  }
 }

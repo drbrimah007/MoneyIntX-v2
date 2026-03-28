@@ -3,7 +3,7 @@
 import { supabase } from './supabase.js';
 
 // ── Constants ─────────────────────────────────────────────────────
-export const FIELD_TYPES = { text:'Text', numeric:'Numeric', paired:'Paired (text + number row)' };
+export const FIELD_TYPES = { paired:'Item + Amount (Paired rows)', numeric:'Numeric / Calculated', text:'Text / Notes' };
 export const CALC_OPS = { multiply:'Multiply by factor', add:'Add to field', subtract:'Subtract from field', aggregate:'Run aggregate (sum all)', select_aggregate:'Selection aggregate (pick fields)' };
 export const LEDGER_FX = { '':'No ledger effect', toy:'They Owe (adds to balance)', toy_credit:'They Owe credit (reduces balance)', yot:'I Owe (adds to balance)', yot_credit:'I Owe credit (reduces balance)' };
 
