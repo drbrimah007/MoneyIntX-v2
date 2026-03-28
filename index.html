@@ -557,7 +557,6 @@ import { listTrustees, createTrustee, deleteTrustee, verifyTrustee, activateTrus
 import { initBpEngine, exposeBpEngine, renderBusinessPage } from './js/bp-engine.js';
 import { listRecurring, createRecurring, deleteRecurring, toggleRecurring, processDueRecurring, FREQUENCIES } from './js/recurring.js';
 import { toast, esc, navigate, statusBadge, TX_LABELS, TX_COLORS, TX_CREATE_LABELS, DIRECTION_SIGN, fmtDate, fmtRelative, openModal, closeModal } from './js/ui.js';
-import { sendNotificationEmail, sendInvoiceEmail } from './js/email.js';
 import { sendNotificationEmail, sendInvoiceEmail, sendOtpEmail, sendInviteEmail, logEmail } from './js/email.js';
 
 let currentUser = null;
