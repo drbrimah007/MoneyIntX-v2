@@ -2714,7 +2714,8 @@ window.sendInvoiceNotification = async function(entryId) {
         entry_id: entryId,
         contact_name: currentProfile?.display_name || '',
         amount: entry.amount,
-        currency: entry.currency
+        currency: entry.currency,
+        read: false
       });
     }
     // Send email if contact has email and checkbox is checked
@@ -2748,7 +2749,8 @@ window.sendInvoiceNotification = async function(entryId) {
     entry_id: entryId,
     contact_name: cName,
     amount: entry?.amount,
-    currency: entry?.currency
+    currency: entry?.currency,
+    read: false
   });
 
   // Self-email copy
@@ -2871,7 +2873,8 @@ window.doShareEntry = async function(entryId) {
         message: `${currentProfile?.display_name || 'Someone'} shared a record with you: ${fmtMoney(entry.amount, entry.currency)}`,
         entry_id: entryId,
         contact_name: currentProfile?.display_name || '',
-        amount: entry.amount, currency: entry.currency
+        amount: entry.amount, currency: entry.currency,
+        read: false
       });
     }
   }
@@ -3153,7 +3156,8 @@ window.doSendReminder = async function(entryId) {
           user_id: linkedUserId, type: 'reminder',
           message: `Reminder from ${currentProfile?.display_name || 'Someone'}: ${message}`,
           entry_id: entryId, contact_name: currentProfile?.display_name || '',
-          amount: entry.amount, currency: entry.currency
+          amount: entry.amount, currency: entry.currency,
+          read: false
         });
       }
       if (cEmail) {
@@ -3195,7 +3199,8 @@ window.doSendReminder = async function(entryId) {
       user_id: currentUser.id, type: 'reminder',
       message: selfMsg,
       entry_id: entryId, contact_name: cName,
-      amount: entry?.amount, currency: entry?.currency
+      amount: entry?.amount, currency: entry?.currency,
+      read: false
     });
 
     // Direct update — bypass updateEntry to avoid amount conversion
@@ -6276,8 +6281,8 @@ async function renderSettings(el) {
     <button class="btn btn-primary btn-sm" style="margin-top:14px;" onclick="saveNotifPrefs()">Save Preferences</button>
   </div>`;
 
-  // ── Email Diagnostics ──────────────────────────────────────────
-  html += `<div class="card" style="margin-top:12px;">
+  // ── Email Diagnostics (admin only) ────────────────────────────
+  if (isAdmin) html += `<div class="card" style="margin-top:12px;">
     <h3 style="font-size:16px;font-weight:700;margin-bottom:4px;">Email Diagnostics</h3>
     <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Send a test email to verify your Resend API key and domain are set up correctly in Vercel.</p>
     <div style="background:var(--bg3);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--muted);">
@@ -6299,7 +6304,7 @@ async function renderSettings(el) {
       </div>
       <div id="s-email-log" style="font-size:12px;color:var(--muted);">Loading…</div>
     </div>
-  </div>`;
+  </div>`;  // end admin-only Email Diagnostics
 
   // ── Invite Friends ─────────────────────────────────────────────
   const inviteLink = `${window.location.origin}${window.location.pathname}?ref=${currentUser?.id || ''}`;
