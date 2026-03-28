@@ -85,6 +85,25 @@
   --sidebar-bg: #0f172a;
   --sidebar-active: #1e293b;
 }
+/* Theme: Money IntX Navy — exact logo colors */
+[data-theme="navy"] {
+  --accent: #e020b0;
+  --accent-hover: #c01898;
+  --accent-light: rgba(224,32,176,0.15);
+  --green: #4ade80;
+  --red: #f87171;
+  --amber: #fbbf24;
+  --blue: #60a5fa;
+  --bg: #03051a;
+  --bg2: #080b53;
+  --bg3: #0f1275;
+  --text: #e2e4f8;
+  --muted: #9090c0;
+  --border: #141980;
+  --radius: 10px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.55);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.55);
+}
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 /* Hide scrollbars globally while keeping content scrollable */
 * { scrollbar-width: none; -ms-overflow-style: none; }
@@ -104,7 +123,8 @@ a { color: var(--accent); text-decoration: none; }
 [data-theme="dark"] #sidebar-user-name,
 [data-theme="purple"] #sidebar-user-name,
 [data-theme="midnight"] #sidebar-user-name,
-[data-theme="forest"] #sidebar-user-name { color: #e2e2f0; }
+[data-theme="forest"] #sidebar-user-name,
+[data-theme="navy"] #sidebar-user-name { color: #e2e2f0; }
 #sidebar-user-name { font-weight: 700; letter-spacing: .01em; }
 #topbar-left { display: flex; align-items: center; gap: 12px; }
 #topbar-center { flex: 1; }
@@ -5914,23 +5934,28 @@ async function renderSettings(el) {
   // ── Theme picker ───────────────────────────────────────────────
   const currentTheme = localStorage.getItem('mxi_theme') || 'classic';
   const themes = [
+    { id: 'navy',    name: 'Money IntX',  color: '#080b53', dot: '#e020b0' },
     { id: 'classic', name: 'Classic Dark', color: '#0f1117' },
-    { id: 'dark',   name: 'Dark Blue',    color: '#334155' },
-    { id: 'purple', name: 'Purple',       color: '#6c63ff' },
-    { id: 'teal',   name: 'Teal',         color: '#0d9488' },
-    { id: 'ocean',  name: 'Ocean',        color: '#0284c7' },
-    { id: 'rose',   name: 'Rose',         color: '#e11d48' }
+    { id: 'dark',    name: 'Dark Blue',   color: '#334155' },
+    { id: 'purple',  name: 'Purple',      color: '#6c63ff' },
+    { id: 'teal',    name: 'Teal',        color: '#0d9488' },
+    { id: 'ocean',   name: 'Ocean',       color: '#0284c7' },
+    { id: 'rose',    name: 'Rose',        color: '#e11d48' }
   ];
   html += `<div class="card" style="margin-top:12px;">
     <h3 style="font-size:16px;font-weight:700;margin-bottom:12px;">Theme</h3>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
-      ${themes.map(t => `
-        <button onclick="setTheme('${t.id}')" title="${t.name}" style="
-          width:56px;height:56px;border-radius:14px;border:3px solid ${currentTheme === t.id ? t.color : 'var(--border)'};
-          background:${t.id === 'dark' ? '#1e293b' : '#fff'};cursor:pointer;display:flex;align-items:center;justify-content:center;
-          transition:all .15s;box-shadow:${currentTheme === t.id ? '0 0 0 2px ' + t.color + '40' : 'none'};">
-          <div style="width:28px;height:28px;border-radius:50%;background:${t.color};"></div>
-        </button>`).join('')}
+      ${themes.map(t => {
+        const isActive = currentTheme === t.id;
+        const bgColor  = ['navy','classic','dark'].includes(t.id) ? t.color : '#fff';
+        const dotColor = t.dot || t.color;
+        return `<button onclick="setTheme('${t.id}')" title="${t.name}" style="
+          width:56px;height:56px;border-radius:14px;border:3px solid ${isActive ? dotColor : 'var(--border)'};
+          background:${bgColor};cursor:pointer;display:flex;align-items:center;justify-content:center;
+          transition:all .15s;box-shadow:${isActive ? '0 0 0 2px ' + dotColor + '40' : 'none'};">
+          <div style="width:28px;height:28px;border-radius:50%;background:${dotColor};"></div>
+        </button>`;
+      }).join('')}
     </div>
     <p style="font-size:12px;color:var(--muted);margin-top:8px;">Current: ${themes.find(t => t.id === currentTheme)?.name || 'Purple'}</p>
   </div>`;
