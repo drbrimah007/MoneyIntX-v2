@@ -657,10 +657,14 @@ function openAddRowModal(sessionKey) {
       fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}</label>
         <input id="bpr-${f.id}" placeholder="${esc(f.label)}"></div>`;
     } else if (f.type === 'numeric') {
-      fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)} <span style="color:var(--muted);font-weight:400;">(${p.currency})</span></label>
+      const _uh = f.unitType === 'currency' ? ` <span style="color:var(--muted);font-weight:400;">(${f.unitValue||p.currency})</span>`
+                : f.unitType === 'weight'   ? ` <span style="color:var(--muted);font-weight:400;">(${f.unitValue||'kg'})</span>` : '';
+      fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
         <input type="number" id="bpr-${f.id}" step="0.01" placeholder="0.00" oninput="window._bpEngine._previewRow()"></div>`;
     } else if (f.type === 'paired') {
-      fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}</label>
+      const _uh = f.unitType === 'currency' ? ` <span style="color:var(--muted);font-weight:400;">(${f.unitValue||p.currency})</span>`
+                : f.unitType === 'weight'   ? ` <span style="color:var(--muted);font-weight:400;">(${f.unitValue||'kg'})</span>` : '';
+      fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
         <div style="display:flex;gap:8px;">
           <input id="bpr-${f.id}-text" placeholder="${esc(f.textLabel || 'Item')}" style="flex:2;">
           <input type="number" id="bpr-${f.id}-num" step="0.01" placeholder="0.00" style="flex:1;" oninput="window._bpEngine._previewRow()">
