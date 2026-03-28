@@ -34,16 +34,16 @@
   --accent: #6c63ff;
   --accent-hover: #5a52e0;
   --accent-light: rgba(108,99,255,0.12);
-  --green: #4ade80;
-  --red: #f87171;
-  --amber: #fbbf24;
-  --blue: #60a5fa;
-  --bg: #0b0d14;
-  --bg2: #141722;
-  --bg3: #1b1f2e;
-  --text: #e2e8f0;
-  --muted: #8892a4;
-  --border: #232842;
+  --green: #5ac47d;
+  --red: #dc7070;
+  --amber: #d9a732;
+  --blue: #44aade;
+  --bg: #0f1929;
+  --bg2: #162338;
+  --bg3: #1e2d48;
+  --text: #c8d4e0;
+  --muted: #7888a0;
+  --border: #1e2d48;
   --radius: 10px;
   --shadow: 0 2px 12px rgba(0,0,0,0.4);
   --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
@@ -85,14 +85,18 @@
   --accent: #6c63ff;
   --accent-hover: #5a52e0;
   --accent-light: rgba(108,99,255,0.15);
-  --bg: #0f172a;
-  --bg2: #1e293b;
-  --bg3: #334155;
-  --text: #f1f5f9;
-  --muted: #94a3b8;
-  --border: #334155;
-  --sidebar-bg: #0f172a;
-  --sidebar-active: #1e293b;
+  --green: #5ac47d;
+  --red: #dc7070;
+  --amber: #d9a732;
+  --blue: #44aade;
+  --bg: #0f1929;
+  --bg2: #162338;
+  --bg3: #1e2d48;
+  --text: #c8d4e0;
+  --muted: #7888a0;
+  --border: #1e2d48;
+  --sidebar-bg: #0f1929;
+  --sidebar-active: #162338;
 }
 /* Theme: Money IntX Navy — exact logo colors */
 [data-theme="navy"] {
@@ -1346,23 +1350,23 @@ async function renderDash(el) {
   html += `<div style="margin-bottom:14px;overflow-x:auto;padding-bottom:2px;">
     <div style="display:flex;gap:8px;min-width:max-content;">
       <button onclick="openNewEntryModal('owe-me')"
-        style="${_qaBtnBase}background:rgba(22,163,74,.18);border-color:rgba(22,163,74,.45);color:#4ade80;"
-        onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">
+        style="${_qaBtnBase}background:rgba(90,196,125,.12);border-color:rgba(90,196,125,.28);color:#5ac47d;"
+        onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
         They Owe Me
       </button>
       <button onclick="openNewEntryModal('i-owe')"
-        style="${_qaBtnBase}background:rgba(220,38,38,.18);border-color:rgba(220,38,38,.45);color:#f87171;"
-        onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">
+        style="${_qaBtnBase}background:rgba(220,112,112,.12);border-color:rgba(220,112,112,.28);color:#dc7070;"
+        onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
         I Owe Them
       </button>
       <button onclick="openNewEntryModal('advance')"
-        style="${_qaBtnBase}background:rgba(217,119,6,.16);border-color:rgba(217,119,6,.42);color:#fbbf24;"
-        onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">
+        style="${_qaBtnBase}background:rgba(217,167,50,.12);border-color:rgba(217,167,50,.28);color:#d9a732;"
+        onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
         Advances
       </button>
       <button onclick="navTo('templates')"
-        style="${_qaBtnBase}background:rgba(14,165,233,.15);border-color:rgba(14,165,233,.4);color:#38bdf8;"
-        onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">
+        style="${_qaBtnBase}background:rgba(68,170,222,.12);border-color:rgba(68,170,222,.28);color:#44aade;"
+        onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
         New Invoice
       </button>
       <button onclick="openNewContactModal()"
