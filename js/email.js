@@ -32,8 +32,8 @@ const BRAND = {
   text: '#1e293b',
   muted: '#64748b',
   border: '#e2e8f0',
-  logoUrl: 'https://moneyintx.com/money.png',
-  siteUrl: 'https://moneyintx.com'
+  logoUrl: 'https://moneyinteractions.com/money.png',
+  siteUrl: 'https://moneyinteractions.com'
 };
 
 // ── HTML escape helper ────────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ function _escHtml(str) {
 }
 
 // ── Shared rich email builder (dark header, V1 style) ─────────────────────────
-function _richEmail({ logoUrl, siteName = 'Money IntX', siteUrl = 'https://moneyintx.com',
+function _richEmail({ logoUrl, siteName = 'Money IntX', siteUrl = 'https://moneyinteractions.com',
     heading, subheading, bodyHtml, footerNote = '' }) {
   const validLogo = (logoUrl && /^https?:\/\//.test(logoUrl)) ? logoUrl : `${siteUrl}/money.png`;
   const logoImg   = `<img src="${_escHtml(validLogo)}" alt="${_escHtml(siteName)}" style="max-height:60px;max-width:220px;width:auto;height:auto;object-fit:contain;display:block;margin:0 auto;" onerror="this.style.display='none'">`;
