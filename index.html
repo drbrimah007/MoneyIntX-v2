@@ -5766,7 +5766,7 @@ async function renderSettings(el) {
   </div>`;
 
   // ── Theme picker ───────────────────────────────────────────────
-  const currentTheme = localStorage.getItem('mxi_theme') || 'purple';
+  const currentTheme = localStorage.getItem('mxi_theme') || 'classic';
   const themes = [
     { id: 'purple', name: 'Purple', color: '#6c63ff' },
     { id: 'teal',   name: 'Teal',   color: '#0d9488' },
@@ -6199,10 +6199,10 @@ window.setTheme = function(theme) {
   if (window._currentPage === 'settings') navTo('settings');
 };
 
-// Load saved theme on startup
+// Load saved theme on startup (default: classic dark like v1)
 (function() {
-  const saved = localStorage.getItem('mxi_theme');
-  if (saved) document.documentElement.setAttribute('data-theme', saved);
+  const saved = localStorage.getItem('mxi_theme') || 'classic';
+  document.documentElement.setAttribute('data-theme', saved);
 })();
 
 // ── Global Search ─────────────────────────────────────────────────
