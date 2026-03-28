@@ -1059,34 +1059,17 @@ window.handleForgotPassword = function() {
 window.doSendResetEmail = async function() {
   const email = document.getElementById('forgot-email')?.value.trim();
   if (!email) return toast('Enter your email address.', 'error');
-  // Use our Resend-based endpoint so the email comes from Money IntX <hello@moneyintx.com>
-  let resetOk = false;
   try {
-    const resp = await fetch('/api/send-reset-email', {
+    const resp = await fetch('/api/auth/reset-request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
     });
     const result = await resp.json();
-    resetOk = result.ok !== false;
-    if (!resetOk && result.error) {
-      // If our endpoint fails (e.g. missing service key env var), fall back to Supabase default
-      console.warn('[doSendResetEmail] custom endpoint failed, falling back:', result.error);
-      const { error: sbErr } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + '/'
-      });
-      if (sbErr) return toast(sbErr.message, 'error');
-      resetOk = true;
-    }
+    if (!result.ok) return toast(result.error || 'Failed to send reset email.', 'error');
   } catch(e) {
-    // Network error — fall back to Supabase
-    const { error: sbErr } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + '/'
-    });
-    if (sbErr) return toast(sbErr.message, 'error');
-    resetOk = true;
+    return toast('Network error. Please try again.', 'error');
   }
-  if (!resetOk) return;
   const forms = document.getElementById('auth-forms');
   if (forms) forms.innerHTML = `
     <div style="text-align:center;padding:20px 0;">
@@ -1149,38 +1132,21 @@ window.doResetPassword = async function() {
   if (!pass || pass.length < 6) return toast('Password must be at least 6 characters.', 'error');
   if (pass !== pass2) return toast('Passwords do not match.', 'error');
   const token = window._resetToken;
-
-  // Try Supabase auth first (if the reset email came from Supabase)
+  if (!token) return toast('Reset token missing. Please use the link from your email.', 'error');
   try {
-    const { error } = await supabase.auth.updateUser({ password: pass });
-    if (!error) {
-      toast('Password updated! Logging you in...', 'success');
-      window._isRecovery = false;
-      window.location.hash = '';
-      setTimeout(() => window.location.reload(), 1500);
-      return;
-    }
-    console.warn('[doResetPassword] Supabase updateUser failed:', error.message);
-  } catch(e) { console.warn('[doResetPassword] Supabase error:', e); }
-
-  // Fall back to custom API if we have a custom token
-  if (token) {
-    try {
-      const resp = await fetch('/api/auth/reset-confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password: pass })
-      });
-      const data = await resp.json();
-      if (!data.ok) return toast(data.error || 'Failed to reset password.', 'error');
-      toast('Password updated! You can now log in.', 'success');
-      window.location.hash = '';
-      setTimeout(() => window.location.reload(), 1500);
-      return;
-    } catch(e) { /* fall through */ }
+    const resp = await fetch('/api/auth/reset-confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password: pass })
+    });
+    const data = await resp.json();
+    if (!data.ok) return toast(data.error || 'Failed to reset password.', 'error');
+    toast('Password updated! You can now log in.', 'success');
+    window.location.hash = '';
+    setTimeout(() => { showAuthTab('login'); }, 1500);
+  } catch(e) {
+    toast('Network error. Please try again.', 'error');
   }
-
-  toast('Could not update password. The reset link may have expired — please request a new one.', 'error');
 };
 
 async function handleLogOut() {
