@@ -8,7 +8,7 @@ export async function listNotifications(userId, { unreadOnly = false, limit = 50
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(limit);
-  if (unreadOnly) query = query.eq('read', false);
+  if (unreadOnly) query = query.not('read', 'eq', true); // catches false AND null
   const { data, error } = await query;
   if (error) console.error('[listNotifications]', error.message);
   return data || [];
@@ -19,7 +19,7 @@ export async function getUnreadCount(userId) {
     .from('notifications')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .eq('read', false);
+    .not('read', 'eq', true); // catches false AND null (rows inserted before default was set)
   if (error) console.error('[getUnreadCount]', error.message);
   return count || 0;
 }
@@ -38,7 +38,7 @@ export async function markAllRead(userId) {
     .from('notifications')
     .update({ read: true, read_at: new Date().toISOString() })
     .eq('user_id', userId)
-    .eq('read', false);
+    .not('read', 'eq', true); // catches false AND null
   if (error) console.error('[markAllRead]', error.message);
   return !error;
 }
@@ -61,7 +61,8 @@ export async function createNotification(userId, { type, message, title = '', en
       contact_id: contactId,
       contact_name: contactName,
       amount,
-      currency
+      currency,
+      read: false
     })
     .select()
     .single();
