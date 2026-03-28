@@ -69,8 +69,10 @@ export async function processDueReminders(userId, { emailFn } = {}) {
 
   // Fetch sender's display name for email
   const { data: senderProfile } = await supabase
-    .from('profiles').select('display_name, company_name').eq('id', userId).single();
+    .from('profiles').select('display_name, company_name, logo_url, company_email').eq('id', userId).single();
   const senderName = senderProfile?.display_name || senderProfile?.company_name || 'Someone';
+  const senderLogoUrl = senderProfile?.logo_url || '';
+  const senderEmail = senderProfile?.company_email || '';
 
   const processed = [];
   for (const rem of due) {
@@ -110,7 +112,10 @@ export async function processDueReminders(userId, { emailFn } = {}) {
         currency: rem.entry?.currency || 'USD',
         message: rem.message || '',
         entryId: rem.entry_id,
-        isReminder: true
+        isReminder: true,
+        logoUrl: senderLogoUrl,
+        fromEmail: senderEmail,
+        siteUrl: 'https://moneyintx.com'
       }).catch(e => console.warn('[processDueReminders] Email send failed:', e));
     }
     // Self notification

@@ -25,8 +25,8 @@ const TX_LABELS = {
 // ── Brand constants ────────────────────────────────────────────────────────────
 const BRAND = {
   name: 'Money IntX',
-  color: '#6366f1',       // indigo accent
-  colorDark: '#4f46e5',
+  color: '#1a1d6e',       // Money IntX navy blue (from logo)
+  colorDark: '#14186a',
   bg: '#f8fafc',
   cardBg: '#ffffff',
   text: '#1e293b',
@@ -115,80 +115,146 @@ async function callSendEmail({ to, subject, html, text }) {
 
 // ── Notification / Reminder email ─────────────────────────────────────────────
 export async function sendNotificationEmail(userId, {
-  to, fromName, txType, amount, currency = 'USD', message, entryId,
-  shareLink, isReminder = false
+  to, fromName, fromEmail, txType, amount, currency = 'USD', message, entryId,
+  shareLink, isReminder = false, logoUrl, siteUrl, entryStatus
 }) {
-  // Flip to contact's perspective for labels
-  const CONTACT_PERSPECTIVE = {
-    owed_to_me: 'i_owe',          i_owe: 'owed_to_me',
-    bill_sent: 'bill_received',   bill_received: 'bill_sent',
-    invoice_sent: 'invoice_received', invoice_received: 'invoice_sent',
-    advance_paid: 'advance_received', advance_received: 'advance_paid',
-    they_owe_you: 'you_owe_them', you_owe_them: 'they_owe_you',
-    they_paid_you: 'you_paid_them', you_paid_them: 'they_paid_you',
+  // Map V2 categories to contact-perspective direction
+  const DIR = {
+    owed_to_me: 'they_owe_you',      // contact owes sender  → contact sees "I Owe Them"
+    i_owe:      'you_owe_them',      // sender owes contact  → contact sees "They Owe Me"
+    bill_sent:  'bill',              // contact receives bill
+    invoice_sent: 'invoice',         // contact receives invoice
+    bill_received: 'you_owe_them',   // sender got bill → contact is creditor
+    invoice_received: 'you_owe_them',
+    advance_paid: 'advance_to_you',  // sender paid advance to contact
+    advance_received: 'advance_from_you',
+    payment_recorded: 'they_paid_you',
+    // legacy
+    they_owe_you: 'they_owe_you', you_owe_them: 'you_owe_them',
+    they_paid_you: 'they_paid_you', you_paid_them: 'you_paid_them',
+    invoice: 'invoice', bill: 'bill',
   };
-  const contactTxType = CONTACT_PERSPECTIVE[txType] || txType;
-  const label   = TX_LABELS[contactTxType] || TX_LABELS[txType] || txType;
-  const prefix  = isReminder ? 'Reminder: ' : '';
-  const subject = `${prefix}${fromName} sent you a record — ${label}`;
+  const dir = DIR[txType] || 'they_owe_you';
+  const isPartial = entryStatus === 'partially_settled';
 
-  // Handle both raw numbers and pre-formatted strings
-  const fmtAmt = typeof amount === 'number'
-    ? `${currency} ${Number(amount).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}`
-    : amount;
+  let subject, heading, subheading, amtLabel;
+  if (dir === 'you_owe_them') {
+    subject    = isReminder ? `Reminder: They Owe Me — from ${fromName}` : `They Owe Me — record from ${fromName}`;
+    heading    = isReminder ? 'Reminder — They Owe Me' : 'They Owe Me';
+    subheading = `<strong>${fromName}</strong> has recorded that they owe you this amount.`;
+    amtLabel   = 'Amount Owed to You';
+  } else if (dir === 'you_paid_them') {
+    subject    = `They Settled Me — payment from ${fromName}`;
+    heading    = 'They Settled Me';
+    subheading = `<strong>${fromName}</strong> has recorded making a payment to you.`;
+    amtLabel   = 'Amount Paid to You';
+  } else if (dir === 'they_paid_you') {
+    subject    = `I Settled Them — settlement recorded by ${fromName}`;
+    heading    = 'I Settled Them';
+    subheading = `<strong>${fromName}</strong> has recorded that you settled a balance with them.`;
+    amtLabel   = 'Amount Settled';
+  } else if (dir === 'invoice' || dir === 'bill') {
+    const doc  = dir === 'invoice' ? 'Invoice' : 'Bill';
+    subject    = isReminder ? `Reminder: ${doc} from ${fromName}` : `${doc} from ${fromName}`;
+    heading    = isReminder ? `Reminder — ${doc} Due` : `${doc} Due`;
+    subheading = `<strong>${fromName}</strong> has sent you a ${doc.toLowerCase()} for the following amount.`;
+    amtLabel   = `${doc} Amount Due`;
+  } else if (dir === 'advance_to_you') {
+    subject    = `Advance Received — from ${fromName}`;
+    heading    = 'Advance Received';
+    subheading = `<strong>${fromName}</strong> has recorded sending you an advance.`;
+    amtLabel   = 'Advance Amount';
+  } else if (dir === 'advance_from_you') {
+    subject    = `Advance Sent — record from ${fromName}`;
+    heading    = 'Advance Sent';
+    subheading = `<strong>${fromName}</strong> has recorded receiving an advance from you.`;
+    amtLabel   = 'Advance Amount';
+  } else {
+    // they_owe_you → contact sees "I Owe Them"
+    subject    = isReminder
+      ? `Reminder: I Owe Them — from ${fromName}`
+      : (isPartial ? `Partial balance still due — from ${fromName}` : `I Owe Them — record from ${fromName}`);
+    heading    = isReminder ? 'Reminder — I Owe Them' : (isPartial ? 'Balance Still Outstanding' : 'I Owe Them');
+    subheading = isPartial
+      ? `<strong>${fromName}</strong> has recorded a partial settlement. A balance is still outstanding.`
+      : `<strong>${fromName}</strong> has shared a record showing you owe this amount.`;
+    amtLabel   = isPartial ? 'Balance Remaining' : 'Amount I Owe';
+  }
 
-  const typeColor = {
-    owed_to_me: '#6366f1', i_owe: '#f59e0b',
-    they_owe_you: '#6366f1', you_owe_them: '#f59e0b',
-    they_paid_you: '#22c55e', you_paid_them: '#22c55e',
-    invoice_sent: '#6366f1', invoice_received: '#f59e0b',
-    bill_sent: '#6366f1', bill_received: '#f59e0b',
-    invoice: '#6366f1', bill: '#f59e0b'
-  }[contactTxType] || BRAND.color;
+  // Format amount using Intl (handles all currencies correctly)
+  function _fmt(val) {
+    const n = parseFloat(val);
+    if (isNaN(n)) return String(val);
+    const code = (currency || 'USD').toUpperCase();
+    const noDecimals = ['JPY','KRW','VND'].includes(code);
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency', currency: code,
+        minimumFractionDigits: noDecimals ? 0 : 2,
+        maximumFractionDigits: noDecimals ? 0 : 2
+      }).format(n);
+    } catch (_) {
+      return code + ' ' + n.toFixed(noDecimals ? 0 : 2);
+    }
+  }
+  const fmtAmt = typeof amount === 'number' ? _fmt(amount) : (amount || '');
 
-  const badgeLabel = isReminder ? '⏰ Reminder' : '📬 New Record';
+  // Profile logo in header (falls back to default)
+  const logoSrc = (logoUrl && /^https?:\/\//i.test(logoUrl)) ? logoUrl : BRAND.logoUrl;
 
-  const body = `
-    <div class="badge">${badgeLabel}</div>
-    <h2>${isReminder ? 'Friendly Reminder' : 'You have a new financial record'}</h2>
-    <p>${fromName} ${isReminder ? 'is following up on a record' : 'has added a record'} with you on Money IntX.</p>
+  // Message block
+  const msgHtml = message
+    ? `<div style="background:#f5f5ff;border-left:4px solid #1a1d6e;border-radius:4px;padding:14px 18px;margin-bottom:18px;font-size:14px;color:#333;line-height:1.6;">${message}</div>`
+    : '';
 
-    <div class="amount-box">
-      <div class="label">Amount</div>
-      <div class="value" style="color:${typeColor};">${fmtAmt}</div>
+  // Amount block
+  const amtHtml = fmtAmt
+    ? `<div style="margin-bottom:18px;"><div style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">${amtLabel}</div><strong style="font-size:28px;font-weight:800;color:#1a1d6e;">${fmtAmt}</strong></div>`
+    : '';
+
+  // Contact reach line
+  const replyHtml = fromEmail
+    ? `<p style="color:#666;font-size:13px;margin-top:8px;">You can reach them: <a href="mailto:${fromEmail}" style="color:#1a1d6e;">${fromEmail}</a></p>`
+    : '';
+
+  const siteName = 'Money IntX';
+  const siteBase = siteUrl || BRAND.siteUrl;
+  const ctaUrl   = shareLink || siteBase;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${subject}</title></head>
+<body style="margin:0;padding:0;background:#f9f9f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <span style="display:none;max-height:0;overflow:hidden;">${fromName} ${isReminder ? 'is following up' : 'sent a record'} — ${fmtAmt}</span>
+  <div style="max-width:520px;margin:32px auto;">
+    <div style="background:#1a1d6e;padding:22px 32px 18px;border-radius:12px 12px 0 0;text-align:center;">
+      <img src="${logoSrc}" alt="${siteName}" style="max-height:60px;max-width:200px;width:auto;height:auto;object-fit:contain;display:block;margin:0 auto;" onerror="this.style.display='none'">
     </div>
-
-    <div>
-      <div class="detail-row"><span class="k">Record Type</span><span class="v">${label}</span></div>
-      <div class="detail-row"><span class="k">From</span><span class="v">${fromName}</span></div>
-      ${entryId ? `<div class="detail-row"><span class="k">Reference</span><span class="v">#${String(entryId).slice(-6).toUpperCase()}</span></div>` : ''}
+    <div style="background:#fff;padding:32px 32px 24px;border-left:1px solid #eee;border-right:1px solid #eee;">
+      <h2 style="margin:0 0 6px;font-size:22px;font-weight:700;color:#1a1d6e;">${heading}</h2>
+      <p style="color:#555;font-size:14px;margin:0 0 20px;">${subheading}</p>
+      ${msgHtml}
+      ${amtHtml}
+      ${entryId ? `<p style="font-size:13px;color:#888;margin-bottom:16px;">Reference: <strong>#${String(entryId).slice(-6).toUpperCase()}</strong></p>` : ''}
+      <div style="text-align:center;margin:24px 0;">
+        <a href="${ctaUrl}" style="display:inline-block;padding:13px 32px;background:#1a1d6e;color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:8px;">View on ${siteName} →</a>
+      </div>
+      ${replyHtml}
+      <p style="font-size:12px;color:#94a3b8;margin-top:20px;">Money IntX does not hold or transfer money. This email is for record-keeping purposes only.</p>
     </div>
+    <div style="background:#f0f0f0;padding:14px 32px;border-radius:0 0 12px 12px;border:1px solid #eee;border-top:none;text-align:center;">
+      <p style="margin:0 0 4px;font-size:12px;color:#888;">${siteName} — Making Money Matters Memorable</p>
+      <p style="margin:0;font-size:12px;"><a href="${siteBase}" style="color:#1a1d6e;text-decoration:none;">${siteBase.replace(/^https?:\/\//, '')}</a></p>
+    </div>
+  </div>
+</body>
+</html>`;
 
-    ${message ? `<div class="message-box"><strong>Message:</strong> ${message}</div>` : ''}
-
-    ${shareLink ? `<a class="btn" href="${shareLink}">View Record →</a>` : `<a class="btn" href="${BRAND.siteUrl}">Open Money IntX →</a>`}
-
-    <p style="font-size:13px;color:${BRAND.muted};">If you were not expecting this, you can ignore this email. Money IntX does not hold or transfer money.</p>
-  `;
-
-  const html = baseTemplate({
-    title: subject,
-    preheader: `${fromName} shared a ${label} record of ${fmtAmt} with you.`,
-    body
-  });
-
-  const text = `${fromName} ${isReminder ? 'is following up on a record' : 'has a new record'} with you on Money IntX.\n\nType: ${label}\nAmount: ${fmtAmt}${message ? '\nMessage: ' + message : ''}\n\nView at: ${BRAND.siteUrl}`;
+  const text = `${heading}\n\n${subheading.replace(/<[^>]+>/g,'')}\n\n${amtLabel}: ${fmtAmt}${message ? '\n\nMessage: ' + message : ''}${entryId ? '\nReference: #' + String(entryId).slice(-6).toUpperCase() : ''}\n\nView: ${ctaUrl}\n\n— ${siteName}`;
 
   const result = await callSendEmail({ to, subject, html, text });
   const status = result.ok ? 'sent' : 'failed';
-
-  await logEmail(userId, {
-    type: isReminder ? 'reminder' : 'notification',
-    recipient: to, subject, status,
-    error: result.error || '',
-    entryId
-  });
-
+  await logEmail(userId, { type: isReminder ? 'reminder' : 'notification', recipient: to, subject, status, error: result.error || '', entryId });
   return { ok: result.ok, subject };
 }
 
