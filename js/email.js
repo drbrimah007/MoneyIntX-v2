@@ -48,8 +48,7 @@ function baseTemplate({ title, preheader, body }) {
     body { margin:0; padding:0; background:${BRAND.bg}; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; }
     .wrapper { max-width:580px; margin:32px auto; background:${BRAND.cardBg}; border-radius:12px; border:1px solid ${BRAND.border}; overflow:hidden; }
     .header { background:${BRAND.color}; padding:24px 32px; text-align:center; }
-    .header img { height:40px; width:40px; border-radius:8px; vertical-align:middle; margin-right:10px; }
-    .header span { color:#fff; font-size:20px; font-weight:700; vertical-align:middle; letter-spacing:-0.3px; }
+    .header img { max-height:64px; max-width:220px; width:auto; height:auto; border-radius:8px; object-fit:contain; }
     .body { padding:32px; color:${BRAND.text}; font-size:15px; line-height:1.6; }
     .body h2 { margin:0 0 16px; font-size:20px; font-weight:700; color:${BRAND.text}; }
     .amount-box { background:${BRAND.bg}; border:1px solid ${BRAND.border}; border-radius:10px; padding:18px 22px; margin:20px 0; }
@@ -74,7 +73,6 @@ function baseTemplate({ title, preheader, body }) {
   <div class="wrapper">
     <div class="header">
       <img src="${BRAND.logoUrl}" alt="Money IntX Logo">
-      <span>Money IntX</span>
     </div>
     <div class="body">
       ${body}
@@ -120,15 +118,33 @@ export async function sendNotificationEmail(userId, {
   to, fromName, txType, amount, currency = 'USD', message, entryId,
   shareLink, isReminder = false
 }) {
-  const label   = TX_LABELS[txType] || txType;
+  // Flip to contact's perspective for labels
+  const CONTACT_PERSPECTIVE = {
+    owed_to_me: 'i_owe',          i_owe: 'owed_to_me',
+    bill_sent: 'bill_received',   bill_received: 'bill_sent',
+    invoice_sent: 'invoice_received', invoice_received: 'invoice_sent',
+    advance_paid: 'advance_received', advance_received: 'advance_paid',
+    they_owe_you: 'you_owe_them', you_owe_them: 'they_owe_you',
+    they_paid_you: 'you_paid_them', you_paid_them: 'they_paid_you',
+  };
+  const contactTxType = CONTACT_PERSPECTIVE[txType] || txType;
+  const label   = TX_LABELS[contactTxType] || TX_LABELS[txType] || txType;
   const prefix  = isReminder ? 'Reminder: ' : '';
   const subject = `${prefix}${fromName} sent you a record — ${label}`;
 
+  // Handle both raw numbers and pre-formatted strings
+  const fmtAmt = typeof amount === 'number'
+    ? `${currency} ${Number(amount).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}`
+    : amount;
+
   const typeColor = {
+    owed_to_me: '#6366f1', i_owe: '#f59e0b',
     they_owe_you: '#6366f1', you_owe_them: '#f59e0b',
     they_paid_you: '#22c55e', you_paid_them: '#22c55e',
+    invoice_sent: '#6366f1', invoice_received: '#f59e0b',
+    bill_sent: '#6366f1', bill_received: '#f59e0b',
     invoice: '#6366f1', bill: '#f59e0b'
-  }[txType] || BRAND.color;
+  }[contactTxType] || BRAND.color;
 
   const badgeLabel = isReminder ? '⏰ Reminder' : '📬 New Record';
 
@@ -139,7 +155,7 @@ export async function sendNotificationEmail(userId, {
 
     <div class="amount-box">
       <div class="label">Amount</div>
-      <div class="value" style="color:${typeColor};">${currency} ${amount}</div>
+      <div class="value" style="color:${typeColor};">${fmtAmt}</div>
     </div>
 
     <div>
@@ -157,11 +173,11 @@ export async function sendNotificationEmail(userId, {
 
   const html = baseTemplate({
     title: subject,
-    preheader: `${fromName} shared a ${label} record of ${currency} ${amount} with you.`,
+    preheader: `${fromName} shared a ${label} record of ${fmtAmt} with you.`,
     body
   });
 
-  const text = `${fromName} ${isReminder ? 'is following up on a record' : 'has a new record'} with you on Money IntX.\n\nType: ${label}\nAmount: ${currency} ${amount}${message ? '\nMessage: ' + message : ''}\n\nView at: ${BRAND.siteUrl}`;
+  const text = `${fromName} ${isReminder ? 'is following up on a record' : 'has a new record'} with you on Money IntX.\n\nType: ${label}\nAmount: ${fmtAmt}${message ? '\nMessage: ' + message : ''}\n\nView at: ${BRAND.siteUrl}`;
 
   const result = await callSendEmail({ to, subject, html, text });
   const status = result.ok ? 'sent' : 'failed';

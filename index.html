@@ -2860,7 +2860,7 @@ window.doSendReminder = async function(entryId) {
           const fromName = currentProfile?.display_name || currentProfile?.company_name || 'Money IntX';
           const result = await sendNotificationEmail(currentUser.id, {
             to: cEmail, fromName, txType: entry.category || entry.tx_type,
-            amount: fmtMoney(entry.amount, entry.currency),
+            amount: entry.amount,
             currency: entry.currency, message, entryId, isReminder: true
           });
           if (!result?.ok) toast('Reminder sent (email failed: ' + (result?.error || 'check Settings → Email Diagnostics') + ')', 'info');
@@ -5777,12 +5777,12 @@ async function renderSettings(el) {
     <div class="form-group"><label>Default Currency</label><select id="s-currency">
       ${CURLIST.map(c => `<option value="${c}" ${p.default_currency === c ? 'selected' : ''}>${c}</option>`).join('')}
     </select></div>
-    <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:10px 0;border-top:1px solid var(--border);margin-top:8px;">
+    <label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:10px 0;border-top:1px solid var(--border);margin-top:8px;">
+      <input type="checkbox" id="s-searchable" ${p.is_searchable !== false ? 'checked' : ''} style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;">
       <div>
         <div style="font-size:14px;font-weight:600;">Searchable Username</div>
         <div style="font-size:12px;color:var(--muted);">Allow other users to find you by your display name</div>
       </div>
-      <input type="checkbox" id="s-searchable" ${p.is_searchable !== false ? 'checked' : ''} style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;">
     </label>
     <button class="btn btn-primary btn-sm" onclick="saveSettings()">Save Profile</button>
   </div>`;
