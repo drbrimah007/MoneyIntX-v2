@@ -87,46 +87,97 @@ export async function confirmShare(tokenId, recipientId) {
   await updateShareStatus(tokenId, 'confirmed');
   await linkShareToUser(tokenId, recipientId);
 
-  // Get the share token with entry details
+  // Get the share token with full entry + snapshot + sender profile
   const { data: token } = await supabase
     .from('share_tokens')
-    .select('*, entry:entries(id, amount, currency, tx_type, date, note, invoice_number, user_id)')
+    .select('*, entry:entries(id, amount, currency, tx_type, date, note, invoice_number, user_id, settled_amount)')
     .eq('id', tokenId)
     .single();
   if (!token?.entry) return null;
 
+  // Resolve sender display name + email from snapshot or sender profile
+  const snap = token.entry_snapshot || {};
+  const fromName = snap.from_name || '';
+  const fromEmail = snap.from_email || token.recipient_email || '';
+
   // Flip tx_type for recipient perspective
   const FLIP = {
-    'they_owe_you': 'you_owe_them',
-    'you_owe_them': 'they_owe_you',
-    'they_paid_you': 'you_paid_them',
-    'you_paid_them': 'they_paid_you',
-    'invoice': 'invoice',
-    'bill': 'bill'
+    'they_owe_you':    'you_owe_them',
+    'you_owe_them':    'they_owe_you',
+    'they_paid_you':   'you_paid_them',
+    'you_paid_them':   'they_paid_you',
+    'owed_to_me':      'i_owe',
+    'i_owe':           'owed_to_me',
+    'invoice_sent':    'invoice_received',
+    'invoice_received':'invoice_sent',
+    'bill_sent':       'bill_received',
+    'bill_received':   'bill_sent',
+    'invoice':         'bill',
+    'bill':            'invoice'
   };
   const flippedType = FLIP[token.entry.tx_type] || token.entry.tx_type;
+
+  // Try to find the sender in recipient's contact list (by email or by linked_user_id)
+  let contactId = null;
+  if (token.sender_id) {
+    // Look for a contact in recipient's list whose linked_user_id matches the sender
+    const { data: linkedContact } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('user_id', recipientId)
+      .eq('linked_user_id', token.sender_id)
+      .maybeSingle();
+    if (linkedContact) {
+      contactId = linkedContact.id;
+    } else if (fromEmail) {
+      // Fallback: match by email
+      const { data: emailContact } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('user_id', recipientId)
+        .eq('email', fromEmail)
+        .maybeSingle();
+      if (emailContact) contactId = emailContact.id;
+    }
+  }
 
   // Create entry in recipient's records
   const { data: newEntry, error } = await supabase
     .from('entries')
     .insert({
-      user_id: recipientId,
-      tx_type: flippedType,
+      user_id:        recipientId,
+      contact_id:     contactId,           // ← linked to sender contact if found
+      tx_type:        flippedType,
       sender_tx_type: token.entry.tx_type,
-      amount: token.entry.amount,
-      currency: token.entry.currency,
-      date: token.entry.date,
-      note: token.entry.note || '',
+      amount:         token.entry.amount,
+      currency:       token.entry.currency,
+      date:           token.entry.date,
+      note:           token.entry.note || '',
       invoice_number: token.entry.invoice_number || '',
-      is_shared: true,
-      share_token: token.token,
-      from_name: '', // will be resolved by caller
-      from_email: '',
-      status: 'accepted'
+      is_shared:      true,
+      share_token:    token.token,
+      from_name:      fromName,
+      from_email:     fromEmail,
+      status:         'posted',
+      settled_amount: 0
     })
     .select()
     .single();
   if (error) console.error('[confirmShare]', error.message);
+
+  // Notify the sender that the share was confirmed
+  if (newEntry && token.sender_id) {
+    await supabase.from('notifications').insert({
+      user_id:      token.sender_id,
+      type:         'shared_record',
+      message:      `Your shared record was confirmed by the recipient.`,
+      entry_id:     token.entry_id,
+      amount:       token.entry.amount,
+      currency:     token.entry.currency,
+      read:         false
+    }).catch(() => {});
+  }
+
   return newEntry;
 }
 
@@ -142,5 +193,5 @@ export async function expireShare(tokenId) {
 
 // ── Generate share URL ────────────────────────────────────────────
 export function getShareUrl(token) {
-  return window.location.origin + '/v2/view?t=' + token;
+  return window.location.origin + '/view?t=' + token;
 }
