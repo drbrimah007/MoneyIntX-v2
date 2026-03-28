@@ -339,7 +339,7 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
   <!-- ═══ NAV BAR ═══ -->
   <nav style="display:flex;align-items:center;justify-content:space-between;padding:18px 28px;position:sticky;top:0;z-index:100;background:rgba(7,17,31,.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.07);">
     <div style="display:flex;align-items:center;gap:10px;">
-      <img src="money_green.png" style="height:36px;width:auto;object-fit:contain;" onerror="this.style.display='none';">
+      <img src="money_green_logo.png" style="height:36px;width:auto;object-fit:contain;" onerror="this.style.display='none';">
     </div>
     <div style="display:flex;gap:10px;align-items:center;">
       <button class="lp-btn-secondary" style="padding:8px 18px;font-size:13px;border-color:rgba(255,255,255,.12);color:#eef4ff;" onclick="showAuthTab('login');document.getElementById('auth-section').scrollIntoView({behavior:'smooth'})">Log In</button>
@@ -568,15 +568,15 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
       <div id="login-form">
         <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="you@example.com" autocomplete="email"></div>
         <div class="form-group"><label>Password</label><input type="password" id="login-pass" placeholder="Your password" autocomplete="current-password"></div>
-        <button class="btn btn-primary" style="width:100%;margin-top:8px;padding:14px;font-size:15px;font-weight:700;border-radius:12px;" onclick="handleLogin()">Log In →</button>
-        <p style="text-align:center;margin-top:12px;font-size:13px;"><a href="#" onclick="handleForgotPassword();return false;">Forgot password?</a></p>
+        <button style="width:100%;margin-top:8px;padding:14px;font-size:15px;font-weight:700;border-radius:12px;background:#7fe0d0;color:#07111f;border:none;cursor:pointer;" onclick="handleLogin()">Log In →</button>
+        <p style="text-align:center;margin-top:12px;font-size:13px;"><a href="#" onclick="handleForgotPassword();return false;" style="color:#7fe0d0;text-decoration:none;">Forgot password?</a></p>
       </div>
       <!-- Signup form (hidden) -->
       <div id="signup-form" style="display:none;">
         <div class="form-group"><label>Display Name</label><input type="text" id="signup-name" placeholder="Your name" autocomplete="name"></div>
         <div class="form-group"><label>Email</label><input type="email" id="signup-email" placeholder="you@example.com" autocomplete="email"></div>
         <div class="form-group"><label>Password</label><input type="password" id="signup-pass" placeholder="Choose a strong password" autocomplete="new-password"></div>
-        <button class="btn btn-primary" style="width:100%;margin-top:8px;padding:14px;font-size:15px;font-weight:700;border-radius:12px;" onclick="handleSignup()">Create Free Account →</button>
+        <button style="width:100%;margin-top:8px;padding:14px;font-size:15px;font-weight:700;border-radius:12px;background:#7fe0d0;color:#07111f;border:none;cursor:pointer;" onclick="handleSignup()">Create Free Account →</button>
       </div>
     </div>
   </div>
@@ -586,7 +586,7 @@ tr.row-selected td { background: rgba(108,99,255,.1) !important; }
   <!-- ═══ FOOTER ═══ -->
   <div style="background:#060a14;border-top:1px solid rgba(255,255,255,.07);padding:24px 24px;text-align:center;">
     <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;">
-      <img src="money_green.png" style="height:22px;object-fit:contain;" onerror="this.style.display='none';">
+      <img src="money_green_logo.png" style="height:22px;object-fit:contain;" onerror="this.style.display='none';">
     </div>
     <p style="font-size:11px;color:#74829b;max-width:400px;margin:0 auto;">&copy; 2026 Money IntX &middot; Making Money Matters Memorable</p>
   </div>
