@@ -36,6 +36,36 @@ const BRAND = {
   siteUrl: 'https://moneyintx.com'
 };
 
+// ── HTML escape helper ────────────────────────────────────────────────────────
+function _escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Shared rich email builder (dark header, V1 style) ─────────────────────────
+function _richEmail({ logoUrl, siteName = 'Money IntX', siteUrl = 'https://moneyintx.com',
+    heading, subheading, bodyHtml, footerNote = '' }) {
+  const validLogo = (logoUrl && /^https?:\/\//.test(logoUrl)) ? logoUrl : `${siteUrl}/money.png`;
+  const logoImg   = `<img src="${_escHtml(validLogo)}" alt="${_escHtml(siteName)}" style="max-height:60px;max-width:220px;width:auto;height:auto;object-fit:contain;display:block;margin:0 auto;" onerror="this.style.display='none'">`;
+  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:0;background:#f9f9f9;">
+    <div style="background:#1a1d6e;padding:22px 32px 18px;border-radius:12px 12px 0 0;text-align:center;">
+      ${logoImg}
+    </div>
+    <div style="background:#fff;padding:32px 32px 24px;border-left:1px solid #eee;border-right:1px solid #eee;">
+      <h2 style="margin:0 0 6px;font-size:22px;font-weight:700;color:#1a1d6e;">${heading}</h2>
+      ${subheading ? `<p style="color:#555;font-size:14px;margin-bottom:20px;line-height:1.6;">${subheading}</p>` : ''}
+      ${bodyHtml}
+    </div>
+    <div style="background:#f0f0f0;padding:16px 32px;border-radius:0 0 12px 12px;border:1px solid #eee;border-top:none;text-align:center;">
+      <p style="margin:0 0 4px;font-size:12px;color:#888;">${_escHtml(siteName)} — Making Money Matters Memorable</p>
+      <p style="margin:0;font-size:12px;color:#aaa;"><a href="${_escHtml(siteUrl)}" style="color:#1a1d6e;text-decoration:none;">${siteUrl.replace(/^https?:\/\//, '')}</a></p>
+      ${footerNote ? `<p style="margin:6px 0 0;font-size:11px;color:#bbb;">${footerNote}</p>` : ''}
+    </div>
+  </div>`;
+}
+
+
+
 // ── Base email wrapper ─────────────────────────────────────────────────────────
 function baseTemplate({ title, preheader, body }) {
   return `<!DOCTYPE html>
@@ -328,36 +358,22 @@ export async function sendInvoiceEmail(userId, {
 }
 
 // ── OTP / Locker access email ──────────────────────────────────────────────────
-export async function sendOtpEmail(userId, { to, otp, lockerName }) {
-  const subject = `Your Money IntX access code: ${otp}`;
-
-  const body = `
-    <h2>Locker Access Code</h2>
-    <p>You requested access to <strong>${lockerName || 'a protected locker'}</strong>.</p>
-    <p>Your one-time verification code is:</p>
-
-    <div class="amount-box" style="text-align:center;">
-      <div class="label">One-Time Code</div>
-      <div class="value" style="font-size:40px;letter-spacing:8px;">${otp}</div>
-      <div style="font-size:12px;color:${BRAND.muted};margin-top:6px;">Expires in 10 minutes</div>
+export async function sendOtpEmail(userId, { to, otp, lockerName, logoUrl, siteUrl = 'https://moneyintx.com' }) {
+  const subject  = `Your Asset Locker Access Code — Money IntX`;
+  const bodyHtml = `
+    <p style="color:#555;font-size:14px;margin-bottom:24px;">You requested access to <strong>${_escHtml(lockerName || 'Asset Locker')}</strong> on Money IntX. Enter the code below to unlock your records for this session.</p>
+    <div style="text-align:center;margin:0 0 28px;">
+      <div style="display:inline-block;background:#f5f5ff;border:2px solid #1a1d6e;border-radius:12px;padding:22px 40px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#1a1d6e;margin-bottom:10px;">Your Access Code</div>
+        <div style="font-size:40px;font-weight:800;letter-spacing:10px;color:#1a1d6e;font-family:monospace;">${_escHtml(String(otp))}</div>
+        <div style="font-size:11px;color:#999;margin-top:10px;">Expires in 30 minutes</div>
+      </div>
     </div>
-
-    <p style="font-size:13px;color:${BRAND.muted};">If you did not request this code, please ignore this email. Never share this code with anyone.</p>
+    <p style="font-size:13px;color:#999;line-height:1.65;margin-bottom:0;">If you did not request this code, someone may be attempting to access your account. Your lockers remain locked — no action is needed unless you made this request.</p>
   `;
-
-  const html = baseTemplate({
-    title: subject,
-    preheader: `Your Money IntX locker access code is ${otp}. Expires in 10 minutes.`,
-    body
-  });
-
-  const result = await callSendEmail({ to, subject, html });
-  const status = result.ok ? 'sent' : 'failed';
-
-  await logEmail(userId, {
-    type: 'otp', recipient: to, subject, status, error: result.error || ''
-  });
-
+  const html = _richEmail({ logoUrl, siteUrl, heading: 'Asset Locker Access Code', bodyHtml });
+  const result = await callSendEmail({ to, subject, html, text: `Asset Locker Access Code\n\nYour one-time code: ${otp}\n\nThis code expires in 30 minutes.\n\nIf you did not request this, your lockers remain locked.\n\n— Money IntX` });
+  await logEmail(userId, { type: 'otp', recipient: to, subject, status: result.ok ? 'sent' : 'failed', error: result.error || '' });
   return { ok: result.ok, subject };
 }
 
@@ -395,39 +411,105 @@ export async function sendAppInviteEmail(userId, { to, fromName, inviteLink }) {
 
 // ── Group / Investment invite email ───────────────────────────────────────────
 export async function sendInviteEmail(userId, {
-  to, fromName, groupName, inviteType = 'group', inviteLink
+  to, fromName, groupName, inviteType = 'group', inviteLink, message, logoUrl, siteUrl = 'https://moneyintx.com'
 }) {
-  const typeLabel = inviteType === 'investment' ? 'investment group' : 'savings group';
-  const subject   = `${fromName} invited you to join ${groupName}`;
-
-  const body = `
-    <div class="badge">🤝 Invitation</div>
-    <h2>You're invited!</h2>
-    <p><strong>${fromName}</strong> has invited you to join the ${typeLabel} <strong>${groupName}</strong> on Money IntX.</p>
-
-    <div class="amount-box">
-      <div class="label">${inviteType === 'investment' ? 'Investment' : 'Savings'} Group</div>
-      <div class="value" style="font-size:22px;">${groupName}</div>
+  const typeLabel = inviteType === 'investment' ? 'Investment Group' : 'Savings Group';
+  const subject   = `You're Invited — ${typeLabel}: ${_escHtml(groupName)}`;
+  const ctaUrl    = inviteLink || siteUrl;
+  const bodyHtml  = `
+    <div style="background:#f5f5ff;border-left:4px solid #1a1d6e;border-radius:4px;padding:16px 20px;margin-bottom:20px;">
+      <p style="margin:0;font-size:15px;color:#333;line-height:1.6;">${_escHtml(message) || 'Log in to view and participate.'}</p>
     </div>
-
-    ${inviteLink ? `<a class="btn" href="${inviteLink}">Accept Invitation →</a>` : `<a class="btn" href="${BRAND.siteUrl}">View in App →</a>`}
-
-    <p style="font-size:13px;color:${BRAND.muted};">Money IntX is a financial record-keeping app. It does not hold or transfer money.</p>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="${_escHtml(ctaUrl)}" style="display:inline-block;padding:13px 32px;background:#1a1d6e;color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:8px;">Open Money IntX →</a>
+    </div>
   `;
-
-  const html = baseTemplate({
-    title: subject,
-    preheader: `${fromName} invited you to join ${groupName} on Money IntX.`,
-    body
-  });
-
-  const result = await callSendEmail({ to, subject, html });
-  const status = result.ok ? 'sent' : 'failed';
-
-  await logEmail(userId, {
-    type: 'invite', recipient: to, subject, status, error: result.error || ''
-  });
-
+  const subheading = `<strong>${_escHtml(fromName)}</strong> has invited you to join ${typeLabel}: <strong>${_escHtml(groupName)}</strong>.`;
+  const html = _richEmail({ logoUrl, siteUrl, heading: "You've Been Invited", subheading, bodyHtml });
+  const result = await callSendEmail({ to, subject, html, text: `You've Been Invited\n\n${fromName} invited you to join ${typeLabel}: ${groupName}.\n\n${message || 'Log in to view and participate.'}\n\n${ctaUrl}\n\n— Money IntX` });
+  await logEmail(userId, { type: 'invite', recipient: to, subject, status: result.ok ? 'sent' : 'failed', error: result.error || '' });
   return { ok: result.ok, subject };
 }
 
+// ── NOK Verification — inform trusted contact they've been designated ──────────
+export async function sendNokVerificationEmail(userId, {
+  to, recipientName, fromName, relationship, accessLevel, logoUrl, siteUrl = 'https://moneyintx.com'
+}) {
+  const ACCESS_LABELS = { readonly: 'View Only', notify_only: 'Notify Only', limited_control: 'Limited Control', full_control: 'Full Control', view_only: 'View Only' };
+  const accessLabel = ACCESS_LABELS[accessLevel] || 'View Only';
+  const subject = `You've been designated as a Trusted Contact — Money IntX`;
+  const bodyHtml = `
+    <div style="background:#f5f5ff;border-left:4px solid #1a1d6e;border-radius:4px;padding:16px 20px;margin-bottom:20px;">
+      <p style="margin:0 0 8px;font-size:14px;color:#333;"><strong>Relationship:</strong> ${_escHtml(relationship || 'Trusted Contact')}</p>
+      <p style="margin:0;font-size:14px;color:#333;"><strong>Your Access Level:</strong> ${_escHtml(accessLabel)}</p>
+    </div>
+    <p style="font-size:13px;color:#777;margin-bottom:20px;line-height:1.6;">No action is required from you right now. You will receive a separate notification if and when your access is activated. This system releases <strong>information only</strong> — not money or legal title.</p>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="${_escHtml(siteUrl)}" style="display:inline-block;padding:13px 32px;background:#1a1d6e;color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:8px;">Learn More →</a>
+    </div>
+  `;
+  const subheading = `<strong>${_escHtml(fromName)}</strong> has named you as a <strong>Next of Kin / Trusted Contact</strong> on their Money IntX account.`;
+  const html = _richEmail({ logoUrl, siteUrl, heading: "You've Been Designated as a Trusted Contact", subheading, bodyHtml, footerNote: 'This is not a legal will and does not transfer money or assign debts.' });
+  const result = await callSendEmail({ to, subject, html, text: `You've Been Designated as a Trusted Contact\n\n${fromName} has named you as a Next of Kin / Trusted Contact.\n\nRelationship: ${relationship || 'Trusted Contact'}\nAccess Level: ${accessLabel}\n\nNo action required now.\n\n— Money IntX` });
+  await logEmail(userId, { type: 'nok_verification', recipient: to, subject, status: result.ok ? 'sent' : 'failed', error: result.error || '' });
+  return { ok: result.ok, subject };
+}
+
+// ── NOK Activation — notify trusted contact their access is now live ──────────
+export async function sendNokActivationEmail(userId, {
+  to, recipientName, fromName, relationship, message, accessLevel, releaseType, triggerReason, logoUrl, siteUrl = 'https://moneyintx.com'
+}) {
+  const ACCESS_LABELS   = { readonly: 'View Only', notify_only: 'Notify Only', limited_control: 'Limited Control', full_control: 'Full Control', view_only: 'View Only' };
+  const RELEASE_LABELS  = { full: 'Full ledger export', summary: 'Summary report only', selected: 'Selected fields', manual: 'On request' };
+  const TRIGGER_LABELS  = { manual: 'Manually activated by account owner', inactivity: 'Activated due to account inactivity', emergency: 'Activated via emergency verification' };
+  const accessLabel  = ACCESS_LABELS[accessLevel]    || 'View Only';
+  const releaseLabel = RELEASE_LABELS[releaseType]   || 'Full export';
+  const triggerLabel = TRIGGER_LABELS[triggerReason] || 'Activated by account owner';
+  const subject = `Your Trusted Access Has Been Activated — Money IntX`;
+  const bodyHtml = `
+    <div style="background:#f5f5ff;border-left:4px solid #1a1d6e;border-radius:4px;padding:16px 20px;margin-bottom:20px;">
+      <p style="margin:0 0 6px;font-size:14px;color:#333;"><strong>Access Level:</strong> ${_escHtml(accessLabel)}</p>
+      <p style="margin:0 0 6px;font-size:14px;color:#333;"><strong>Data Release:</strong> ${_escHtml(releaseLabel)}</p>
+      <p style="margin:0;font-size:13px;color:#777;"><strong>Reason:</strong> ${_escHtml(triggerLabel)}</p>
+    </div>
+    ${message ? `<div style="background:#fffbf0;border:1px solid #f0d080;border-radius:6px;padding:14px 18px;margin-bottom:20px;font-size:14px;color:#555;line-height:1.6;font-style:italic;">"${_escHtml(message)}"</div>` : ''}
+    <p style="font-size:12px;color:#999;line-height:1.6;">This system releases information only. It is not a legal will, does not transfer money, and is not legally binding for debt assignment. All access is logged and subject to review.</p>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="${_escHtml(siteUrl)}" style="display:inline-block;padding:13px 32px;background:#1a1d6e;color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:8px;">Access Money IntX →</a>
+    </div>
+  `;
+  const subheading = `Your Next of Kin access to <strong>${_escHtml(fromName)}'s</strong> account on Money IntX is now active.`;
+  const html = _richEmail({ logoUrl, siteUrl, heading: 'Your Trusted Access Has Been Activated', subheading, bodyHtml });
+  const result = await callSendEmail({ to, subject, html, text: `Your Trusted Access Has Been Activated\n\n${fromName} has activated your Next of Kin access on Money IntX.\n\nAccess Level: ${accessLabel}\nData Release: ${releaseLabel}\nReason: ${triggerLabel}\n\n${message ? '"' + message + '"\n\n' : ''}${siteUrl}\n\n— Money IntX` });
+  await logEmail(userId, { type: 'nok_activation', recipient: to, subject, status: result.ok ? 'sent' : 'failed', error: result.error || '' });
+  return { ok: result.ok, subject };
+}
+
+// ── Locker Info — send asset details to a designated trustee ──────────────────
+export async function sendLockerInfoEmail(userId, {
+  to, trusteeName, fromName, lockerTitle, lockerType, lockerLocation, lockerAccess, lockerKey, lockerNotes, logoUrl, siteUrl = 'https://moneyintx.com'
+}) {
+  const subject = `Asset Locker: ${lockerTitle} — Money IntX`;
+  const rows = [
+    lockerType     ? ['Type',     lockerType]     : null,
+    lockerLocation ? ['Location', lockerLocation] : null,
+    lockerAccess   ? ['Access',   lockerAccess]   : null,
+    lockerKey      ? ['Key',      lockerKey]      : null,
+    lockerNotes    ? ['Notes',    lockerNotes]    : null,
+  ].filter(Boolean);
+  const tableRows = rows.map(([k, v]) =>
+    `<tr><td style="padding:6px 12px 6px 0;font-size:12px;font-weight:700;text-transform:uppercase;color:#999;white-space:nowrap;vertical-align:top;">${_escHtml(k)}</td><td style="padding:6px 0;font-size:14px;color:#333;">${_escHtml(v)}</td></tr>`
+  ).join('');
+  const bodyHtml = `
+    <div style="background:#f5f5ff;border-left:4px solid #1a1d6e;border-radius:4px;padding:16px 20px;margin-bottom:24px;">
+      <div style="font-size:18px;font-weight:800;color:#1a1d6e;margin-bottom:12px;">${_escHtml(lockerTitle)}</div>
+      <table style="border-collapse:collapse;width:100%;">${tableRows}</table>
+    </div>
+    <p style="font-size:12px;color:#999;line-height:1.65;">This information is shared for asset location and access purposes only. It does not transfer ownership, constitute a legal instruction, or assign financial liability.</p>
+  `;
+  const subheading = `This information has been sent to you by <strong>${_escHtml(fromName)}</strong> via Money IntX. You have been designated as a trustee for the following asset.`;
+  const html = _richEmail({ logoUrl, siteUrl, heading: 'Asset Locker Information', subheading, bodyHtml });
+  const result = await callSendEmail({ to, subject, html, text: `Asset Locker Information\n\nSent by: ${fromName}\nLocker: ${lockerTitle}\n\n${rows.map(([k,v])=>k+': '+v).join('\n')}\n\nThis information does not transfer ownership or constitute a legal instruction.\n\n— Money IntX` });
+  await logEmail(userId, { type: 'locker_info', recipient: to, subject, status: result.ok ? 'sent' : 'failed', error: result.error || '' });
+  return { ok: result.ok, subject };
+}

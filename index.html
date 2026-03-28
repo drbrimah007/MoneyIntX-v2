@@ -557,7 +557,7 @@ import { listTrustees, createTrustee, deleteTrustee, verifyTrustee, activateTrus
 import { initBpEngine, exposeBpEngine, renderBusinessPage } from './js/bp-engine.js';
 import { listRecurring, createRecurring, deleteRecurring, toggleRecurring, processDueRecurring, FREQUENCIES } from './js/recurring.js';
 import { toast, esc, navigate, statusBadge, TX_LABELS, TX_COLORS, TX_CREATE_LABELS, DIRECTION_SIGN, fmtDate, fmtRelative, openModal, closeModal } from './js/ui.js';
-import { sendNotificationEmail, sendInvoiceEmail, sendOtpEmail, sendInviteEmail, sendAppInviteEmail, logEmail } from './js/email.js';
+import { sendNotificationEmail, sendInvoiceEmail, sendOtpEmail, sendInviteEmail, sendAppInviteEmail, sendNokVerificationEmail, sendNokActivationEmail, sendLockerInfoEmail, logEmail } from './js/email.js';
 
 let currentUser = null;
 let currentProfile = null;
@@ -4639,14 +4639,23 @@ window.doCreateTrustee = async function() {
   const name = document.getElementById('nk-name').value.trim();
   const email = document.getElementById('nk-email').value.trim();
   if (!name || !email) return toast('Name and email required.', 'error');
-  await createTrustee(currentUser.id, {
+  const trusteeData = await createTrustee(currentUser.id, {
     trusteeName: name, trusteeEmail: email,
     relationship: document.getElementById('nk-rel').value.trim(),
     accessLevel: document.getElementById('nk-access').value,
     releaseType: document.getElementById('nk-release').value,
     inactivityDays: parseInt(document.getElementById('nk-days')?.value) || 90
   });
-  closeModal(); toast('Trustee added.', 'success'); navTo('nok');
+  // Notify trustee they've been designated
+  try {
+    await sendNokVerificationEmail(currentUser.id, {
+      to: email, fromName: currentProfile?.display_name || currentProfile?.company_name || 'Someone',
+      recipientName: name, relationship: document.getElementById('nk-rel').value.trim(),
+      accessLevel: document.getElementById('nk-access').value,
+      logoUrl: currentProfile?.logo_url, siteUrl: 'https://moneyintx.com'
+    });
+  } catch(e) { console.warn('[NOK] Verification email failed:', e); }
+  closeModal(); toast('Trustee added & notified.', 'success'); navTo('nok');
 };
 
 window.doVerifyTrustee = async function(id) {
@@ -4657,8 +4666,22 @@ window.doVerifyTrustee = async function(id) {
 window.doActivateTrustee = async function(id) {
   if (!confirm('Activate access for this trustee? They will be able to view your records.')) return;
   const reason = prompt('Reason for activation (optional):') || '';
+  const trustees = await listTrustees(currentUser.id);
+  const trustee  = trustees.find(t => t.id === id);
   await activateTrustee(id, reason);
-  toast('Access activated.', 'success'); navTo('nok');
+  // Notify trustee their access is now live
+  if (trustee?.trustee_email) {
+    try {
+      await sendNokActivationEmail(currentUser.id, {
+        to: trustee.trustee_email, fromName: currentProfile?.display_name || currentProfile?.company_name || 'Someone',
+        recipientName: trustee.trustee_name, relationship: trustee.relationship,
+        accessLevel: trustee.access_level, releaseType: trustee.release_type,
+        triggerReason: reason ? 'manual' : 'manual',
+        logoUrl: currentProfile?.logo_url, siteUrl: 'https://moneyintx.com'
+      });
+    } catch(e) { console.warn('[NOK] Activation email failed:', e); }
+  }
+  toast('Access activated & trustee notified.', 'success'); navTo('nok');
 };
 
 window.confirmDeleteTrustee = async function(id) {
