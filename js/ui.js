@@ -102,23 +102,23 @@ export function fmtRelative(ts) {
   return fmtDate(ts);
 }
 
-// ── Status badge — calm production palette ─────────────────────────
+// ── Status badge — exact production tokens ─────────────────────────
 const STATUS_COLORS = {
-  draft:             { bg: 'rgba(143,168,214,.08)', color: '#8fa8d6', border: 'rgba(143,168,214,.16)' },
-  posted:            { bg: 'rgba(143,168,214,.12)', color: '#8fa8d6', border: 'rgba(143,168,214,.20)' },
+  draft:             { bg: 'rgba(157,178,219,.10)', color: '#9db2db', border: 'rgba(157,178,219,.16)' },
+  posted:            { bg: 'rgba(157,178,219,.12)', color: '#9db2db', border: 'rgba(157,178,219,.20)' },
   sent:              { bg: 'rgba(108,99,255,.10)',  color: '#a78bfa', border: 'rgba(108,99,255,.18)' },
   viewed:            { bg: 'rgba(108,99,255,.08)',  color: '#c4b5fd', border: 'rgba(108,99,255,.15)' },
-  accepted:          { bg: 'rgba(127,224,208,.12)', color: '#7fe0d0', border: 'rgba(127,224,208,.20)' },
-  due:               { bg: 'rgba(214,185,122,.12)', color: '#d6b97a', border: 'rgba(214,185,122,.20)' },
-  partially_settled: { bg: 'rgba(214,185,122,.12)', color: '#d6b97a', border: 'rgba(214,185,122,.20)' },
-  settled:           { bg: 'rgba(127,224,208,.12)', color: '#7fe0d0', border: 'rgba(127,224,208,.20)' },
-  fulfilled:         { bg: 'rgba(127,224,208,.12)', color: '#7fe0d0', border: 'rgba(127,224,208,.20)' },
+  accepted:          { bg: 'rgba(99,214,154,.12)',  color: '#63d69a', border: 'rgba(99,214,154,.20)' },
+  due:               { bg: 'rgba(213,187,122,.12)', color: '#d5bb7a', border: 'rgba(213,187,122,.20)' },
+  partially_settled: { bg: 'rgba(213,187,122,.12)', color: '#d5bb7a', border: 'rgba(213,187,122,.20)' },
+  settled:           { bg: 'rgba(99,214,154,.12)',  color: '#63d69a', border: 'rgba(99,214,154,.20)' },
+  fulfilled:         { bg: 'rgba(99,214,154,.12)',  color: '#63d69a', border: 'rgba(99,214,154,.20)' },
   overdue:           { bg: 'rgba(208,120,120,.12)', color: '#d07878', border: 'rgba(208,120,120,.20)' },
   disputed:          { bg: 'rgba(208,120,120,.12)', color: '#d07878', border: 'rgba(208,120,120,.20)' },
-  voided:            { bg: 'rgba(255,255,255,.04)', color: '#6f7c96', border: 'rgba(255,255,255,.08)' },
-  cancelled:         { bg: 'rgba(255,255,255,.04)', color: '#6f7c96', border: 'rgba(255,255,255,.08)' },
-  closed:            { bg: 'rgba(255,255,255,.04)', color: '#6f7c96', border: 'rgba(255,255,255,.08)' },
-  payment:           { bg: 'rgba(127,224,208,.12)', color: '#7fe0d0', border: 'rgba(127,224,208,.20)' },
+  voided:            { bg: 'rgba(255,255,255,.04)', color: '#6f7788', border: 'rgba(255,255,255,.08)' },
+  cancelled:         { bg: 'rgba(255,255,255,.04)', color: '#6f7788', border: 'rgba(255,255,255,.08)' },
+  closed:            { bg: 'rgba(255,255,255,.04)', color: '#6f7788', border: 'rgba(255,255,255,.08)' },
+  payment:           { bg: 'rgba(99,214,154,.12)',  color: '#63d69a', border: 'rgba(99,214,154,.20)' },
 };
 
 const STATUS_LABELS = {
@@ -172,26 +172,26 @@ export const TX_CREATE_LABELS = {
 };
 
 export const TX_COLORS = {
-  // Green = receivable / owed to me  (V1 dark theme --green: #4ade80)
-  owed_to_me:       '#4ade80',
-  invoice_sent:     '#4ade80',
-  bill_sent:        '#4ade80',
-  they_owe_you:     '#4ade80',
-  they_paid_you:    '#4ade80',
-  // Red = payable / I owe  (V1 dark theme --red: #f87171)
-  i_owe:            '#f87171',
-  invoice_received: '#f87171',
-  bill_received:    '#f87171',
-  you_owe_them:     '#f87171',
-  you_paid_them:    '#f87171',
-  // Purple = neutral invoice/bill  (V1 --accent #6c63ff, lightened for readability)
-  invoice:          '#818cf8',
-  bill:             '#818cf8',
-  // Teal = payment recorded (neutral settlement)
-  payment_recorded: '#2dd4bf',
-  // Amber / sky for advances
-  advance_paid:     '#fb923c',
-  advance_received: '#60a5fa'
+  // Receivable / owed to me → success green
+  owed_to_me:       '#63d69a',
+  invoice_sent:     '#63d69a',
+  bill_sent:        '#63d69a',
+  they_owe_you:     '#63d69a',
+  they_paid_you:    '#63d69a',
+  // Payable / I owe → muted red
+  i_owe:            '#d07878',
+  invoice_received: '#d07878',
+  bill_received:    '#d07878',
+  you_owe_them:     '#d07878',
+  you_paid_them:    '#d07878',
+  // Neutral invoice/bill → posted blue
+  invoice:          '#9db2db',
+  bill:             '#9db2db',
+  // Payment recorded → success green
+  payment_recorded: '#63d69a',
+  // Advances → partial gold
+  advance_paid:     '#d5bb7a',
+  advance_received: '#d5bb7a'
 };
 
 // Direction sign per category (canonical source of truth for new entries)

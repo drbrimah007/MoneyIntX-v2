@@ -29,40 +29,57 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-/* Theme: Classic Dark — production system */
+/* Theme: Classic Dark — final production tokens */
 :root, [data-theme="classic"] {
   --accent: #6c63ff;
   --accent-hover: #5a52e0;
   --accent-light: rgba(108,99,255,0.10);
 
-  --bg:      #07111f;
-  --bg2:     #0a1528;
-  --bg3:     #0d182b;
-  --bg-soft: #0a1528;
-  --panel:   #0d182b;
+  /* Backgrounds — real black foundation */
+  --bg:       #06080f;
+  --bg2:      #0b1020;
+  --bg3:      #0f1528;
+  --bg-soft:  #0b1020;
+  --panel:    #0b1020;
+  --panel-2:  #0f1528;
 
-  --text:    #eef4ff;
-  --text-2:  #c7d2e5;
-  --muted:   #8b98b3;
-  --muted-2: #6f7c96;
+  /* Text hierarchy */
+  --text:     #eef2f7;
+  --text-2:   #cfd6e4;
+  --muted:    #8f98ab;
+  --muted-2:  #6f7788;
 
-  --border:  rgba(255,255,255,.06);
-  --line:    rgba(255,255,255,.06);
-  --line-2:  rgba(255,255,255,.10);
+  /* Borders */
+  --border:   rgba(255,255,255,.05);
+  --line:     rgba(255,255,255,.05);
+  --line-2:   rgba(255,255,255,.08);
 
-  --green:    #7fe0d0;
-  --green-bg: rgba(127,224,208,.12);
-  --red:      #d07878;
-  --red-bg:   rgba(208,120,120,.12);
-  --amber:    #d6b97a;
-  --gold:     #d6b97a;
-  --gold-bg:  rgba(214,185,122,.12);
-  --blue:     #8fa8d6;
-  --blue-bg:  rgba(143,168,214,.12);
+  /* Contact name/avatar accent */
+  --contact:  #d88978;
+
+  /* Status tokens */
+  --green:      #63d69a;
+  --green-bg:   rgba(99,214,154,.12);
+  --success:    #63d69a;
+  --success-bg: rgba(99,214,154,.12);
+
+  --red:        #d07878;
+  --red-bg:     rgba(208,120,120,.12);
+
+  --amber:      #d5bb7a;
+  --gold:       #d5bb7a;
+  --partial:    #d5bb7a;
+  --gold-bg:    rgba(213,187,122,.12);
+  --partial-bg: rgba(213,187,122,.12);
+
+  --blue:       #9db2db;
+  --posted:     #9db2db;
+  --blue-bg:    rgba(157,178,219,.12);
+  --posted-bg:  rgba(157,178,219,.12);
 
   --radius: 10px;
-  --shadow:    0 2px 12px rgba(0,0,0,.5);
-  --shadow-lg: 0 8px 28px rgba(0,0,0,.5);
+  --shadow:    0 2px 12px rgba(0,0,0,.55);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,.55);
 }
 /* Theme: teal light */
 [data-theme="teal"] {
@@ -120,16 +137,24 @@
   --line:    rgba(255,255,255,.06);
   --line-2:  rgba(255,255,255,.10);
 
-  /* Status palette — calm, not bright */
-  --green:    #7fe0d0;
-  --green-bg: rgba(127,224,208,.12);
-  --red:      #d07878;
-  --red-bg:   rgba(208,120,120,.12);
-  --amber:    #d6b97a;
-  --gold:     #d6b97a;
-  --gold-bg:  rgba(214,185,122,.12);
-  --blue:     #8fa8d6;
-  --blue-bg:  rgba(143,168,214,.12);
+  /* Status palette */
+  --contact:    #d88978;
+  --green:      #63d69a;
+  --green-bg:   rgba(99,214,154,.12);
+  --success:    #63d69a;
+  --success-bg: rgba(99,214,154,.12);
+  --red:        #d07878;
+  --red-bg:     rgba(208,120,120,.12);
+  --amber:      #d5bb7a;
+  --gold:       #d5bb7a;
+  --partial:    #d5bb7a;
+  --gold-bg:    rgba(213,187,122,.12);
+  --partial-bg: rgba(213,187,122,.12);
+  --blue:       #9db2db;
+  --posted:     #9db2db;
+  --blue-bg:    rgba(157,178,219,.12);
+  --posted-bg:  rgba(157,178,219,.12);
+  --panel-2:    #0d182b;
 
   --sidebar-bg:     #07111f;
   --sidebar-active: #0a1528;
@@ -139,9 +164,9 @@
 }
 /* Theme: Money IntX Navy — production system, blue-tinted foundation */
 [data-theme="navy"] {
-  --accent: #7fe0d0;
-  --accent-hover: #5ccbbf;
-  --accent-light: rgba(127,224,208,0.10);
+  --accent: #e020b0;
+  --accent-hover: #c01898;
+  --accent-light: rgba(224,32,176,0.10);
 
   --bg:      #050e1b;
   --bg2:     #081426;
@@ -158,15 +183,23 @@
   --line:    rgba(255,255,255,.06);
   --line-2:  rgba(255,255,255,.10);
 
-  --green:    #7fe0d0;
-  --green-bg: rgba(127,224,208,.12);
-  --red:      #d07878;
-  --red-bg:   rgba(208,120,120,.12);
-  --amber:    #d6b97a;
-  --gold:     #d6b97a;
-  --gold-bg:  rgba(214,185,122,.12);
-  --blue:     #8fa8d6;
-  --blue-bg:  rgba(143,168,214,.12);
+  --contact:    #d88978;
+  --green:      #63d69a;
+  --green-bg:   rgba(99,214,154,.12);
+  --success:    #63d69a;
+  --success-bg: rgba(99,214,154,.12);
+  --red:        #d07878;
+  --red-bg:     rgba(208,120,120,.12);
+  --amber:      #d5bb7a;
+  --gold:       #d5bb7a;
+  --partial:    #d5bb7a;
+  --gold-bg:    rgba(213,187,122,.12);
+  --partial-bg: rgba(213,187,122,.12);
+  --blue:       #9db2db;
+  --posted:     #9db2db;
+  --blue-bg:    rgba(157,178,219,.12);
+  --posted-bg:  rgba(157,178,219,.12);
+  --panel-2:    #0b1a31;
 
   --sidebar-bg:     #050e1b;
   --sidebar-active: #081426;
@@ -1426,22 +1459,22 @@ async function renderDash(el) {
   html += `<div style="margin-bottom:14px;overflow-x:auto;padding-bottom:2px;">
     <div style="display:flex;gap:8px;min-width:max-content;">
       <button onclick="openNewEntryModal('owe-me')"
-        style="${_qaBtnBase}background:rgba(127,224,208,.10);border-color:rgba(127,224,208,.22);color:#7fe0d0;"
+        style="${_qaBtnBase}background:rgba(99,214,154,.10);border-color:rgba(99,214,154,.20);color:#63d69a;"
         onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
         They Owe Me
       </button>
       <button onclick="openNewEntryModal('i-owe')"
-        style="${_qaBtnBase}background:rgba(208,120,120,.10);border-color:rgba(208,120,120,.22);color:#d07878;"
+        style="${_qaBtnBase}background:rgba(208,120,120,.10);border-color:rgba(208,120,120,.20);color:#d07878;"
         onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
         I Owe Them
       </button>
       <button onclick="openNewEntryModal('advance')"
-        style="${_qaBtnBase}background:rgba(214,185,122,.10);border-color:rgba(214,185,122,.22);color:#d6b97a;"
+        style="${_qaBtnBase}background:rgba(213,187,122,.10);border-color:rgba(213,187,122,.20);color:#d5bb7a;"
         onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
         Advances
       </button>
       <button onclick="navTo('templates')"
-        style="${_qaBtnBase}background:rgba(143,168,214,.10);border-color:rgba(143,168,214,.22);color:#8fa8d6;"
+        style="${_qaBtnBase}background:rgba(157,178,219,.10);border-color:rgba(157,178,219,.20);color:#9db2db;"
         onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
         New Invoice
       </button>
@@ -1544,7 +1577,7 @@ async function renderDash(el) {
         <td style="min-width:80px;">
           ${cId ? `<span style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;" onclick="openContactDetail('${cId}')">
             <span style="width:24px;height:24px;border-radius:50%;background:${col};display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;color:#fff;">${esc(cName.charAt(0).toUpperCase())}</span>
-            <span style="font-weight:600;color:${col};">${esc(cName)}</span>
+            <span style="font-weight:600;color:var(--contact,#d88978);">${esc(cName)}</span>
           </span>` : `<span style="color:var(--muted);">${esc(cName)}</span>`}
         </td>
         <td style="font-weight:700;cursor:pointer;" onclick="openEntryDetail('${e.id}')">${amtHtml}</td>
@@ -2056,7 +2089,7 @@ async function renderEntries(el, page, forceRefresh) {
         <td style="min-width:80px;">
           ${cId ? `<span style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;" onclick="openContactDetail('${cId}')">
             <span style="width:24px;height:24px;border-radius:50%;background:${col};display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;color:#fff;">${esc(cName.charAt(0).toUpperCase())}</span>
-            <span style="font-weight:600;color:${col};">${esc(cName)}</span>
+            <span style="font-weight:600;color:var(--contact,#d88978);">${esc(cName)}</span>
           </span>` : `<span style="color:var(--muted);">${esc(cName)}</span>`}
         </td>
         <td style="font-weight:700;cursor:pointer;" onclick="openEntryDetail('${e.id}')">${amtHtml}</td>
