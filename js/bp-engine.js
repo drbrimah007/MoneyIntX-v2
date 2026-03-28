@@ -910,6 +910,7 @@ function _bpOpenFieldModal(fid, forceDir) {
   const html = `<div class="modal-bg" id="bpFieldModalBg" onclick="if(event.target===this)this.remove()">
     <div class="modal" style="max-width:680px;max-height:90vh;overflow-y:auto;" onclick="event.stopPropagation()">
       <div class="modal-title">${isNew ? 'Add Field' : 'Edit Field'}</div>
+      <input type="hidden" id="bpfl-fid" value="${esc(fid||'')}">
       ${dirBanner}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
         <div class="fg"><label>Field Label *</label>
@@ -976,16 +977,72 @@ function _bpTypeChange(val) {
     if (el) el.style.display = t === val ? 'block' : 'none';
   });
 }
+
+// Re-renders #bpfl-calc-list in-place from _bpFldCalcs (no modal close/reopen)
+function _bpRenderCalcList() {
+  const p = _curPanel;
+  const fid = document.getElementById('bpfl-fid')?.value || '';
+
+  const _tOpts = (selfFid) => {
+    const cands = (p?.fields || []).filter(ff => ff.id !== selfFid && ff.direction !== 'row');
+    if (!cands.length) return '<option value="">— no numeric fields yet —</option>';
+    return '<option value="">— none —</option>' + cands.map(ff =>
+      `<option value="${ff.id}">${esc(ff.label)}</option>`
+    ).join('');
+  };
+  const _sagg = (selfFid, selIds) => {
+    const cands = (p?.fields || []).filter(ff => ff.id !== selfFid && ff.direction !== 'row');
+    if (!cands.length) return '<p style="color:var(--muted);font-size:12px;">No column fields yet.</p>';
+    return cands.map(ff => `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;cursor:pointer;">
+      <input type="checkbox" class="bp-sagg-check" value="${ff.id}" ${(selIds||[]).includes(ff.id)?'checked':''}> ${esc(ff.label)}
+    </label>`).join('');
+  };
+
+  const html = _bpFldCalcs.map((c, i) => {
+    const isAgg  = c.operation === 'aggregate';
+    const isSAgg = c.operation === 'select_aggregate';
+    return `<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;" id="bpfc_${i}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="fg"><label>Result Name *</label>
+          <input value="${esc(c.name||'')}" oninput="window._bpEngine._bpUpdCalc(${i},'name',this.value)" placeholder="e.g. Total"></div>
+        <div class="fg"><label>Operation</label>
+          <select onchange="window._bpEngine._bpUpdCalc(${i},'operation',this.value);window._bpEngine._bpCalcOpChange(${i})">
+            ${Object.entries(CALC_OPS).map(([k,v])=>`<option value="${k}" ${c.operation===k?'selected':''}>${v}</option>`).join('')}
+          </select></div>
+        <div class="fg" id="bpcoper_${i}" style="${isAgg||isSAgg?'display:none':''}">
+          <label>Factor / Operand</label>
+          <input type="number" value="${c.operand||''}" oninput="window._bpEngine._bpUpdCalc(${i},'operand',this.value)" step="any"></div>
+        <div class="fg" id="bpctarg_${i}" style="${isAgg||isSAgg?'display:none':''}">
+          <label>Apply To Field</label>
+          <select onchange="window._bpEngine._bpUpdCalc(${i},'targetFieldId',this.value)">
+            ${_tOpts(fid)}
+          </select></div>
+        <div class="fg" id="bpcsagg_${i}" style="${isSAgg?'':'display:none'};grid-column:1/-1;">
+          <label>Fields to Include</label>
+          <div style="border:1px solid var(--border);border-radius:6px;padding:10px;background:var(--bg3);max-height:150px;overflow-y:auto;">
+            ${_sagg(fid, c.targetFieldIds||[])}</div></div>
+        <div class="fg" style="grid-column:1/-1;"><label>Show Result</label>
+          <select onchange="window._bpEngine._bpUpdCalc(${i},'resultVisible',this.value==='yes')">
+            <option value="yes" ${c.resultVisible!==false?'selected':''}>Yes — visible in row</option>
+            <option value="no" ${c.resultVisible===false?'selected':''}>No — hidden (usable in later calcs)</option>
+          </select></div>
+      </div>
+      <button class="bs sm" style="color:var(--red);margin-top:6px;" onclick="window._bpEngine._bpRemCalc(${i})">✕ Remove</button>
+    </div>`;
+  }).join('');
+
+  const listEl = document.getElementById('bpfl-calc-list');
+  if (listEl) listEl.innerHTML = html;
+}
+
 function _bpAddCalc() {
   _bpFldCalcs.push({ name:'', operation:'multiply', operand:1, targetFieldId:'', targetFieldIds:[], resultVisible:true });
-  const fid = document.getElementById('bpfl-label')?.dataset?.fid || '';
-  document.getElementById('bpFieldModalBg')?.remove();
-  _bpOpenFieldModal(fid || null, _bpFldDir);
+  _bpRenderCalcList();
 }
 function _bpUpdCalc(i, key, val) { if (_bpFldCalcs[i]) _bpFldCalcs[i][key] = val; }
 function _bpRemCalc(i) {
   _bpFldCalcs.splice(i, 1);
-  document.getElementById('bpfc_' + i)?.remove();
+  _bpRenderCalcList();
 }
 function _bpCalcOpChange(i) {
   const op = _bpFldCalcs[i]?.operation;
@@ -1092,7 +1149,7 @@ export function exposeBpEngine() {
     openCreateModal, _doCreate,
     openPanel, backToList,
     openFieldBuilder, openAddFieldChoice,
-    _bpOpenFieldModal, _bpTypeChange, _bpAddCalc, _bpUpdCalc, _bpRemCalc, _bpCalcOpChange, _bpSaveField,
+    _bpOpenFieldModal, _bpTypeChange, _bpRenderCalcList, _bpAddCalc, _bpUpdCalc, _bpRemCalc, _bpCalcOpChange, _bpSaveField,
     _bpMoveField, _bpDeleteField,
     openAddRowModal, _previewRow, _doAddRow,
     openEditRowModal, _doSaveRow, _doDeleteRow,
