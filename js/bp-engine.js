@@ -7,7 +7,7 @@ import {
   listRows, addRow, updateRow, deleteRow,
   archiveSessionRows, listArchivedRows,
   listPanelMembers, findUserByEmail, addPanelMember, updatePanelMember, removePanelMember,
-  getMyMembership, listSharedPanels
+  getMyMembership, listSharedPanels, listAllUsers
 } from './business-panels.js';
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -473,7 +473,8 @@ function renderPanelView(el) {
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       ${isOwner ? `<button class="bs sm" onclick="window._bpEngine.openFieldBuilder()">⚙ Fields</button>
       <button class="bs sm" onclick="window._bpEngine.openMembersModal()">👥 Members</button>
-      <button class="bs sm" onclick="window._bpEngine.openArchiveView('${p.id}')">🗂 Archive</button>` : ''}
+      <button class="bs sm" onclick="window._bpEngine.openArchiveView('${p.id}')">🗂 Archive</button>
+      <button class="bs sm" style="color:var(--red);" onclick="window._bpEngine._bpDeletePanel('${p.id}')">🗑 Delete</button>` : ''}
       ${canAdd ? `<button class="btn btn-primary btn-sm" onclick="window._bpEngine.openAddRowModal('${todayKey}')">+ Add Row</button>` : ''}
     </div>
   </div>`;
@@ -771,7 +772,7 @@ function openAddRowModal(sessionKey) {
         const aClr = f.outputColor || 'var(--accent)';
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
           <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:${aClr};font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
-          <div id="bpr-auto-${f.id}" style="background:var(--bg3);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 12px;color:${aClr};font-weight:600;font-size:15px;">—</div>
+          <div id="bpr-auto-${f.id}" style="background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:10px 12px;color:${aClr};font-weight:600;font-size:15px;">—</div>
         </div>`;
       } else {
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
@@ -782,7 +783,7 @@ function openAddRowModal(sessionKey) {
         const aClr = f.outputColor || 'var(--accent)';
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
           <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:${aClr};font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
-          <div id="bpr-auto-${f.id}" style="background:var(--bg3);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 12px;color:${aClr};font-weight:600;font-size:15px;">—</div>
+          <div id="bpr-auto-${f.id}" style="background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:10px 12px;color:${aClr};font-weight:600;font-size:15px;">—</div>
         </div>`;
       } else {
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
@@ -805,7 +806,7 @@ function openAddRowModal(sessionKey) {
         <input type="date" id="bpr-date" value="${todayStr()}">
       </div>
       ${fieldsHtml}
-      ${hasRowFields ? `<div id="bpr-preview" style="background:var(--bg3);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;display:none;">
+      ${hasRowFields ? `<div id="bpr-preview" style="background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;display:none;">
         <div style="font-weight:700;margin-bottom:8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">Calculated</div>
         ${rowFields.map(f => `<div style="display:flex;justify-content:space-between;padding:3px 0;">
           <span style="color:var(--muted);">${esc(f.label)}</span>
@@ -941,7 +942,7 @@ async function openEditRowModal(rowId) {
         const eClr = f.outputColor || 'var(--accent)';
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
           <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:${eClr};font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
-          <div id="bped-auto-${f.id}" style="background:var(--bg3);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 12px;color:${eClr};font-weight:600;font-size:15px;">${dispVal}</div>
+          <div id="bped-auto-${f.id}" style="background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:10px 12px;color:${eClr};font-weight:600;font-size:15px;">${dispVal}</div>
         </div>`;
       } else {
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
@@ -954,7 +955,7 @@ async function openEditRowModal(rowId) {
         const eClr = f.outputColor || 'var(--accent)';
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
           <label>${esc(f.label)}${_uh} <span style="font-size:11px;color:${eClr};font-weight:600;background:var(--bg3);padding:1px 6px;border-radius:10px;margin-left:4px;">AUTO</span></label>
-          <div id="bped-auto-${f.id}" style="background:var(--bg3);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 12px;color:${eClr};font-weight:600;font-size:15px;">${dispVal}</div>
+          <div id="bped-auto-${f.id}" style="background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:10px 12px;color:${eClr};font-weight:600;font-size:15px;">${dispVal}</div>
         </div>`;
       } else {
         fieldsHtml += `<div class="fg" style="margin-bottom:12px;"><label>${esc(f.label)}${_uh}</label>
@@ -1056,7 +1057,7 @@ function openFieldBuilder() {
       const dirTag = f.direction === 'row'
         ? `<span style="background:rgba(99,102,241,.2);color:var(--accent);border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700;">ROW</span>`
         : `<span style="background:rgba(255,255,255,.08);color:var(--muted);border-radius:4px;padding:1px 6px;font-size:11px;">COL</span>`;
-      html += `<div style="border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:14px;margin-bottom:10px;">
+      html += `<div style="border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:14px;margin-bottom:10px;">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
           <div style="flex:1;">
             <div style="font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;">${dirTag} ${esc(f.label || 'Unnamed')}</div>
@@ -1180,7 +1181,7 @@ function _bpOpenFieldModal(fid, forceDir) {
 
       <!-- NUMERIC OPTIONS -->
       <div id="bpfl-panel-numeric" style="display:${isRow||ftype==='numeric'?'block':'none'}">
-        ${isRow ? '' : `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;padding:12px;background:var(--bg3);border-radius:8px;border:1px solid rgba(255,255,255,0.1);">
+        ${isRow ? '' : `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;padding:12px;background:rgba(0,0,0,.18);border-radius:8px;border:1px solid rgba(255,255,255,.18);">
           <div class="fg" style="margin:0;"><label style="font-size:12px;">Unit</label>
             <select id="bpfl-unittype" onchange="window._bpEngine._bpUnitTypeChange(this.value)">
               <option value="none" ${(f?.unitType||'none')==='none'?'selected':''}>None</option>
@@ -1223,7 +1224,7 @@ function _bpOpenFieldModal(fid, forceDir) {
           <div class="fg"><label>Text Label</label><input id="bpfl-textlabel" value="${esc(f?.textLabel||'Item')}" placeholder="Item"></div>
           <div class="fg"><label>Number Label</label><input id="bpfl-numlabel" value="${esc(f?.numericLabel||'Amount')}" placeholder="Amount"></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;padding:12px;background:var(--bg3);border-radius:8px;border:1px solid rgba(255,255,255,0.1);">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;padding:12px;background:rgba(0,0,0,.18);border-radius:8px;border:1px solid rgba(255,255,255,.18);">
           <div class="fg" style="margin:0;"><label style="font-size:12px;">Unit</label>
             <select id="bpfl-unittype-p" onchange="window._bpEngine._bpUnitTypeChangeP(this.value)">
               <option value="none" ${(f?.unitType||'none')==='none'?'selected':''}>None</option>
@@ -1246,7 +1247,7 @@ function _bpOpenFieldModal(fid, forceDir) {
       </div>
 
       <!-- OUTPUT COLOR -->
-      <div style="margin-top:14px;padding:12px;background:var(--bg3);border:1px solid rgba(255,255,255,0.1);border-radius:8px;">
+      <div style="margin-top:14px;padding:12px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.18);border-radius:8px;">
         <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">🎨 Display Color</div>
         <input type="hidden" id="bpfl-color" value="${esc(f?.outputColor||'')}">
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
@@ -1361,7 +1362,7 @@ function _bpRenderCalcList() {
     const isSAgg = op === 'select_aggregate';
     const sym    = BP_OP_SYMBOL[op] || '';
 
-    return `<div style="border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:14px;margin-bottom:12px;background:var(--bg2);" id="bpfc_${i}">
+    return `<div style="border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:14px;margin-bottom:12px;background:var(--bg2);" id="bpfc_${i}">
       <!-- Top row: name + op + remove -->
       <div style="display:grid;grid-template-columns:1fr 200px auto;gap:10px;align-items:flex-end;margin-bottom:12px;">
         <div class="fg" style="margin:0;">
@@ -1379,7 +1380,7 @@ function _bpRenderCalcList() {
 
       <!-- Binary expression: [Left] OP [Right] -->
       <div id="bpc-expr-${i}" style="${isBin?'':'display:none'}">
-        <div style="display:grid;grid-template-columns:1fr 32px 1fr;align-items:center;gap:10px;background:var(--bg3);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px;">
+        <div style="display:grid;grid-template-columns:1fr 32px 1fr;align-items:center;gap:10px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:12px;">
           <div>
             <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px;">LEFT</div>
             ${_operandPicker(i, 'left', c)}
@@ -1396,7 +1397,7 @@ function _bpRenderCalcList() {
       <!-- select_aggregate checkboxes -->
       <div id="bpcsagg_${i}" style="${isSAgg?'':'display:none'}">
         <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Fields to sum:</div>
-        <div style="border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px;background:var(--bg3);max-height:160px;overflow-y:auto;">
+        <div style="border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:10px;background:var(--bg3);max-height:160px;overflow-y:auto;">
           ${_saggChecks(c.targetFieldIds||[])}
         </div>
       </div>
@@ -1564,10 +1565,21 @@ function backToList() {
 }
 
 // ── Members Modal ─────────────────────────────────────────────────
+async function _bpDeletePanel(panelId) {
+  if (!confirm('Delete this panel and ALL its rows? This cannot be undone.')) return;
+  const { error } = await deletePanel(panelId);
+  if (error) { toast('Error deleting panel: ' + error.message, 'error'); return; }
+  toast('Panel deleted.', 'success');
+  backToList();
+}
+
 async function openMembersModal() {
   const p = _curPanel;
   if (!p) return;
-  const members = await listPanelMembers(p.id);
+  const [members, allUsers] = await Promise.all([
+    listPanelMembers(p.id),
+    listAllUsers(_userId)
+  ]);
 
   const memberRows = members.length ? members.map(m => `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
@@ -1588,24 +1600,55 @@ async function openMembersModal() {
       </div>
     </div>`).join('') : `<p style="color:var(--muted);font-size:13px;padding:12px 0;">No members yet. Add someone below.</p>`;
 
+  // Build existing member IDs set so we can hide them from the picker
+  const existingMemberUserIds = new Set(members.map(m => m.member_user_id));
+  const availableUsers = allUsers.filter(u => !existingMemberUserIds.has(u.id));
+
+  const userOptions = availableUsers.length
+    ? `<option value="">— Select a site user —</option>` + availableUsers.map(u =>
+        `<option value="${u.id}">${esc(u.display_name || u.email)} — ${esc(u.email)}</option>`).join('')
+    : `<option value="">All users are already members</option>`;
+
   const html = `<div class="modal-bg" id="bpMembersBg" onclick="if(event.target===this)this.remove()">
     <div class="modal" style="max-width:560px;" onclick="event.stopPropagation()">
       <div class="modal-title">👥 Panel Members — ${esc(p.title)}</div>
       <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Members can view this panel. Control whether they can add or edit rows.</p>
       <div id="bpm-list">${memberRows}</div>
       <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
-        <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Invite by Email</div>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
-          <input id="bpm-email" placeholder="user@example.com" style="flex:1;" type="email">
-          <label style="font-size:12px;display:flex;align-items:center;gap:4px;white-space:nowrap;">
-            <input type="checkbox" id="bpm-canadd-new" checked style="width:auto;"> Add rows
-          </label>
-          <label style="font-size:12px;display:flex;align-items:center;gap:4px;white-space:nowrap;">
-            <input type="checkbox" id="bpm-canedit-new" style="width:auto;"> Edit rows
-          </label>
+        <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">Add Member</div>
+
+        <!-- Option 1: Pick from site users -->
+        <div style="margin-bottom:14px;">
+          <label style="font-size:12px;color:var(--muted);margin-bottom:6px;display:block;">From site users:</label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select id="bpm-user-pick" style="flex:1;min-width:0;">
+              ${userOptions}
+            </select>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;white-space:nowrap;">
+              <input type="checkbox" id="bpm-canadd-pick" checked style="width:auto;"> Add rows
+            </label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;white-space:nowrap;">
+              <input type="checkbox" id="bpm-canedit-pick" style="width:auto;"> Edit rows
+            </label>
+            <button class="btn btn-primary btn-sm" onclick="window._bpEngine._bpmAddByUserId('${p.id}')">Add</button>
+          </div>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="window._bpEngine._bpmAdd('${p.id}')">Add Member</button>
-        <span id="bpm-msg" style="font-size:12px;color:var(--muted);margin-left:10px;"></span>
+
+        <!-- Option 2: By email -->
+        <div style="padding-top:10px;border-top:1px solid var(--border);">
+          <label style="font-size:12px;color:var(--muted);margin-bottom:6px;display:block;">Or by email:</label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input id="bpm-email" placeholder="user@example.com" style="flex:1;min-width:120px;" type="email">
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;white-space:nowrap;">
+              <input type="checkbox" id="bpm-canadd-new" checked style="width:auto;"> Add rows
+            </label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;white-space:nowrap;">
+              <input type="checkbox" id="bpm-canedit-new" style="width:auto;"> Edit rows
+            </label>
+            <button class="btn btn-primary btn-sm" onclick="window._bpEngine._bpmAdd('${p.id}')">Add</button>
+          </div>
+          <span id="bpm-msg" style="font-size:12px;color:var(--red);margin-top:6px;display:block;"></span>
+        </div>
       </div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;border-top:1px solid var(--border);padding-top:14px;">
         <button class="bs" onclick="document.getElementById('bpMembersBg').remove()">Close</button>
@@ -1614,6 +1657,19 @@ async function openMembersModal() {
     </div>
   </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
+}
+
+async function _bpmAddByUserId(panelId) {
+  const userId  = document.getElementById('bpm-user-pick')?.value;
+  const canAdd  = document.getElementById('bpm-canadd-pick')?.checked ?? true;
+  const canEdit = document.getElementById('bpm-canedit-pick')?.checked ?? false;
+  const msg     = document.getElementById('bpm-msg');
+  if (!userId) { if (msg) { msg.textContent = 'Select a user first.'; } return; }
+  const { error } = await addPanelMember(panelId, userId, { canAdd, canEdit });
+  if (error) { if (msg) msg.textContent = 'Error: ' + error.message; return; }
+  toast('Member added');
+  document.getElementById('bpMembersBg')?.remove();
+  openMembersModal();
 }
 
 async function _bpmAdd(panelId) {
@@ -1669,6 +1725,7 @@ export function exposeBpEngine() {
     openEditRowModal, _doSaveRow, _doDeleteRow,
     toggleFoldedSession, archiveSession,
     openArchiveView,
-    openMembersModal, _bpmAdd, _bpmRemove, _bpmSaveAll
+    openMembersModal, _bpmAdd, _bpmAddByUserId, _bpmRemove, _bpmSaveAll,
+    _bpDeletePanel
   };
 }

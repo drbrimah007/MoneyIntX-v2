@@ -190,3 +190,14 @@ export async function listSharedPanels(userId) {
   if (error) console.error('[listSharedPanels]', error.message);
   return (data || []).map(r => ({ ...r.panel, _membership: { can_add: r.can_add, can_edit: r.can_edit } }));
 }
+
+/** List all registered users (for member picker) */
+export async function listAllUsers(excludeUserId) {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, email, display_name')
+    .neq('id', excludeUserId)
+    .order('display_name');
+  if (error) console.error('[listAllUsers]', error.message);
+  return data || [];
+}

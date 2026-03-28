@@ -1783,7 +1783,7 @@ window.openEntryDetail = async function(id) {
   const settlements = entry.settlements || [];
   const paidAmt  = entry.paid_amount || entry.settled_amount || 0;
   const remaining = entry.outstanding_amount != null ? entry.outstanding_amount : (entry.amount - paidAmt);
-  const isTerminal = ['paid','settled','voided','cancelled','fulfilled'].includes(entry.status);
+  const isTerminal = ['settled','partially_settled','voided','cancelled','fulfilled','closed'].includes(entry.status);
   const canMarkPaid = ['owed_to_me','bill_sent','invoice_sent','i_owe','bill_received','invoice_received',
     'they_owe_you','you_owe_them','invoice','bill'].includes(_ecat) && !isTerminal;
 
@@ -2242,7 +2242,7 @@ window.saveMarkPaid = async function(entryId, currency) {
     }
 
     closeModal();
-    const statusText = result?.status === 'paid' ? 'Fully paid ✓' : `Partially paid — ${fmtMoney(result?.outstanding_amount, currency)} still outstanding`;
+    const statusText = (result?.status === 'settled' || result?.outstanding_amount === 0) ? 'Fully settled ✓' : `Partially settled — ${fmtMoney(result?.outstanding_amount, currency)} still outstanding`;
     toast(statusText, 'success');
     _invalidateEntries(); navTo('entries');
   } catch (err) {
