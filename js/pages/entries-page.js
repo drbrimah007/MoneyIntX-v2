@@ -1829,13 +1829,13 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
     <div class="modal-title">New Entry</div>
     <div style="display:flex;gap:6px;margin-bottom:14px;">${tabBarHtml}</div>
     <div id="ne-action-row" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">${actionRowHtml}</div>
-    ${templates.length > 0 ? `
-      <div class="form-group"><label style="color:var(--muted);">Or use a template</label>
-        <select id="ne-template" onchange="if(this.value){closeModal();useTemplateForEntry(this.value);}">
-          <option value="">— Select template —</option>
-          ${templates.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}
-        </select>
-      </div>` : ''}
+    <div class="form-group" ${templates.length === 0 ? 'style="display:none;"' : ''}>
+      <label style="color:var(--muted);">Or use a template</label>
+      <select id="ne-template" onchange="if(this.value){closeModal();useTemplateForEntry(this.value);}">
+        <option value="">— Select template —</option>
+        ${templates.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}
+      </select>
+    </div>
     <div class="form-group" style="position:relative;">
       <label style="display:flex;justify-content:space-between;align-items:center;">
         <span>Contact *</span>
@@ -1860,12 +1860,6 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
         </div>
       </div>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label>Amount *</label><input type="number" id="ne-amount" min="0" step="0.01" placeholder="0.00"></div>
-      <div class="form-group"><label>Currency</label><select id="ne-currency">
-        ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'].map(c => `<option value="${c}" ${(getCurrentProfile()?.default_currency||'USD')===c?'selected':''}>${c}</option>`).join('')}
-      </select></div>
-    </div>
     <div id="ne-items-section" style="display:none;margin-bottom:14px;">
       <label style="font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:6px;display:block;">Line Items</label>
       <div style="display:flex;gap:6px;margin-bottom:4px;">
@@ -1876,6 +1870,12 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
       </div>
       <div id="ne-items-rows"></div>
       <button type="button" class="bs sm" onclick="addNeItemRow()" style="margin-top:4px;">+ Add Row</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Amount * <span id="ne-amount-hint" style="display:none;font-size:10px;font-weight:400;color:var(--accent);">(auto from items)</span></label><input type="number" id="ne-amount" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="form-group"><label>Currency</label><select id="ne-currency">
+        ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'].map(c => `<option value="${c}" ${(getCurrentProfile()?.default_currency||'USD')===c?'selected':''}>${c}</option>`).join('')}
+      </select></div>
     </div>
     <div id="ne-extra-fields"></div>
     <div class="form-row">
@@ -2191,9 +2191,11 @@ function _neRenderExtraFields(action) {
 
   // Show/hide item lister for invoice/bill types
   const itemsSection = document.getElementById('ne-items-section');
+  const amtHint = document.getElementById('ne-amount-hint');
   if (itemsSection) {
     const showItems = ['invoice_sent','invoice_received','bill_sent','bill_received'].includes(window._neCategory);
     itemsSection.style.display = showItems ? '' : 'none';
+    if (amtHint) amtHint.style.display = showItems ? '' : 'none';
     if (showItems && document.querySelectorAll('#ne-items-rows > div').length === 0) {
       addNeItemRow(); // Add first empty row
     }
