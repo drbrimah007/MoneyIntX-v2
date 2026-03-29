@@ -813,6 +813,12 @@ async function handleLogOut() {
 // ── Enter app after auth ──────────────────────────────────────────
 async function enterApp(user) {
   currentUser = user;
+  // Load per-user theme (overrides generic fallback set at page load)
+  const userTheme = localStorage.getItem('mxi_theme_' + user.id);
+  if (userTheme) {
+    document.documentElement.setAttribute('data-theme', userTheme);
+    localStorage.setItem('mxi_theme', userTheme); // sync fallback
+  }
   currentProfile = await getProfile(user.id);
   // If profile doesn't exist (trigger failed), create it now
   if (!currentProfile) {
@@ -6444,7 +6450,7 @@ async function renderSettings(el) {
   </div>`;
 
   // ── Theme picker ───────────────────────────────────────────────
-  const currentTheme = localStorage.getItem('mxi_theme') || 'classic';
+  const currentTheme = (currentUser?.id && localStorage.getItem('mxi_theme_' + currentUser.id)) || localStorage.getItem('mxi_theme') || 'classic';
   const themes = [
     { id: 'navy',    name: 'Money IntX',  color: '#080b53', dot: '#e020b0' },
     { id: 'classic', name: 'Classic Dark', color: '#0f1117' },
@@ -6970,7 +6976,10 @@ window.closeMobileMore = function() {
 // ── Theme ─────────────────────────────────────────────────────────
 window.setTheme = function(theme) {
   document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem('mxi_theme', theme);
+  // Save per-user theme (keyed by user ID so switching accounts doesn't bleed)
+  const uid = window.currentUser?.id;
+  if (uid) localStorage.setItem('mxi_theme_' + uid, theme);
+  localStorage.setItem('mxi_theme', theme); // fallback for pre-auth load
   toast('Theme updated to ' + theme.charAt(0).toUpperCase() + theme.slice(1), 'success');
   if (window._currentPage === 'settings') navTo('settings');
 };
