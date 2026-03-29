@@ -87,11 +87,15 @@ export async function renderEntries(el, page, forceRefresh) {
       const cur = snap.currency || 'USD';
       // Flip tx_type to show recipient's perspective
       const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'bill','bill':'invoice' };
-      const txLabel = TX_LABELS[SNAP_FLIP[snap.tx_type] || snap.tx_type] || snap.tx_type || '—';
+      const flippedCat = SNAP_FLIP[snap.tx_type] || snap.tx_type;
+      const txLabel = TX_LABELS[flippedCat] || snap.tx_type || '—';
+      // Color: green-ish if they owe you, purple-ish if you owe them
+      const isOwedToMe = ['you_owe_them','owed_to_me','bill_received','invoice_received','advance_received'].includes(flippedCat);
+      const txColor = isOwedToMe ? 'var(--green, #5FD39A)' : 'var(--owe-color, #8D8CFF)';
       const note = snap.note ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(snap.note)}</div>` : '';
       html += `<tr data-pending-id="${s.id}">
         <td style="font-weight:700;">${esc(fromName)}</td>
-        <td style="font-weight:700;color:var(--gold, #D5BA78);">${fmtMoney(amtCents, cur)}${note}</td>
+        <td><div style="font-size:11px;font-weight:700;color:${txColor};margin-bottom:2px;">${esc(txLabel)}</div><span style="font-weight:700;color:var(--gold, #D5BA78);">${fmtMoney(amtCents, cur)}</span>${note}</td>
         <td class="hide-mobile" style="font-size:12px;color:var(--muted);">${esc(txLabel)}</td>
         <td class="hide-mobile" style="font-size:12px;color:var(--muted);">${fmtDate(snap.date)}</td>
         <td style="white-space:nowrap;">
