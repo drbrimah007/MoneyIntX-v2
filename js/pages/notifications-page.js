@@ -2,7 +2,8 @@
 // Extracted from index.html page modules
 
 import { getCurrentUser } from './state.js';
-import { esc, toast, fmtRelative, fmtMoney } from '../ui.js';
+import { esc, toast, fmtRelative } from '../ui.js';
+import { fmtMoney } from '../entries.js';
 import { supabase } from '../supabase.js';
 import { listNotifications, markAllRead } from '../notifications.js';
 

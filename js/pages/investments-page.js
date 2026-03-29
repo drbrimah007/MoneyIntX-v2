@@ -2,7 +2,8 @@
 // Extracted from index.html page modules
 
 import { getCurrentUser, getCurrentProfile } from './state.js';
-import { esc, toast, fmtDate, fmtMoney, openModal, closeModal } from '../ui.js';
+import { esc, toast, fmtDate, openModal, closeModal } from '../ui.js';
+import { fmtMoney } from '../entries.js';
 import { supabase } from '../supabase.js';
 import { listContacts } from '../contacts.js';
 import {

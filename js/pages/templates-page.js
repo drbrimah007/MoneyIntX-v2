@@ -2,10 +2,11 @@
 // Extracted from index.html page modules
 
 import { getCurrentUser, getCurrentProfile } from './state.js';
-import { esc, toast, openModal, closeModal, fmtDate, fmtRelative } from '../ui.js';
+import { esc, toast, openModal, closeModal, fmtDate, fmtRelative, TX_LABELS } from '../ui.js';
 import { supabase } from '../supabase.js';
 import { listContacts } from '../contacts.js';
 import { fmtMoney } from '../entries.js';
+import { listTemplates } from '../templates.js';
 
 // Functions from other modules should be available
 // TX_LABELS, TX_COLORS, etc. on window

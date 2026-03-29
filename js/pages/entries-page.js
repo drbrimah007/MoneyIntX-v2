@@ -1,9 +1,11 @@
 // ── Entries Page Module ──────────────────────────────────────────
 
 import { getCurrentUser, getCurrentProfile, contactColor, contactAvatar, renderPagination, PAGE_SIZE, _invalidateEntries, _fmtAmt } from './state.js';
-import { listEntries, getEntry, createEntry, updateEntry, deleteEntry, fmtMoney, toCents, listReceivedShares, dismissShare, getDashboardTotals, listTemplates, createScheduledReminder, invalidateEntryCache } from '../entries.js';
+import { listEntries, getEntry, createEntry, updateEntry, deleteEntry, fmtMoney, toCents, getDashboardTotals, invalidateEntryCache } from '../entries.js';
 import { listContacts, createContact } from '../contacts.js';
-import { createShareToken, getShareUrl } from '../sharing.js';
+import { createShareToken, getShareUrl, listReceivedShares, dismissShare } from '../sharing.js';
+import { listTemplates } from '../templates.js';
+import { createScheduledReminder } from '../reminders.js';
 import { esc, statusBadge, TX_LABELS, TX_COLORS, fmtDate, toast, openModal, closeModal } from '../ui.js';
 import { supabase } from '../supabase.js';
 import { sendNotificationEmail } from '../email.js';

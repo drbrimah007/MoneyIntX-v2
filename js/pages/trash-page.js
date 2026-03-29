@@ -2,7 +2,8 @@
 // Extracted from index.html page modules
 
 import { getCurrentUser, getCurrentProfile } from './state.js';
-import { esc, toast, fmtMoney, fmtDate } from '../ui.js';
+import { esc, toast, fmtDate, TX_LABELS } from '../ui.js';
+import { fmtMoney } from '../entries.js';
 import { supabase } from '../supabase.js';
 import { listArchivedEntries, restoreEntry } from '../entries.js';
 

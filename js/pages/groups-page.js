@@ -2,7 +2,8 @@
 // Extracted from index.html page modules
 
 import { getCurrentUser, getCurrentProfile } from './state.js';
-import { esc, toast, fmtMoney, fmtDate, openModal, closeModal } from '../ui.js';
+import { esc, toast, fmtDate, openModal, closeModal } from '../ui.js';
+import { fmtMoney } from '../entries.js';
 import { supabase } from '../supabase.js';
 import { listContacts } from '../contacts.js';
 import { createGroup, getGroup, deleteGroup, calcGroupStats, addGroupMember, removeGroupMember, createRound, markContributionPaid, postNotice, getNoticeBoard } from '../groups.js';

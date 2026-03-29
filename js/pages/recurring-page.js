@@ -2,9 +2,11 @@
 // Extracted from index.html page modules
 
 import { getCurrentUser, getCurrentProfile } from './state.js';
-import { esc, toast, openModal, closeModal } from '../ui.js';
+import { esc, toast, openModal, closeModal, fmtDate, TX_LABELS } from '../ui.js';
 import { supabase } from '../supabase.js';
 import { listContacts } from '../contacts.js';
+import { fmtMoney } from '../entries.js';
+import { listRecurring, createRecurring, toggleRecurring, deleteRecurring, FREQUENCIES } from '../recurring.js';
 
 // Functions should be available on window or imported as needed
 
