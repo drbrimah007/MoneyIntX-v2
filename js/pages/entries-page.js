@@ -204,11 +204,22 @@ window.openEntryDetail = async function(id) {
   if (settlements.length > 0) {
     settleHtml = `<div style="margin-top:16px;"><h4 style="font-size:14px;margin-bottom:8px;">Settlements</h4>`;
     settlements.forEach(s => {
+      const statusBadgeHtml = s.status === 'pending'
+        ? `<span style="background:rgba(251,191,36,.15);color:var(--amber);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">⏳ Pending</span>`
+        : s.status === 'confirmed'
+          ? `<span style="background:rgba(74,222,128,.15);color:var(--green);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">✓ Confirmed</span>`
+          : '';
       settleHtml += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">
         <div>
           <strong>${fmtMoney(s.amount, entry.currency)}</strong>
           ${s.method ? `<span style="color:var(--muted);margin-left:8px;">${esc(s.method)}</span>` : ''}
-          ${s.note ? `<div style="color:var(--muted);font-size:12px;">${esc(s.note)}</div>` : ''}
+          ${statusBadgeHtml ? `<span style="margin-left:8px;">${statusBadgeHtml}</span>` : ''}
+          ${s.note ? `<div style="color:var(--muted);font-size:12px;margin-top:2px;">${esc(s.note)}</div>` : ''}
+          ${s.proof_url ? `<div style="margin-top:4px;">
+            ${s.proof_url.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+              ? `<img src="${esc(s.proof_url)}" style="max-width:100px;max-height:80px;border-radius:4px;border:1px solid var(--border);cursor:pointer;margin-top:2px;" onclick="window.open('${esc(s.proof_url)}','_blank')" title="Click to view full size">`
+              : `<a href="${esc(s.proof_url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);font-size:12px;text-decoration:underline;">📎 View Proof</a>`}
+          </div>` : ''}
         </div>
         <div style="color:var(--muted);font-size:12px;">${fmtDate(s.created_at)}</div>
       </div>`;
@@ -695,25 +706,52 @@ window.saveMarkPaid = async function(entryId, currency) {
 
     if (error) throw error;
 
-    const fmtAmt = fmtMoney(amountDollars, currency || entry?.currency || 'USD');
+    const cur = currency || entry?.currency || 'USD';
+    const fmtAmt = fmtMoney(amountCents, cur);
     const fromName = currentProfile?.display_name || currentProfile?.full_name || 'Someone';
 
-    // 3. Self-notification
+    // 3. Determine direction — if user who owes records, contact must verify
+    const iOwe = ['i_owe','bill_received','invoice_received','you_owe_them','advance_received'].includes(entry.category || entry.tx_type);
+
+    // 4. Self-notification
     await supabase.from('notifications').insert({
-      user_id: getCurrentUser().id, type: 'notification',
+      user_id: getCurrentUser().id, type: 'payment_sent',
       message: `Payment of ${fmtAmt} recorded for ${contactName}${note ? ' — ' + note : ''}`,
-      amount: amountDollars, currency: currency || entry?.currency || 'USD',
+      amount: amountCents, currency: cur,
       contact_name: contactName, entry_id: entryId, read: false
     });
 
-    // 4. In-app notification to linked contact
+    // 5. In-app notification to linked contact
     if (linkedUserId) {
+      // If I owe them and I'm recording payment → needs their verification
+      const contactType = iOwe ? 'settlement_pending' : 'payment_received';
       await supabase.from('notifications').insert({
-        user_id: linkedUserId, type: 'notification',
+        user_id: linkedUserId, type: contactType,
         message: `${fromName} recorded a payment of ${fmtAmt}${note ? ' — ' + note : ''}`,
-        amount: amountDollars, currency: currency || entry?.currency || 'USD',
+        amount: amountCents, currency: cur,
         contact_name: fromName, entry_id: entryId, read: false
       });
+    }
+
+    // 6. Mirror settlement to linked user's entry (both panels show same balance)
+    if (linkedUserId) {
+      const { data: mirrorEntry } = await supabase
+        .from('entries')
+        .select('id')
+        .eq('user_id', linkedUserId)
+        .eq('linked_entry_id', entryId)
+        .maybeSingle();
+      if (mirrorEntry?.id) {
+        await supabase.from('settlements').insert({
+          entry_id:    mirrorEntry.id,
+          amount:      amountCents,
+          method:      method,
+          note:        note,
+          proof_url:   proofUrl,
+          recorded_by: getCurrentUser().id,
+          status:      iOwe ? 'pending' : 'confirmed'
+        });
+      }
     }
 
     // 5. Email to contact (non-blocking)
@@ -756,28 +794,87 @@ window.openRecordFulfillmentModal = async function(entryId) {
       <label>Note <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
       <textarea id="rf-note" rows="2" placeholder="e.g. Goods delivered on March 15..."></textarea>
     </div>
+    <div class="form-group">
+      <label>Proof / Evidence <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+      <input type="file" id="rf-proof" accept="image/*,.pdf" style="width:100%;font-size:13px;">
+      <div id="rf-proof-preview" style="margin-top:6px;display:none;">
+        <img id="rf-proof-img" style="max-width:100%;max-height:120px;border-radius:6px;border:1px solid var(--border);">
+      </div>
+    </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="bs sm" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary btn-sm" id="rf-save-btn" onclick="saveRecordFulfillment('${entryId}')">✅ Mark Fulfilled</button>
     </div>
   `, { maxWidth: '440px' });
+
+  // Preview uploaded file
+  document.getElementById('rf-proof')?.addEventListener('change', function() {
+    const file = this.files?.[0];
+    const preview = document.getElementById('rf-proof-preview');
+    const img = document.getElementById('rf-proof-img');
+    if (file && file.type.startsWith('image/') && preview && img) {
+      img.src = URL.createObjectURL(file);
+      preview.style.display = '';
+    } else if (preview) { preview.style.display = 'none'; }
+  });
 };
 
 window.saveRecordFulfillment = async function(entryId) {
   const note = document.getElementById('rf-note')?.value.trim() || null;
+  const proofFile = document.getElementById('rf-proof')?.files?.[0] || null;
   const btn = document.getElementById('rf-save-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   try {
+    // Upload proof file if provided
+    let proofUrl = '';
+    if (proofFile) {
+      const ext  = proofFile.name.split('.').pop();
+      const path = `fulfillments/${getCurrentUser().id}/${Date.now()}.${ext}`;
+      const { data: upData, error: upErr } = await supabase.storage
+        .from('attachments').upload(path, proofFile, { upsert: false });
+      if (!upErr && upData) {
+        const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(path);
+        proofUrl = urlData?.publicUrl || '';
+      }
+    }
+
+    const entry = await getEntry(entryId);
+    const contactName = entry?.contact?.name || 'Contact';
+    const linkedUserId = entry?.contact?.linked_user_id || null;
+    const fromName = getCurrentProfile()?.display_name || getCurrentProfile()?.full_name || 'Someone';
+
     const updateData = { status: 'fulfilled', updated_at: new Date().toISOString() };
     if (note) updateData.note = note;
+    if (proofUrl) updateData.proof_url = proofUrl;
     const { error } = await supabase.from('entries').update(updateData).eq('id', entryId);
     if (error) throw error;
+
     // Self-notification
     await supabase.from('notifications').insert({
-      user_id: getCurrentUser().id, type: 'notification',
-      message: `Advance marked as fulfilled${note ? ': ' + note : ''}`,
-      entry_id: entryId, read: false
+      user_id: getCurrentUser().id, type: 'fulfilled',
+      message: `Advance marked as fulfilled for ${contactName}${note ? ': ' + note : ''}`,
+      contact_name: contactName, entry_id: entryId, read: false
     });
+
+    // Notify linked contact
+    if (linkedUserId) {
+      await supabase.from('notifications').insert({
+        user_id: linkedUserId, type: 'fulfilled',
+        message: `${fromName} marked an advance as fulfilled${note ? ': ' + note : ''}`,
+        contact_name: fromName, entry_id: entryId, read: false
+      });
+      // Mirror status to linked entry
+      const { data: mirrorEntry } = await supabase
+        .from('entries')
+        .select('id')
+        .eq('user_id', linkedUserId)
+        .eq('linked_entry_id', entryId)
+        .maybeSingle();
+      if (mirrorEntry?.id) {
+        await supabase.from('entries').update(updateData).eq('id', mirrorEntry.id);
+      }
+    }
+
     closeModal();
     toast('Advance marked as fulfilled ✓', 'success');
     _invalidateEntries(); navTo('entries');

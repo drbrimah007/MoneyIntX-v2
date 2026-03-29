@@ -175,26 +175,33 @@ export async function confirmShare(tokenId, recipientId) {
   const { data: newEntry, error } = await supabase
     .from('entries')
     .insert({
-      user_id:        recipientId,
-      contact_id:     contactId,           // ← linked to sender contact if found
-      tx_type:        flippedType,
-      sender_tx_type: token.entry.tx_type,
-      amount:         token.entry.amount,
-      currency:       token.entry.currency,
-      date:           token.entry.date,
-      note:           token.entry.note || '',
-      invoice_number: token.entry.invoice_number || '',
-      entry_number:   entryNumber,
-      is_shared:      true,
-      share_token:    token.token,
-      from_name:      fromName,
-      from_email:     fromEmail,
-      status:         'posted',
-      settled_amount: 0
+      user_id:          recipientId,
+      contact_id:       contactId,           // ← linked to sender contact if found
+      tx_type:          flippedType,
+      sender_tx_type:   token.entry.tx_type,
+      amount:           token.entry.amount,
+      currency:         token.entry.currency,
+      date:             token.entry.date,
+      note:             token.entry.note || '',
+      invoice_number:   token.entry.invoice_number || '',
+      entry_number:     entryNumber,
+      is_shared:        true,
+      share_token:      token.token,
+      from_name:        fromName,
+      from_email:       fromEmail,
+      linked_entry_id:  token.entry_id,     // ← link back to original entry
+      status:           'posted',
+      settled_amount:   0
     })
     .select()
     .single();
   if (error) console.error('[confirmShare]', error.message);
+
+  // Also link the original entry back to this new entry
+  if (newEntry && token.entry_id) {
+    await supabase.from('entries').update({ linked_entry_id: newEntry.id })
+      .eq('id', token.entry_id).catch(() => {});
+  }
 
   // Notify the sender that the share was confirmed
   if (newEntry && token.sender_id) {
