@@ -24,12 +24,9 @@ function fmtMoney(n, cur) {
   catch(e) { return `${cur||'USD'} ${(n||0).toFixed(2)}`; }
 }
 
-// Compact number for table cells: ≤9999 shows in full; 10K+ uses K/M suffix
+// Format number with thousand separators (commas every 3 digits for 4+ digit numbers)
 function _cmpct(n) {
   const abs = Math.abs(n), s = n < 0 ? '−' : '';
-  if (abs >= 1_000_000) return s + (abs / 1_000_000).toFixed(abs >= 100_000_000 ? 0 : 1).replace(/\.0$/, '') + 'M';
-  if (abs >= 10_000)    return s + (abs / 1_000).toFixed(abs >= 100_000 ? 0 : 1).replace(/\.0$/, '') + 'K';
-  // under 10 000 — show without trailing zeros
   return s + abs.toLocaleString('en-US', { minimumFractionDigits:0, maximumFractionDigits:2 });
 }
 

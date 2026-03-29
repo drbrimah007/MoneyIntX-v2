@@ -303,7 +303,7 @@ export async function renderDash(el) {
       const txLabel = TX_LABELS[SNAP_FLIP[snap.tx_type] || snap.tx_type] || snap.tx_type || '—';
       html += `<tr data-pending-id="${s.id}">
         <td style="font-weight:700;">${esc(fromName)}</td>
-        <td style="font-weight:700;color:#f59e0b;">${fmtMoney(amtCents, cur)}</td>
+        <td style="font-weight:700;color:var(--gold, #D5BA78);">${fmtMoney(amtCents, cur)}</td>
         <td class="hide-mobile" style="font-size:12px;color:var(--muted);">${esc(txLabel)}</td>
         <td style="white-space:nowrap;">
           <button class="btn btn-primary btn-sm" onclick="doPendingConfirm('${s.id}')" style="padding:5px 14px;font-size:12px;font-weight:700;">✓ Confirm</button>
