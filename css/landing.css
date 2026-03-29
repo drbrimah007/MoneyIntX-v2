@@ -1,0 +1,30 @@
+/* Landing — v1 dark style */
+/* Landing visible by default — enterApp hides it */
+/* landing.active class no longer needed */
+.lp-hero { background: linear-gradient(135deg, var(--bg2) 0%, var(--bg) 60%, #1c1830 100%); padding:80px 32px 64px; text-align:center; }
+.lp-hero h1 { font-size:clamp(28px,5vw,52px); font-weight:900; line-height:1.15; margin-bottom:18px; background:linear-gradient(135deg, #fff 30%, var(--accent) 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.lp-hero p { font-size:clamp(15px,2vw,19px); color:var(--muted); max-width:600px; margin:0 auto 36px; line-height:1.7; }
+.lp-btn-primary { background:var(--accent); color:#fff; border:none; border-radius:10px; padding:14px 32px; font-size:16px; font-weight:700; cursor:pointer; }
+.lp-btn-secondary { background:transparent; color:var(--text); border:1.5px solid var(--border); border-radius:10px; padding:14px 32px; font-size:16px; font-weight:600; cursor:pointer; }
+.auth-modal { max-width:420px; }
+
+/* Landing tabs */
+.landing-tabs { display: flex; gap: 0; margin-bottom: 24px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; overflow: hidden; }
+.landing-tab { flex: 1; padding: 12px; text-align: center; font-size: 14px; font-weight: 600; cursor: pointer; background: #111422; color: #8892a4; border: none; transition: background .15s, color .15s; }
+.landing-tab.active { background: #7fe0d0 !important; color: #07111f !important; }
+
+/* Lock landing page colors — never follow dashboard theme */
+#landing { --bg: #07111f; --bg2: #0d182b; --bg3: #111422; --text: #eef4ff; --muted: #8892a4; --border: rgba(255,255,255,.1); --accent: #7fe0d0; --accent-hover: #6dd4c4; --accent-light: rgba(127,224,208,.12); }
+#landing input, #landing select, #landing textarea { background: #0d182b !important; border-color: rgba(255,255,255,.1) !important; color: #eef4ff !important; }
+#landing input::placeholder, #landing textarea::placeholder { color: #5a6e8a !important; }
+#landing label { color: #96a3ba !important; }
+#landing .btn { border-radius: 12px; }
+#landing .form-group { margin-bottom: 16px; }
+
+/* Mobile landing overrides */
+@media (max-width: 640px) {
+  .lp-hero { padding: 48px 16px 40px; }
+  .landing-card .form-group label { font-size: 14px !important; }
+  .landing-card input, .landing-card select { font-size: 16px !important; padding: 12px 14px !important; }
+  .landing-card .btn { font-size: 16px !important; padding: 14px !important; }
+}
