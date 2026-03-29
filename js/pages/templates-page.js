@@ -476,17 +476,15 @@ window.useTemplateForEntry = async function(templateId) {
     <div class="form-group"><label>Type</label><select id="tfe-type">
       ${t.tx_type ? `<option value="${t.tx_type}" selected>${TX_LABELS[t.tx_type]}</option>` : Object.entries(TX_LABELS).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}
     </select></div>
-    <div class="form-row">
-      <div class="form-group"><label>Issue Date</label><input type="date" id="tfe-date" value="${new Date().toISOString().slice(0,10)}"></div>
-      <div class="form-group"><label>Due Date <span style="font-weight:400;color:var(--muted);">(optional)</span></label><input type="date" id="tfe-due-date" style="width:100%;"></div>
+    <div class="inline-row" style="gap:12px;margin-bottom:16px;">
+      <div class="fg" style="flex:1;"><label>Issue Date</label><input type="date" id="tfe-date" value="${new Date().toISOString().slice(0,10)}"></div>
+      <div class="fg" style="flex:1;"><label>Due Date <span style="font-weight:400;color:var(--muted);">(optional)</span></label><input type="date" id="tfe-due-date"></div>
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>${fields.some(f=>f.isFinalTotal)?'Currency':'Amount'}</label>
-        <div style="display:flex;gap:6px;">
-          <input type="number" id="tfe-amount" step="0.01" placeholder="${fields.some(f=>f.isFinalTotal)?'Auto':'0.00'}" style="flex:1;${fields.some(f=>f.isFinalTotal)?'display:none;':''}" oninput="this._userEdited = this.value !== ''">
-          <select id="tfe-currency" style="flex:0 0 86px;padding:10px 4px;" onchange="window._activeTplCurrency=this.value;recalcTemplateFields()">${currencySelectHtml(t.currency || currentProfile?.default_currency)}</select>
-        </div>
+    <div class="form-group">
+      <label>${fields.some(f=>f.isFinalTotal)?'Currency':'Amount'}</label>
+      <div class="inline-row">
+        <input type="number" id="tfe-amount" step="0.01" placeholder="${fields.some(f=>f.isFinalTotal)?'Auto':'0.00'}" style="flex:1;min-width:0;${fields.some(f=>f.isFinalTotal)?'display:none;':''}" oninput="this._userEdited = this.value !== ''">
+        <select id="tfe-currency" style="flex:0 0 86px;padding:10px 4px;" onchange="window._activeTplCurrency=this.value;recalcTemplateFields()">${currencySelectHtml(t.currency || currentProfile?.default_currency)}</select>
       </div>
     </div>
     ${fieldsHtml}

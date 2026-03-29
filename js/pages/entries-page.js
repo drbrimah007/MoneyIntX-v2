@@ -1873,17 +1873,17 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
     </div>
     <div class="form-group">
       <label>Amount * <span id="ne-amount-hint" style="display:none;font-size:10px;font-weight:400;color:var(--accent);">(auto from items)</span></label>
-      <div style="display:flex;gap:8px;flex-wrap:nowrap;">
-        <input type="number" id="ne-amount" min="0" step="0.01" placeholder="0.00" style="flex:1;min-width:0;width:auto;">
-        <select id="ne-currency" style="flex:0 0 90px;width:auto;">
+      <div class="inline-row">
+        <input type="number" id="ne-amount" min="0" step="0.01" placeholder="0.00" style="flex:1;min-width:0;">
+        <select id="ne-currency" style="flex:0 0 90px;">
           ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'].map(c => `<option value="${c}" ${(getCurrentProfile()?.default_currency||'USD')===c?'selected':''}>${c}</option>`).join('')}
         </select>
       </div>
     </div>
     <div id="ne-extra-fields"></div>
-    <div class="form-row">
-      <div class="form-group"><label>Issue Date</label><input type="date" id="ne-date" value="${new Date().toISOString().slice(0,10)}"></div>
-      <div class="form-group"><label>Due Date <span style="font-weight:400;color:var(--muted);">(optional)</span></label><input type="date" id="ne-due-date" style="width:100%;"></div>
+    <div class="inline-row" style="gap:12px;margin-bottom:16px;">
+      <div class="fg" style="flex:1;"><label>Issue Date</label><input type="date" id="ne-date" value="${new Date().toISOString().slice(0,10)}"></div>
+      <div class="fg" style="flex:1;"><label>Due Date <span style="font-weight:400;color:var(--muted);">(optional)</span></label><input type="date" id="ne-due-date"></div>
     </div>
     <!-- EMAIL section with ON/OFF toggle -->
     <div style="margin-bottom:12px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">

@@ -82,8 +82,14 @@ hr, .divider { border: none; border-top: 1px solid var(--line, rgba(255,255,255,
 .form-group { margin-bottom: 16px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .frow { display: flex; gap: 10px; align-items: flex-end; }
+/* Inline row that NEVER stacks on mobile — use for Amount+Currency, Date pairs */
+.inline-row { display: flex; gap: 8px; flex-wrap: nowrap; }
+.inline-row input, .inline-row select, .inline-row textarea { width: auto !important; }
+.inline-row .fg { flex: 1; min-width: 0; margin-bottom: 0; }
+.inline-row .fg-fixed { flex: 0 0 auto; min-width: 0; margin-bottom: 0; }
 @media(max-width:640px) { .frow, .form-row { flex-direction: column; grid-template-columns: 1fr; } }
 @media(max-width:640px) { input, select, textarea { font-size: 16px !important; border-radius: 10px !important; } }
+@media(max-width:640px) { .inline-row input, .inline-row select { font-size: 16px !important; } }
 
 /* Tables */
 .tbl-wrap { overflow-x: auto; }
