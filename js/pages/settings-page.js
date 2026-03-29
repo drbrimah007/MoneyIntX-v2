@@ -165,17 +165,22 @@ async function renderSettings(el) {
   // ── Theme picker ───────────────────────────────────────────────
   const currentTheme = (currentUser?.id && localStorage.getItem('mxi_theme_' + currentUser.id)) || localStorage.getItem('mxi_theme') || 'classic';
   const themes = [
-    { id: 'navy',    name: 'MoneyIntX',     bg: '#020617', accent: '#3B82F6' },
-    { id: 'classic', name: 'Classic Dark',   bg: '#0A0B0E', accent: '#6366F1' },
-    { id: 'dark',    name: 'Deep Black',     bg: '#030303', accent: '#6366F1' },
-    { id: 'light',   name: 'Light',          bg: '#F5F7FB', accent: '#6366F1' }
+    { id: 'navy',           name: 'MoneyIntX',     bg: '#020617', accent: '#3B82F6', light: false },
+    { id: 'classic',        name: 'Classic Dark',   bg: '#0A0B0E', accent: '#6366F1', light: false },
+    { id: 'dark',           name: 'Deep Black',     bg: '#030303', accent: '#6366F1', light: false },
+    { id: 'light',          name: 'Light',          bg: '#F5F7FB', accent: '#6366F1', light: true },
+    { id: 'light-sage',     name: 'Sage',           bg: '#F4F7F2', accent: '#5B8C5A', light: true },
+    { id: 'light-rose',     name: 'Rose',           bg: '#FBF5F6', accent: '#C06078', light: true },
+    { id: 'light-ocean',    name: 'Ocean',          bg: '#F2F8FB', accent: '#2E7D9B', light: true },
+    { id: 'light-sand',     name: 'Sand',           bg: '#FAF7F3', accent: '#B07845', light: true },
+    { id: 'light-lavender', name: 'Lavender',       bg: '#F7F5FB', accent: '#7C5CBA', light: true }
   ];
   html += `<div class="card" style="margin-top:12px;">
     <h3 style="font-size:16px;font-weight:700;margin-bottom:12px;">Theme</h3>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       ${themes.map(t => {
         const isActive = currentTheme === t.id;
-        const isLight = t.id === 'light';
+        const isLight = !!t.light;
         return `<button onclick="setTheme('${t.id}')" title="${t.name}" style="
           width:64px;height:64px;border-radius:14px;
           border:${isActive ? '2px solid rgba(99,102,241,.45)' : '1px solid ' + (isLight ? 'rgba(24,32,51,.10)' : 'rgba(255,255,255,.05)')};
@@ -234,12 +239,21 @@ async function renderSettings(el) {
       <button class="btn btn-primary btn-sm" onclick="saveBranding()">Save Branding</button>
     </div>`;
 
+    // Get current topbar tip text
+    const currentTopbarTip = document.getElementById('app-tip-bar')?.textContent?.replace(/^💡\s*/, '') || '(none)';
+
     html += `<div class="card" style="margin-top:12px;border-color:rgba(251,191,36,.3);">
       <h3 style="font-size:16px;font-weight:700;margin-bottom:4px;">🛠 Admin: Dashboard Tips</h3>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">One tip is shown per day on the dashboard. Edit the list here.</p>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:6px;">One tip is shown at random on each page load. Edit the list here.</p>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:14px;">
+        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Currently showing in topbar</div>
+        <div style="font-size:13px;color:var(--text);">💡 ${esc(currentTopbarTip)}</div>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;">${currentTips.length} tip${currentTips.length === 1 ? '' : 's'} saved</div>
       <div id="admin-tips-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
         ${currentTips.map((tip,i) => `
           <div style="display:flex;gap:8px;align-items:center;">
+            <span style="font-size:11px;color:var(--muted);min-width:20px;text-align:right;">${i+1}.</span>
             <input type="text" value="${esc(tip)}" id="admin-tip-${i}" style="flex:1;font-size:13px;">
             <button class="btn btn-danger btn-sm" style="padding:4px 10px;flex-shrink:0;" onclick="removeAdminTip(${i})">✕</button>
           </div>`).join('')}
@@ -527,6 +541,7 @@ window.sendEmailInvite = async function() {
 };
 
 window.uploadSiteLogo = async function(input) {
+  const currentUser = getCurrentUser();
   const file = input.files[0];
   if (!file) return;
   const statusEl = document.getElementById('s-site-logo-status');
@@ -539,7 +554,8 @@ window.uploadSiteLogo = async function(input) {
   }
   statusEl.textContent = '⏳ Uploading…';
   const ext = file.name.split('.').pop();
-  const path = `site-branding/site-logo.${ext}`;
+  // Use user ID prefix so storage RLS allows the upload
+  const path = `${currentUser.id}/site-logo.${ext}`;
   const { error } = await supabase.storage.from('user-logos').upload(path, file, { upsert: true });
   if (error) { statusEl.textContent = '❌ ' + error.message; return; }
   const { data } = supabase.storage.from('user-logos').getPublicUrl(path);
@@ -573,14 +589,18 @@ window.saveBranding = async function() {
   }).eq('id', currentUser.id);
   if (error) return toast(error.message, 'error');
 
-  // Save site logo to app_settings (platform-wide)
+  // Save site logo to app_settings (platform-wide), fallback to user profile
   const siteLogoUrl = document.getElementById('s-site-logo-url')?.value.trim() || '';
   const { error: logoErr } = await supabase.from('app_settings').upsert({
     key: 'site_logo',
     value: siteLogoUrl,
     updated_at: new Date().toISOString()
   }, { onConflict: 'key' });
-  if (logoErr) console.error('[saveBranding] site_logo:', logoErr.message);
+  if (logoErr) {
+    console.warn('[saveBranding] app_settings RLS failed, saving to user profile:', logoErr.message);
+    // Fallback: store site_logo_url on admin's user profile
+    await supabase.from('users').update({ site_logo_url: siteLogoUrl }).eq('id', currentUser.id);
+  }
 
   // Update topbar logo immediately
   const topbarLogo = document.getElementById('topbar-logo');

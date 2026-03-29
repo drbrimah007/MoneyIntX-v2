@@ -717,12 +717,6 @@ async function handleLogOut() {
 async function enterApp(user) {
   currentUser = user;
   setCurrentUser(user); // Sync with state.js
-  // Load per-user theme (overrides generic fallback set at page load)
-  const userTheme = localStorage.getItem('mxi_theme_' + user.id);
-  if (userTheme) {
-    document.documentElement.setAttribute('data-theme', userTheme);
-    localStorage.setItem('mxi_theme', userTheme); // sync fallback
-  }
   currentProfile = await getProfile(user.id);
   // If profile doesn't exist (trigger failed), create it now
   if (!currentProfile) {
@@ -734,6 +728,22 @@ async function enterApp(user) {
     currentProfile = data;
   }
   setCurrentProfile(currentProfile); // Sync with state.js
+
+  // ── Sync theme from DB (cross-device) ──────────────────────────
+  const dbTheme = currentProfile?.theme;
+  const localTheme = localStorage.getItem('mxi_theme_' + user.id);
+  const userTheme = dbTheme || localTheme;
+  if (userTheme) {
+    document.documentElement.setAttribute('data-theme', userTheme);
+    localStorage.setItem('mxi_theme_' + user.id, userTheme);
+    localStorage.setItem('mxi_theme', userTheme);
+  }
+
+  // ── Sync modules from DB (cross-device) ────────────────────────
+  if (currentProfile?.enabled_modules && typeof currentProfile.enabled_modules === 'object') {
+    localStorage.setItem(_modsKey(), JSON.stringify(currentProfile.enabled_modules));
+  }
+
   // ── Cross-user login linking (SECURITY DEFINER RPC) ─────────────
   // Direct table updates can't do this — RLS blocks one user from writing
   // another user's contacts/share_tokens. The RPC runs with elevated
@@ -822,12 +832,17 @@ async function enterApp(user) {
   // Load site logo from app_settings (admin-set platform logo)
   (async () => {
     try {
+      let logoUrl = '';
+      // Try app_settings first
       const { data: logoRow } = await supabase.from('app_settings').select('value').eq('key','site_logo').maybeSingle();
-      if (logoRow?.value) {
+      if (logoRow?.value) logoUrl = logoRow.value;
+      // Fallback: check admin user profile for site_logo_url
+      if (!logoUrl && currentProfile?.site_logo_url) logoUrl = currentProfile.site_logo_url;
+      if (logoUrl) {
         const topbarLogo = document.getElementById('topbar-logo');
         const topbarName = document.getElementById('topbar-brand-name');
         if (topbarLogo) {
-          topbarLogo.src = logoRow.value;
+          topbarLogo.src = logoUrl;
           topbarLogo.style.display = '';
           if (topbarName) topbarName.style.display = 'none';
         }
@@ -981,7 +996,7 @@ window.OPTIONAL_MODULES = [
 ];
 const OPTIONAL_MODULES = window.OPTIONAL_MODULES;
 
-// Modules stored in localStorage — no DB column required
+// Modules stored in localStorage + DB (syncs across devices)
 function _modsKey() { return 'mxi_modules_' + (currentUser?.id || 'default'); }
 
 window._getModules = function _getModules() {
@@ -994,6 +1009,17 @@ window._getModules = function _getModules() {
     try { localStorage.setItem(_modsKey(), JSON.stringify(defaults)); } catch(_) {}
     return defaults;
   } catch(e) { return {}; }
+}
+
+window._saveModules = function _saveModules(mods) {
+  try { localStorage.setItem(_modsKey(), JSON.stringify(mods)); } catch(_) {}
+  // Also persist to DB so it syncs across devices
+  const uid = currentUser?.id;
+  if (uid) {
+    supabase.from('users').update({ enabled_modules: mods }).eq('id', uid).then(({ error }) => {
+      if (error) console.warn('[_saveModules] DB save failed:', error.message);
+    });
+  }
 }
 
 function _modEnabled(mod) {
@@ -1017,7 +1043,7 @@ window.saveModules = function() {
   OPTIONAL_MODULES.forEach(m => {
     mods[m.id] = !!(document.getElementById('mod-' + m.id)?.checked);
   });
-  try { localStorage.setItem(_modsKey(), JSON.stringify(mods)); } catch(e) {}
+  _saveModules(mods);
   applyModuleVisibility();
   toast('Modules saved.', 'success');
 };
@@ -1218,9 +1244,14 @@ window.closeMobileMore = function() {
 // ── Theme ─────────────────────────────────────────────────────────
 window.setTheme = function(theme) {
   document.documentElement.setAttribute('data-theme', theme);
-  // Save per-user theme (keyed by user ID so switching accounts doesn't bleed)
+  // Save per-user theme locally + to DB so it syncs across devices
   const uid = window.currentUser?.id;
-  if (uid) localStorage.setItem('mxi_theme_' + uid, theme);
+  if (uid) {
+    localStorage.setItem('mxi_theme_' + uid, theme);
+    supabase.from('users').update({ theme }).eq('id', uid).then(({ error }) => {
+      if (error) console.warn('[setTheme] DB save failed:', error.message);
+    });
+  }
   localStorage.setItem('mxi_theme', theme); // fallback for pre-auth load
   toast('Theme updated to ' + theme.charAt(0).toUpperCase() + theme.slice(1), 'success');
   if (window._currentPage === 'settings') navTo('settings');

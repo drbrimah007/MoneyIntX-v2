@@ -254,19 +254,334 @@
   --shadow-lg: 0 8px 24px rgba(0,0,0,.06);
 }
 
-/* ── Light theme form input override ────────────────────────────── */
+/* ── Light Sage — Warm olive-green, earthy ────────────────────────
+   Nature-inspired light theme. Sage and olive tones.                   */
+[data-theme="light-sage"] {
+  --accent: #5B8C5A;
+  --accent-hover: #4A7A49;
+  --accent-light: rgba(91,140,90,0.08);
+
+  --bg:      #F4F7F2;
+  --bg2:     #FFFFFF;
+  --bg3:     #EAF0E6;
+  --bg-soft: #EAF0E6;
+  --panel:   #FFFFFF;
+  --panel-2: #EAF0E6;
+
+  --text:    #1E2B1A;
+  --text-2:  #4A5D42;
+  --muted:   #738568;
+  --muted-2: #9BAA90;
+
+  --border:  rgba(30,43,26,.08);
+  --line:    rgba(30,43,26,.08);
+  --line-2:  rgba(30,43,26,.12);
+
+  --contact:    #5B8C5A;
+  --green:      #2D8A4E;
+  --green-bg:   rgba(45,138,78,.08);
+  --success:    #2D8A4E;
+  --success-bg: rgba(45,138,78,.08);
+  --red:        #C23B22;
+  --red-bg:     rgba(194,59,34,.08);
+  --owe-color:  #7B6BA6;
+  --owe-bg:     rgba(123,107,166,.08);
+  --amber:      #A67C37;
+  --gold:       #A67C37;
+  --partial:    #A67C37;
+  --gold-bg:    rgba(166,124,55,.08);
+  --partial-bg: rgba(166,124,55,.08);
+  --blue:       #4A7BA5;
+  --posted:     #4A7BA5;
+  --blue-bg:    rgba(74,123,165,.08);
+  --posted-bg:  rgba(74,123,165,.08);
+
+  --user-coral:  #B06650;
+  --user-purple: #7B6BA6;
+  --user-teal:   #3D8B80;
+  --user-blue:   #4A7BA5;
+  --user-gold:   #A67C37;
+  --user-rose:   #A65068;
+
+  --card-border: 1px solid rgba(30,43,26,.08);
+  --radius: 14px;
+  --shadow:    none;
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.06);
+}
+
+/* ── Light Rose — Warm blush, soft pink undertones ───────────────
+   Elegant feminine light theme. Blush pinks and warm greys.           */
+[data-theme="light-rose"] {
+  --accent: #C06078;
+  --accent-hover: #A84E66;
+  --accent-light: rgba(192,96,120,0.08);
+
+  --bg:      #FBF5F6;
+  --bg2:     #FFFFFF;
+  --bg3:     #F5EAED;
+  --bg-soft: #F5EAED;
+  --panel:   #FFFFFF;
+  --panel-2: #F5EAED;
+
+  --text:    #2D1A22;
+  --text-2:  #6B4A58;
+  --muted:   #997D8A;
+  --muted-2: #B9A0AC;
+
+  --border:  rgba(45,26,34,.08);
+  --line:    rgba(45,26,34,.08);
+  --line-2:  rgba(45,26,34,.12);
+
+  --contact:    #C06078;
+  --green:      #3A8A5C;
+  --green-bg:   rgba(58,138,92,.08);
+  --success:    #3A8A5C;
+  --success-bg: rgba(58,138,92,.08);
+  --red:        #C43B3B;
+  --red-bg:     rgba(196,59,59,.08);
+  --owe-color:  #8B6BAA;
+  --owe-bg:     rgba(139,107,170,.08);
+  --amber:      #B88A3A;
+  --gold:       #B88A3A;
+  --partial:    #B88A3A;
+  --gold-bg:    rgba(184,138,58,.08);
+  --partial-bg: rgba(184,138,58,.08);
+  --blue:       #5580A8;
+  --posted:     #5580A8;
+  --blue-bg:    rgba(85,128,168,.08);
+  --posted-bg:  rgba(85,128,168,.08);
+
+  --user-coral:  #C47060;
+  --user-purple: #8B6BAA;
+  --user-teal:   #3D8B80;
+  --user-blue:   #5580A8;
+  --user-gold:   #B88A3A;
+  --user-rose:   #C06078;
+
+  --card-border: 1px solid rgba(45,26,34,.08);
+  --radius: 14px;
+  --shadow:    none;
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.06);
+}
+
+/* ── Light Ocean — Cool blue tones, coastal calm ─────────────────
+   Breezy ocean-inspired light theme. Cool blues and teals.             */
+[data-theme="light-ocean"] {
+  --accent: #2E7D9B;
+  --accent-hover: #236A85;
+  --accent-light: rgba(46,125,155,0.08);
+
+  --bg:      #F2F8FB;
+  --bg2:     #FFFFFF;
+  --bg3:     #E4F0F6;
+  --bg-soft: #E4F0F6;
+  --panel:   #FFFFFF;
+  --panel-2: #E4F0F6;
+
+  --text:    #122A34;
+  --text-2:  #3C5E6E;
+  --muted:   #678899;
+  --muted-2: #94ADB9;
+
+  --border:  rgba(18,42,52,.08);
+  --line:    rgba(18,42,52,.08);
+  --line-2:  rgba(18,42,52,.12);
+
+  --contact:    #2E7D9B;
+  --green:      #1E8A5E;
+  --green-bg:   rgba(30,138,94,.08);
+  --success:    #1E8A5E;
+  --success-bg: rgba(30,138,94,.08);
+  --red:        #C0392B;
+  --red-bg:     rgba(192,57,43,.08);
+  --owe-color:  #6E5BAE;
+  --owe-bg:     rgba(110,91,174,.08);
+  --amber:      #C4881D;
+  --gold:       #C4881D;
+  --partial:    #C4881D;
+  --gold-bg:    rgba(196,136,29,.08);
+  --partial-bg: rgba(196,136,29,.08);
+  --blue:       #2E7D9B;
+  --posted:     #2E7D9B;
+  --blue-bg:    rgba(46,125,155,.08);
+  --posted-bg:  rgba(46,125,155,.08);
+
+  --user-coral:  #C2705E;
+  --user-purple: #6E5BAE;
+  --user-teal:   #26897A;
+  --user-blue:   #2E7D9B;
+  --user-gold:   #C4881D;
+  --user-rose:   #B0566A;
+
+  --card-border: 1px solid rgba(18,42,52,.08);
+  --radius: 14px;
+  --shadow:    none;
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.06);
+}
+
+/* ── Light Sand — Warm neutral beige, desert warmth ──────────────
+   Sandy, warm-toned light theme. Terracotta and warm greys.           */
+[data-theme="light-sand"] {
+  --accent: #B07845;
+  --accent-hover: #9A6638;
+  --accent-light: rgba(176,120,69,0.08);
+
+  --bg:      #FAF7F3;
+  --bg2:     #FFFFFF;
+  --bg3:     #F2ECE4;
+  --bg-soft: #F2ECE4;
+  --panel:   #FFFFFF;
+  --panel-2: #F2ECE4;
+
+  --text:    #2C2218;
+  --text-2:  #5C4D3D;
+  --muted:   #8A7A68;
+  --muted-2: #AFA196;
+
+  --border:  rgba(44,34,24,.08);
+  --line:    rgba(44,34,24,.08);
+  --line-2:  rgba(44,34,24,.12);
+
+  --contact:    #B07845;
+  --green:      #3B874E;
+  --green-bg:   rgba(59,135,78,.08);
+  --success:    #3B874E;
+  --success-bg: rgba(59,135,78,.08);
+  --red:        #BF3A30;
+  --red-bg:     rgba(191,58,48,.08);
+  --owe-color:  #7A68A8;
+  --owe-bg:     rgba(122,104,168,.08);
+  --amber:      #B07845;
+  --gold:       #B07845;
+  --partial:    #B07845;
+  --gold-bg:    rgba(176,120,69,.08);
+  --partial-bg: rgba(176,120,69,.08);
+  --blue:       #4E7FA0;
+  --posted:     #4E7FA0;
+  --blue-bg:    rgba(78,127,160,.08);
+  --posted-bg:  rgba(78,127,160,.08);
+
+  --user-coral:  #C06848;
+  --user-purple: #7A68A8;
+  --user-teal:   #3A8878;
+  --user-blue:   #4E7FA0;
+  --user-gold:   #B07845;
+  --user-rose:   #A8526A;
+
+  --card-border: 1px solid rgba(44,34,24,.08);
+  --radius: 14px;
+  --shadow:    none;
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.06);
+}
+
+/* ── Light Lavender — Cool purple tones, dreamy ──────────────────
+   Soft lavender-inspired light theme. Violet and cool greys.           */
+[data-theme="light-lavender"] {
+  --accent: #7C5CBA;
+  --accent-hover: #6849A4;
+  --accent-light: rgba(124,92,186,0.08);
+
+  --bg:      #F7F5FB;
+  --bg2:     #FFFFFF;
+  --bg3:     #EDEBF5;
+  --bg-soft: #EDEBF5;
+  --panel:   #FFFFFF;
+  --panel-2: #EDEBF5;
+
+  --text:    #1E1830;
+  --text-2:  #4D4268;
+  --muted:   #7E7398;
+  --muted-2: #A89EBB;
+
+  --border:  rgba(30,24,48,.08);
+  --line:    rgba(30,24,48,.08);
+  --line-2:  rgba(30,24,48,.12);
+
+  --contact:    #7C5CBA;
+  --green:      #2E8A52;
+  --green-bg:   rgba(46,138,82,.08);
+  --success:    #2E8A52;
+  --success-bg: rgba(46,138,82,.08);
+  --red:        #C43B46;
+  --red-bg:     rgba(196,59,70,.08);
+  --owe-color:  #7C5CBA;
+  --owe-bg:     rgba(124,92,186,.08);
+  --amber:      #B5892E;
+  --gold:       #B5892E;
+  --partial:    #B5892E;
+  --gold-bg:    rgba(181,137,46,.08);
+  --partial-bg: rgba(181,137,46,.08);
+  --blue:       #4C78B0;
+  --posted:     #4C78B0;
+  --blue-bg:    rgba(76,120,176,.08);
+  --posted-bg:  rgba(76,120,176,.08);
+
+  --user-coral:  #C06E5C;
+  --user-purple: #7C5CBA;
+  --user-teal:   #35887C;
+  --user-blue:   #4C78B0;
+  --user-gold:   #B5892E;
+  --user-rose:   #AD5272;
+
+  --card-border: 1px solid rgba(30,24,48,.08);
+  --radius: 14px;
+  --shadow:    none;
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.06);
+}
+
+/* ── Light theme form input overrides (all light variants) ───────── */
 [data-theme="light"] .form-input,
 [data-theme="light"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 [data-theme="light"] textarea,
-[data-theme="light"] select {
+[data-theme="light"] select,
+[data-theme="light-sage"] .form-input,
+[data-theme="light-sage"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="light-sage"] textarea,
+[data-theme="light-sage"] select,
+[data-theme="light-rose"] .form-input,
+[data-theme="light-rose"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="light-rose"] textarea,
+[data-theme="light-rose"] select,
+[data-theme="light-ocean"] .form-input,
+[data-theme="light-ocean"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="light-ocean"] textarea,
+[data-theme="light-ocean"] select,
+[data-theme="light-sand"] .form-input,
+[data-theme="light-sand"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="light-sand"] textarea,
+[data-theme="light-sand"] select,
+[data-theme="light-lavender"] .form-input,
+[data-theme="light-lavender"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="light-lavender"] textarea,
+[data-theme="light-lavender"] select {
   background: #FFFFFF !important;
-  color: #182033 !important;
-  border-color: rgba(24,32,51,.10) !important;
+  color: var(--text, #182033) !important;
+  border-color: var(--border, rgba(24,32,51,.10)) !important;
 }
 [data-theme="light"] .form-input:focus,
 [data-theme="light"] input:focus:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 [data-theme="light"] textarea:focus,
-[data-theme="light"] select:focus {
-  border-color: rgba(99,102,241,.35) !important;
-  box-shadow: 0 0 0 2px rgba(99,102,241,.10) !important;
+[data-theme="light"] select:focus,
+[data-theme="light-sage"] .form-input:focus,
+[data-theme="light-sage"] input:focus:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="light-sage"] textarea:focus,
+[data-theme="light-sage"] select:focus,
+[data-theme="light-rose"] .form-input:focus,
+[data-theme="light-rose"] input:focus:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="light-rose"] textarea:focus,
+[data-theme="light-rose"] select:focus,
+[data-theme="light-ocean"] .form-input:focus,
+[data-theme="light-ocean"] input:focus:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="light-ocean"] textarea:focus,
+[data-theme="light-ocean"] select:focus,
+[data-theme="light-sand"] .form-input:focus,
+[data-theme="light-sand"] input:focus:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="light-sand"] textarea:focus,
+[data-theme="light-sand"] select:focus,
+[data-theme="light-lavender"] .form-input:focus,
+[data-theme="light-lavender"] input:focus:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="light-lavender"] textarea:focus,
+[data-theme="light-lavender"] select:focus {
+  border-color: var(--accent, rgba(99,102,241,.35)) !important;
+  box-shadow: 0 0 0 2px var(--accent-light, rgba(99,102,241,.10)) !important;
 }
