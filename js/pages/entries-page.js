@@ -190,7 +190,9 @@ window.filterEntryRows = function(q) {
 };
 
 // ── Entry Detail ──────────────────────────────────────────────────
-window.openEntryDetail = async function(id) {
+window.openEntryDetail = async function(id, options) {
+  options = options || {};
+  const reviewMode = options.reviewMode || false;
   const entry = await getEntry(id);
   if (!entry) return toast('Entry not found.', 'error');
   const cName = entry.contact?.name || '—';
@@ -204,6 +206,7 @@ window.openEntryDetail = async function(id) {
   const canMarkPaid = ['owed_to_me','bill_sent','invoice_sent','i_owe','bill_received','invoice_received',
     'they_owe_you','you_owe_them','invoice','bill','advance_paid','advance_received'].includes(_ecat) && !isTerminal;
   const canFulfill  = ['advance_paid','advance_received'].includes(_ecat) && !isTerminal;
+  const pendingSettlements = settlements.filter(s => s.status === 'pending');
 
   let settleHtml = '';
   if (settlements.length > 0) {
@@ -216,9 +219,10 @@ window.openEntryDetail = async function(id) {
           ? `<span style="background:rgba(95,211,154,.15);color:var(--green);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">✓ Confirmed</span>`
           : '';
       const pendingActions = isPending
-        ? `<div style="display:flex;gap:6px;margin-top:6px;">
-            <button class="btn btn-primary btn-sm" onclick="confirmSettlement('${s.id}','${entry.id}')" style="padding:4px 12px;font-size:11px;font-weight:700;">✓ Confirm</button>
-            <button class="bs sm" onclick="rejectSettlement('${s.id}','${entry.id}')" style="padding:4px 10px;font-size:11px;color:var(--red);border-color:var(--red);">✕ Reject</button>
+        ? `<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="confirmSettlement('${s.id}','${entry.id}',${reviewMode})" style="padding:6px 12px;font-size:11px;font-weight:700;background:var(--green);border-color:var(--green);">✓ Confirm Payment</button>
+            <button class="bs sm" onclick="rejectSettlement('${s.id}','${entry.id}',${reviewMode})" style="padding:6px 10px;font-size:11px;color:var(--red);border-color:var(--red);">✕ Reject Payment</button>
+            <button class="bs sm" onclick="openAdjustSettlementModal('${s.id}','${entry.id}','${fmtMoney(s.amount, entry.currency)}',${reviewMode})" style="padding:6px 10px;font-size:11px;background:var(--amber,#D5BA78);color:#000;border-color:var(--amber,#D5BA78);font-weight:600;">⚙ Edit &amp; Adjust</button>
           </div>`
         : '';
       settleHtml += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;${isPending ? 'background:rgba(213,186,120,.05);margin:0 -12px;padding:8px 12px;border-radius:8px;border:1px solid rgba(213,186,120,.2);margin-bottom:6px;' : ''}">
@@ -240,75 +244,120 @@ window.openEntryDetail = async function(id) {
     settleHtml += `</div>`;
   }
 
-  openModal(`
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
-      <h3 style="margin:0;">Entry Detail</h3>
-      <button class="btn btn-secondary btn-sm" onclick="closeModal()">✕</button>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
-      <div style="background:var(--bg3);border-radius:10px;padding:12px;">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Contact</div>
-        <div style="font-weight:700;margin-top:4px;">${esc(cName)}</div>
+  // Build modal content based on review mode
+  let modalContent = '';
+
+  if (reviewMode && pendingSettlements.length > 0) {
+    // PAYMENT REVIEW MODE: Settlements at top with prominent actions
+    modalContent = `
+      <div style="background:linear-gradient(135deg, rgba(213,186,120,.15), rgba(213,186,120,.08));border:1px solid rgba(213,186,120,.3);border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--amber,#D5BA78);text-transform:uppercase;letter-spacing:.05em;">🔍 Payment Review Mode</div>
       </div>
-      <div style="background:var(--bg3);border-radius:10px;padding:12px;">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Type</div>
-        <div style="font-weight:700;color:${txColor};margin-top:4px;">${esc(txLabel)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+        <h3 style="margin:0;color:var(--text);">Pending Settlement</h3>
+        <button class="btn btn-secondary btn-sm" onclick="closeModal()">✕</button>
       </div>
-      <div style="background:var(--bg3);border-radius:10px;padding:12px;">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Amount</div>
-        <div style="font-weight:800;font-size:20px;margin-top:4px;">${fmtMoney(entry.amount, entry.currency)}</div>
+      ${settleHtml}
+      <div style="border-top:1px solid var(--border);margin-top:20px;padding-top:14px;">
+        <h4 style="font-size:13px;margin:0 0 12px 0;color:var(--muted);">Entry Details</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+          <div style="background:var(--bg3);border-radius:10px;padding:12px;">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Contact</div>
+            <div style="font-weight:700;margin-top:4px;">${esc(cName)}</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:10px;padding:12px;">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Type</div>
+            <div style="font-weight:700;color:${txColor};margin-top:4px;">${esc(txLabel)}</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:10px;padding:12px;">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Amount</div>
+            <div style="font-weight:800;font-size:20px;margin-top:4px;">${fmtMoney(entry.amount, entry.currency)}</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:10px;padding:12px;">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Date</div>
+            <div style="font-weight:600;margin-top:4px;">${fmtDate(entry.date)}</div>
+          </div>
+        </div>
       </div>
-      <div style="background:var(--bg3);border-radius:10px;padding:12px;">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Status</div>
-        <div style="margin-top:4px;">${statusBadge(entry.status)}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+        <button class="bs sm" onclick="openEditEntryModal('${entry.id}')">Edit</button>
+        <button class="bs sm" onclick="printInvoice('${entry.id}')">Print</button>
       </div>
-      <div style="background:var(--bg3);border-radius:10px;padding:12px;">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Date</div>
-        <div style="font-weight:600;margin-top:4px;">${fmtDate(entry.date)}</div>
+    `;
+  } else {
+    // STANDARD VIEW: Settlements at bottom, all options available
+    modalContent = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+        <h3 style="margin:0;">Entry Detail</h3>
+        <button class="btn btn-secondary btn-sm" onclick="closeModal()">✕</button>
       </div>
-      ${entry.invoice_number ? `<div style="background:var(--bg3);border-radius:10px;padding:12px;">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Invoice #</div>
-        <div style="font-weight:600;margin-top:4px;">${esc(entry.invoice_number)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+        <div style="background:var(--bg3);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Contact</div>
+          <div style="font-weight:700;margin-top:4px;">${esc(cName)}</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Type</div>
+          <div style="font-weight:700;color:${txColor};margin-top:4px;">${esc(txLabel)}</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Amount</div>
+          <div style="font-weight:800;font-size:20px;margin-top:4px;">${fmtMoney(entry.amount, entry.currency)}</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Status</div>
+          <div style="margin-top:4px;">${statusBadge(entry.status)}</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Date</div>
+          <div style="font-weight:600;margin-top:4px;">${fmtDate(entry.date)}</div>
+        </div>
+        ${entry.invoice_number ? `<div style="background:var(--bg3);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Invoice #</div>
+          <div style="font-weight:600;margin-top:4px;">${esc(entry.invoice_number)}</div>
+        </div>` : ''}
+      </div>
+      ${entry.settled_amount > 0 ? `
+        <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;padding:10px 14px;background:var(--bg3);border-bottom:1px solid var(--border);">
+            <span style="font-size:12px;color:var(--muted);text-transform:uppercase;">Settled</span>
+            <span style="font-weight:700;color:var(--green);">${fmtMoney(entry.settled_amount, entry.currency)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:10px 14px;">
+            <span style="font-size:12px;color:var(--muted);text-transform:uppercase;">Balance</span>
+            <span style="font-weight:800;color:${remaining <= 0 ? 'var(--green)' : 'var(--amber)'};">${fmtMoney(remaining, entry.currency)}</span>
+          </div>
+        </div>
+      ` : ''}
+      ${entry.note ? `<div style="background:var(--bg3);border-radius:10px;padding:10px 12px;margin-bottom:16px;">
+        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">🔒 Note to self</div>
+        <div style="font-size:13px;">${esc(entry.note)}</div>
       </div>` : ''}
-    </div>
-    ${entry.settled_amount > 0 ? `
-      <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">
-        <div style="display:flex;justify-content:space-between;padding:10px 14px;background:var(--bg3);border-bottom:1px solid var(--border);">
-          <span style="font-size:12px;color:var(--muted);text-transform:uppercase;">Settled</span>
-          <span style="font-weight:700;color:var(--green);">${fmtMoney(entry.settled_amount, entry.currency)}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:10px 14px;">
-          <span style="font-size:12px;color:var(--muted);text-transform:uppercase;">Balance</span>
-          <span style="font-weight:800;color:${remaining <= 0 ? 'var(--green)' : 'var(--amber)'};">${fmtMoney(remaining, entry.currency)}</span>
-        </div>
+      ${settleHtml}
+      ${canMarkPaid ? `
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="bs sm" style="background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;" onclick="closeModal();openMarkPaidModal('${entry.id}')">💳 Record Payment${remaining > 0 ? ` (${fmtMoney(remaining, entry.currency || 'USD')})` : ''}</button>
+        ${canFulfill ? `<button class="bs sm" style="border-color:var(--green);color:var(--green);font-weight:600;" onclick="closeModal();openRecordFulfillmentModal('${entry.id}')">✅ Record Fulfillment</button>` : ''}
+      </div>` : ''}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:${canMarkPaid ? '10' : '14'}px;${canMarkPaid ? '' : 'border-top:1px solid var(--border);margin-top:16px;'}">
+        <button class="bs sm" onclick="openEditEntryModal('${entry.id}')">Edit</button>
+        <button class="bs sm" onclick="closeModal();openShareModal('${entry.id}')">Share</button>
+        ${!isTerminal ? `<button class="bs sm" onclick="closeModal();openSendReminderModal('${entry.id}')">Remind</button>` : ''}
+        ${['invoice_sent','bill_sent','invoice','bill'].includes(_ecat) && !isTerminal ? `<button class="bs sm" onclick="closeModal();openNotifyInvoiceModal('${entry.id}')" style="color:#60a5fa;">✉️ Email</button>` : ''}
+        <button class="bs sm" onclick="printInvoice('${entry.id}')">Print</button>
+        <button class="bs sm" onclick="duplicateEntry('${entry.id}');closeModal();">Duplicate</button>
+        <button class="bs sm" onclick="toggleNoLedger('${entry.id}',${!entry.no_ledger});closeModal();">${entry.no_ledger ? 'Restore Ledger' : 'Rm Ledger'}</button>
+        <button class="bs sm" onclick="handleVoidEntry('${entry.id}');closeModal();" style="color:var(--amber);">Void</button>
+        <button class="bs sm" onclick="confirmDeleteEntry('${entry.id}');closeModal();" style="color:var(--red);">Delete</button>
       </div>
-    ` : ''}
-    ${entry.note ? `<div style="background:var(--bg3);border-radius:10px;padding:10px 12px;margin-bottom:16px;">
-      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">🔒 Note to self</div>
-      <div style="font-size:13px;">${esc(entry.note)}</div>
-    </div>` : ''}
-    ${settleHtml}
-    ${canMarkPaid ? `
-    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="bs sm" style="background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;" onclick="closeModal();openMarkPaidModal('${entry.id}')">💳 Record Payment${remaining > 0 ? ` (${fmtMoney(remaining, entry.currency || 'USD')})` : ''}</button>
-      ${canFulfill ? `<button class="bs sm" style="border-color:var(--green);color:var(--green);font-weight:600;" onclick="closeModal();openRecordFulfillmentModal('${entry.id}')">✅ Record Fulfillment</button>` : ''}
-    </div>` : ''}
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:${canMarkPaid ? '10' : '14'}px;${canMarkPaid ? '' : 'border-top:1px solid var(--border);margin-top:16px;'}">
-      <button class="bs sm" onclick="openEditEntryModal('${entry.id}')">Edit</button>
-      <button class="bs sm" onclick="closeModal();openShareModal('${entry.id}')">Share</button>
-      ${!isTerminal ? `<button class="bs sm" onclick="closeModal();openSendReminderModal('${entry.id}')">Remind</button>` : ''}
-      ${['invoice_sent','bill_sent','invoice','bill'].includes(_ecat) && !isTerminal ? `<button class="bs sm" onclick="closeModal();openNotifyInvoiceModal('${entry.id}')" style="color:#60a5fa;">✉️ Email</button>` : ''}
-      <button class="bs sm" onclick="printInvoice('${entry.id}')">Print</button>
-      <button class="bs sm" onclick="duplicateEntry('${entry.id}');closeModal();">Duplicate</button>
-      <button class="bs sm" onclick="toggleNoLedger('${entry.id}',${!entry.no_ledger});closeModal();">${entry.no_ledger ? 'Restore Ledger' : 'Rm Ledger'}</button>
-      <button class="bs sm" onclick="handleVoidEntry('${entry.id}');closeModal();" style="color:var(--amber);">Void</button>
-      <button class="bs sm" onclick="confirmDeleteEntry('${entry.id}');closeModal();" style="color:var(--red);">Delete</button>
-    </div>
-  `, { maxWidth: '560px' });
+    `;
+  }
+
+  openModal(modalContent, { maxWidth: '560px' });
 };
 
 // ── Confirm / Reject Settlement ──────────────────────────────────
-window.confirmSettlement = async function(settlementId, entryId) {
+window.confirmSettlement = async function(settlementId, entryId, reviewMode) {
   try {
     const result = await reviewSettlement(settlementId, {
       status: 'confirmed',
@@ -321,15 +370,15 @@ window.confirmSettlement = async function(settlementId, entryId) {
     toast('Settlement confirmed.', 'success');
     invalidateEntryCache(getCurrentUser().id);
     closeModal();
-    // Re-open the entry detail to show updated state
-    await window.openEntryDetail(entryId);
+    // Re-open the entry detail, staying in review mode if applicable
+    await window.openEntryDetail(entryId, { reviewMode: reviewMode || false });
   } catch (err) {
     console.error('[confirmSettlement]', err);
     toast('Error confirming settlement: ' + (err?.message || err), 'error');
   }
 };
 
-window.rejectSettlement = async function(settlementId, entryId) {
+window.rejectSettlement = async function(settlementId, entryId, reviewMode) {
   if (!confirm('Reject this settlement? It will be removed.')) return;
   try {
     const ok = await deleteSettlement(settlementId);
@@ -340,10 +389,76 @@ window.rejectSettlement = async function(settlementId, entryId) {
     toast('Settlement rejected and removed.', 'success');
     invalidateEntryCache(getCurrentUser().id);
     closeModal();
-    await window.openEntryDetail(entryId);
+    await window.openEntryDetail(entryId, { reviewMode: reviewMode || false });
   } catch (err) {
     console.error('[rejectSettlement]', err);
     toast('Error rejecting settlement: ' + (err?.message || err), 'error');
+  }
+};
+
+// ── Edit & Adjust Settlement Amount ────────────────────────────────
+window.openAdjustSettlementModal = async function(settlementId, entryId, currentAmount, reviewMode) {
+  // Parse the amount from the formatted string (remove currency symbols and format)
+  const parsedAmount = parseFloat(currentAmount.replace(/[^0-9.-]/g, ''));
+  const settlement = await supabase.from('settlements').select('*').eq('id', settlementId).single().then(r => r.data);
+
+  if (!settlement) return toast('Settlement not found.', 'error');
+
+  openModal(`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+      <h3 style="margin:0;">Edit & Adjust Amount</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal();openEntryDetail('${entryId}', { reviewMode: ${reviewMode} })">✕</button>
+    </div>
+    <p style="color:var(--muted);margin-bottom:16px;font-size:13px;">Modify the settlement amount before confirming.</p>
+    <div class="form-group">
+      <label>Settlement Amount</label>
+      <input type="number" id="adjust-amount" step="0.01" min="0" value="${settlement.amount / 100}" style="font-size:16px;font-weight:600;">
+    </div>
+    <div style="margin-top:20px;display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal();openEntryDetail('${entryId}', { reviewMode: ${reviewMode} })">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmAdjustedSettlement('${settlementId}','${entryId}',${reviewMode})">Confirm Adjusted Amount</button>
+    </div>
+  `, { maxWidth: '400px' });
+};
+
+// ── Confirm Adjusted Settlement ────────────────────────────────────
+window.confirmAdjustedSettlement = async function(settlementId, entryId, reviewMode) {
+  const newAmount = parseFloat(document.getElementById('adjust-amount').value);
+  if (isNaN(newAmount) || newAmount < 0) {
+    toast('Please enter a valid amount.', 'error');
+    return;
+  }
+
+  try {
+    // Update settlement with new amount (convert to cents)
+    const result = await supabase
+      .from('settlements')
+      .update({ amount: Math.round(newAmount * 100) })
+      .eq('id', settlementId);
+
+    if (result.error) {
+      toast('Failed to update amount: ' + result.error.message, 'error');
+      return;
+    }
+
+    // Now confirm the settlement
+    const reviewResult = await reviewSettlement(settlementId, {
+      status: 'confirmed',
+      reviewedBy: getCurrentUser().id
+    });
+
+    if (!reviewResult) {
+      toast('Failed to confirm settlement.', 'error');
+      return;
+    }
+
+    toast('Settlement amount adjusted and confirmed.', 'success');
+    invalidateEntryCache(getCurrentUser().id);
+    closeModal();
+    await window.openEntryDetail(entryId, { reviewMode: reviewMode || false });
+  } catch (err) {
+    console.error('[confirmAdjustedSettlement]', err);
+    toast('Error: ' + (err?.message || err), 'error');
   }
 };
 
@@ -1714,6 +1829,13 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
     <div class="modal-title">New Entry</div>
     <div style="display:flex;gap:6px;margin-bottom:14px;">${tabBarHtml}</div>
     <div id="ne-action-row" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">${actionRowHtml}</div>
+    ${templates.length > 0 ? `
+      <div class="form-group"><label style="color:var(--muted);">Or use a template</label>
+        <select id="ne-template" onchange="if(this.value){closeModal();useTemplateForEntry(this.value);}">
+          <option value="">— Select template —</option>
+          ${templates.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}
+        </select>
+      </div>` : ''}
     <div class="form-group" style="position:relative;">
       <label style="display:flex;justify-content:space-between;align-items:center;">
         <span>Contact *</span>
@@ -1746,6 +1868,8 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
     </div>
     <div id="ne-extra-fields"></div>
     <div class="form-group"><label>Issue Date</label><input type="date" id="ne-date" value="${new Date().toISOString().slice(0,10)}"></div>
+    <div class="form-group"><label>Due Date <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+      <input type="date" id="ne-due-date" style="width:100%;"></div>
     <!-- EMAIL section with ON/OFF toggle -->
     <div style="margin-bottom:12px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg3);cursor:pointer;" onclick="toggleNeNotify()">
@@ -1783,13 +1907,6 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
     </div>
     <textarea id="ne-note" rows="1" placeholder="Private reminder..." oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" style="width:100%;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;resize:none;overflow:hidden;box-sizing:border-box;line-height:1.5;margin-bottom:12px;"></textarea>
 
-    ${templates.length > 0 ? `
-      <div class="form-group"><label style="color:var(--muted);">Or use a template</label>
-        <select id="ne-template" onchange="if(this.value){closeModal();useTemplateForEntry(this.value);}">
-          <option value="">— Select template —</option>
-          ${templates.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}
-        </select>
-      </div>` : ''}
     <input type="hidden" id="ne-category" value="${window._neCategory}">
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="bs sm" onclick="closeModal()">Cancel</button>
@@ -1973,10 +2090,6 @@ function _neRenderExtraFields(action) {
   if ((action.extra || []).includes('ref_number')) {
     html += `<div class="form-group"><label>Bill / Ref Number <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
       <input type="text" id="ne-ref-number" placeholder="REF-001" style="width:100%;"></div>`;
-  }
-  if ((action.extra || []).includes('due_date')) {
-    html += `<div class="form-group"><label>Due Date <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
-      <input type="date" id="ne-due-date" style="width:100%;"></div>`;
   }
   if ((action.extra || []).includes('advance_note')) {
     html += `<div class="form-group"><label>Advance Note <span style="font-weight:400;color:var(--muted);">(optional, visible to contact)</span></label>

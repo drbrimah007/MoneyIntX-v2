@@ -60,7 +60,7 @@ export async function renderNotifications(el) {
       // Action button: any notification with an entry_id gets a "View" that opens the entry detail
       let actionBtn = '';
       if (n.entry_id && (n.type === 'settlement_pending' || n.type === 'payment_received')) {
-        actionBtn = `<button onclick="openEntryDetail('${n.entry_id}')" style="background:var(--amber,#D5BA78);color:#000;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:700;margin-right:4px;">Review</button>`;
+        actionBtn = `<button onclick="openEntryDetail('${n.entry_id}', { reviewMode: true })" style="background:var(--amber,#D5BA78);color:#000;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:700;margin-right:4px;">Review</button>`;
       } else if (n.entry_id) {
         actionBtn = `<button onclick="openEntryDetail('${n.entry_id}')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View</button>`;
       } else if (n.type === 'shared_record') {

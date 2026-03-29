@@ -12,13 +12,19 @@ export async function listRecurring(userId) {
   return data || [];
 }
 
-export async function createRecurring(userId, { contactId, templateId, frequency, customDays, nextRunAt, txType, amount, currency = 'USD', note = '', autoNotify = false, notifyWho = 'them', notifyMessage = '', maxRuns }) {
+export async function createRecurring(userId, { contactId, templateId, frequency, customDays, nextRunAt, txType, amount, currency = 'USD', note = '', autoNotify = false, notifyWho = 'them', notifyMessage = '', maxRuns, description = '', customLabel = '', remindDays = 0, notifyContact = false, notifySelf = false, notifyEmail = false }) {
   const { data, error } = await supabase.from('recurring_rules').insert({
     user_id: userId, contact_id: contactId, template_id: templateId,
     frequency, custom_days: customDays || null,
     next_run_at: nextRunAt, tx_type: txType, amount: toCents(amount),
     currency, note, auto_notify: autoNotify, notify_who: notifyWho,
-    notify_message: notifyMessage, max_runs: maxRuns || null
+    notify_message: notifyMessage, max_runs: maxRuns || null,
+    description: description || null,
+    custom_label: customLabel || null,
+    remind_days: remindDays || 0,
+    notify_contact: notifyContact,
+    notify_self: notifySelf,
+    notify_email: notifyEmail
   }).select().single();
   if (error) console.error('[createRecurring]', error.message);
   return data;

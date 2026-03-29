@@ -2,7 +2,8 @@
 .card { background: var(--bg2); border-radius: 18px; padding: 20px; margin-bottom: 16px; border: 1px solid var(--border); box-shadow: none; }
 .card-sm { padding: 14px; }
 .stat-card { background: var(--bg2); border-radius: 18px; padding: 18px; border: 1px solid var(--border); box-shadow: none; }
-.stat-val { font-size: 26px; font-weight: 800; margin: 4px 0; }
+.stat-val { font-size: 26px; font-weight: 800; margin: 4px 0; word-break: break-word; overflow-wrap: break-word; }
+@media(max-width:640px) { .stat-val { font-size: 20px; } }
 .stat-lbl { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; }
 
 /* Buttons — solid matte, no gradient, no glow */
@@ -88,9 +89,23 @@ hr, .divider { border: none; border-top: 1px solid var(--line, rgba(255,255,255,
 .tbl-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th { text-align: left; color: var(--muted-2, var(--muted)); font-size: 11px; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--line, var(--border)); text-transform: uppercase; letter-spacing: .06em; }
-td { padding: 10px; border-bottom: 1px solid var(--line, var(--border)); vertical-align: middle; word-break: break-word; color: var(--text-2, var(--text)); }
+td { padding: 10px; border-bottom: 1px solid var(--line, var(--border)); vertical-align: middle; word-break: break-word; overflow-wrap: break-word; color: var(--text-2, var(--text)); }
 tr:last-child td { border-bottom: none; }
 tr.row-selected td { background: rgba(108,99,255,.1) !important; }
+/* Amount cells: allow wrapping and reduce font on mobile for very large numbers */
+td[style*="font-weight:700"], td[style*="font-weight: 700"], td[style*="strong"] {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  word-spacing: 100vw;
+}
+@media(max-width:640px) {
+  td { font-size: 13px; padding: 8px 6px; }
+  td[style*="font-weight:700"], td[style*="font-weight: 700"], td[style*="strong"] {
+    font-size: 12px;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+}
 .show-mobile { display: none; }
 .mobile-label { display: none; }
 @media(max-width:640px) { .hide-mobile { display: none; } .show-mobile { display: block !important; } .mobile-label { display: block; } }

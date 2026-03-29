@@ -2,6 +2,9 @@
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
+/* ── Amount display on mobile ────────────────────────────────────────── */
+.amount-display { display: inline-block; word-break: break-word; overflow-wrap: break-word; }
+
 /* ── Print config ─────────────────────────────────────────────── */
 @media print {
   #topbar, #nav, #mobile-tab-bar, #mobile-more-sheet, .no-print, .action-menu, .pagination { display:none!important; }
@@ -10,4 +13,14 @@
   th, td { color:#000!important; border-color:#e2e8f0!important; }
   .modal-bg { position:static!important; background:none!important; padding:0!important; }
   .modal { max-height:none!important; border-radius:0!important; border:none!important; box-shadow:none!important; }
+}
+
+/* ── Mobile number wrapping for formatted amounts ────────────────────── */
+@media(max-width:600px) {
+  .amount-display, [style*="font-weight:700"], [style*="font-weight: 700"] {
+    word-spacing: 100vw;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
 }

@@ -83,7 +83,7 @@ export async function renderGroups(el) {
             ${stats.currentRound?`<p style="font-size:12px;color:var(--muted);margin-top:4px;">Round ${stats.currentRound.round_number}: ${stats.paidInRound}/${activeMembers.length} paid</p>`:''}
           </div>
           <div class="action-menu">
-            <button class="action-menu-btn" onclick="toggleActionMenu(this)">⋮</button>
+            <button class="action-menu-btn" onclick="window.toggleActionMenu(this)">⋮</button>
             <div class="action-dropdown">
               <button onclick="openGroupDetail('${g.id}')">👁 View</button>
               ${isOwner?`<button onclick="openAddMemberModal('${g.id}')">+ Add Member</button>`:''}
@@ -105,6 +105,8 @@ export async function renderGroups(el) {
 
 // V1-style group creation — name, amount, frequency, initial members, rotation all at once
 window.openNewGroupModal = async function() {
+  const currentUser = getCurrentUser();
+  const currentProfile = getCurrentProfile();
   const contacts = await listContacts(currentUser.id);
   const contactOpts = contacts.map(c=>`<option value="${c.id}" data-name="${esc(c.name)}">${esc(c.name)}</option>`).join('');
   window._newGroupMembers = []; // [{contactId, name}]
@@ -167,6 +169,8 @@ window._ngAddMember = function() {
 };
 
 window.doCreateGroup = async function() {
+  const currentUser = getCurrentUser();
+  const currentProfile = getCurrentProfile();
   const name = document.getElementById('ng-name').value.trim();
   if (!name) return toast('Name required.', 'error');
   const g = await createGroup(currentUser.id, {
@@ -185,7 +189,7 @@ window.doCreateGroup = async function() {
   }
   closeModal();
   toast(`Group "${name}" created${members.length>0?` with ${members.length} member${members.length!==1?'s':''}`:''}. You are the owner.`, 'success');
-  navTo('groups');
+  window.navTo('groups');
 };
 
 // ── Group Detail ──────────────────────────────────────────────────
@@ -197,6 +201,7 @@ const GROUP_ROLE_PERMS = {
   invitee: { label: 'Invitee', badge: 'badge-yellow', canManageMembers: false, canManageRounds: false, canEditGroup: false, canPost: false, canUploadDocs: false, canViewAll: false }
 };
 function getMyGroupRole(g) {
+  const currentUser = getCurrentUser();
   if (g.user_id === currentUser.id) return 'owner';
   const me = (g.members || []).find(m => m.user_id === currentUser.id || m.contact_id === currentUser.id);
   return me?.role || 'member';
@@ -351,7 +356,7 @@ window.doAddMember = async function(groupId) {
   if (!result) return toast('Failed to add member.', 'error');
   closeModal();
   toast('Member added.', 'success');
-  navTo('groups');
+  window.navTo('groups');
 };
 
 window.doRemoveMember = async function(memberId, name, groupId) {

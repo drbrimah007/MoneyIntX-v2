@@ -509,6 +509,11 @@ window.openModal  = openModal;
 window.toast      = toast;
 window.renderDash = function() { renderDash(document.getElementById('content')); };
 
+// Expose investment globals for page modules
+window.calcInvestmentStats = calcInvestmentStats;
+window.INV_TYPES   = INV_TYPES;
+window.INV_STATUSES = INV_STATUSES;
+
 // ── Auth tab toggle ───────────────────────────────────────────────
 window.showAuthTab = function(tab) {
   const authForms = document.getElementById('auth-forms');
@@ -541,7 +546,10 @@ window.showAuthTab = function(tab) {
   }
   document.getElementById('login-form').style.display = tab === 'login' ? '' : 'none';
   document.getElementById('signup-form').style.display = tab === 'signup' ? '' : 'none';
-  document.querySelectorAll('.landing-tab').forEach(t => t.classList.toggle('active', t.textContent.toLowerCase().includes(tab)));
+  document.querySelectorAll('.landing-tab').forEach(t => {
+    const txt = t.textContent.toLowerCase().replace(/\s+/g, '');
+    t.classList.toggle('active', txt.includes(tab));
+  });
   // Clear recovery flag so login works after reset
   window._isRecovery = false;
   try { sessionStorage.removeItem('_mxi_recovery'); } catch(e) {}
@@ -884,9 +892,11 @@ async function enterApp(user) {
       `);
     }, 600);
   } else if (!isNewUser) {
-    // returning user — restore last page
-    const savedPage = localStorage.getItem('mxi_last_page') || 'dash';
-    navTo(savedPage);
+    // returning user — restore page from URL hash first, then fall back to localStorage
+    const hashPage = (window.location.hash || '').replace('#', '').split('?')[0] || '';
+    const validPages = ['dash','entries','contacts','settings','groups','investments','business','templates','recurring','notifications','nok','trash','admin','view-all','user-entries'];
+    const pageToRestore = validPages.includes(hashPage) ? hashPage : (localStorage.getItem('mxi_last_page') || 'dash');
+    navTo(pageToRestore);
   }
   // Process scheduled reminders + recurring rules every 60s
   setInterval(() => { processDueReminders(user.id, { emailFn: sendNotificationEmail }); processDueRecurring(user.id); }, 60000);
@@ -970,8 +980,8 @@ function navTo(page) {
 // ── Back-button handler ──────────────────────────────────────────
 window.addEventListener('popstate', (e) => {
   if (!currentUser) return;          // on landing page, let browser handle
-  const hash = (window.location.hash || '').replace('#', '') || 'dash';
-  const validPages = ['dash','entries','contacts','settings','view-all','user-entries','notifications'];
+  const hash = (window.location.hash || '').replace('#', '').split('?')[0] || 'dash';
+  const validPages = ['dash','entries','contacts','settings','groups','investments','business','templates','recurring','notifications','nok','trash','admin','view-all','user-entries'];
   if (validPages.includes(hash)) {
     navTo(hash);
   } else {
