@@ -119,10 +119,10 @@ function _cpEntriesTable(entries, page) {
     const txColor = TX_COLORS[_txKey] || 'var(--text)';
     const settled = e.settled_amount > 0;
     const remaining = e.amount - (e.settled_amount || 0);
-    const typeMobileCp = `<div class="show-mobile" style="font-size:11px;font-weight:700;color:${txColor};margin-bottom:2px;">${esc(txLabel)}</div>`;
+    const typeLabelCp = `<div style="font-size:11px;font-weight:700;color:${txColor};margin-bottom:2px;">${esc(txLabel)}</div>`;
     const amtHtml = settled
-      ? `${typeMobileCp}${fmtMoney(e.amount, e.currency)}<div style="font-size:11px;color:var(--muted);">Pd ${fmtMoney(e.settled_amount, e.currency)}</div><div style="font-size:11px;font-weight:700;color:${remaining<=0?'var(--green)':'var(--amber)'};">Bal ${fmtMoney(remaining, e.currency)}</div>`
-      : `${typeMobileCp}${fmtMoney(e.amount, e.currency)}`;
+      ? `${typeLabelCp}${fmtMoney(e.amount, e.currency)}<div style="font-size:11px;color:var(--muted);">Pd ${fmtMoney(e.settled_amount, e.currency)}</div><div style="font-size:11px;font-weight:700;color:${remaining<=0?'var(--green)':'var(--amber)'};">Bal ${fmtMoney(remaining, e.currency)}</div>`
+      : `${typeLabelCp}${fmtMoney(e.amount, e.currency)}`;
     const reminderHtml = e.reminder_count > 0 ? `<span class="badge badge-red" style="margin-left:4px;cursor:pointer;" onclick="openEntryDetail('${e.id}')">🚩${e.reminder_count}</span>` : '';
     const noLedgerHtml = e.no_ledger ? `<span class="badge badge-gray" style="margin-left:4px;" title="Not in ledger">⊘</span>` : '';
     return `<tr>
@@ -226,11 +226,11 @@ window.openContactDetail = async function(id) {
     if (el) el.innerHTML = _cpEntriesTable(window._cpData.entries, window._cpPage);
   };
 
-  const netGrad = net > 0 ? 'linear-gradient(135deg,#064e3b,#065f46)' : net < 0 ? 'linear-gradient(135deg,#7f1d1d,#991b1b)' : 'linear-gradient(135deg,#1e293b,#334155)';
+  const netGrad = net > 0 ? '#064e3b' : net < 0 ? '#3b1d4e' : '#1e293b';
 
   openModal(`
     <!-- ── Contact Header ── -->
-    <div style="background:${netGrad};border-radius:16px;padding:18px;color:#fff;margin-bottom:0;">
+    <div style="background:${netGrad};border-radius:16px;padding:18px;color:#fff;margin-bottom:0;-webkit-user-select:none;user-select:none;">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
         <span style="width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;flex-shrink:0;border:2px solid rgba(255,255,255,.3);">${esc(c.name.charAt(0).toUpperCase())}</span>
         <div style="flex:1;min-width:0;">
@@ -259,7 +259,7 @@ window.openContactDetail = async function(id) {
 
     <!-- ── Action buttons ── -->
     <div style="display:flex;gap:6px;margin:10px 0;">
-      <button class="btn sm" onclick="closeModal();openNewEntryModal(null,'${id}')" style="flex:1;background:linear-gradient(135deg,var(--accent),#6c63ff);">+ Entry</button>
+      <button class="btn sm" onclick="closeModal();openNewEntryModal(null,'${id}')" style="flex:1;">+ Entry</button>
       <button class="bs sm" onclick="openEditContactModal('${c.id}')" style="flex:1;">✏️ Edit</button>
       <button class="bs sm" style="flex:1;color:var(--red);" onclick="confirmDeleteContact('${c.id}','${esc(c.name)}');closeModal();">🗑 Delete</button>
     </div>

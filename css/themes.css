@@ -23,11 +23,11 @@
   --panel:    #111318;
   --panel-2:  #161920;
 
-  /* Text — 4-level hierarchy */
+  /* Text — 4-level hierarchy (muted-2 raised for label readability) */
   --text:     #E7EBF2;
   --text-2:   #B4BDCB;
   --muted:    #8791A2;
-  --muted-2:  #616978;
+  --muted-2:  #7A8394;
 
   /* Borders — soft, not visible lines */
   --border:   rgba(255,255,255,.05);
@@ -95,7 +95,7 @@
   --text:    #F1F4F8;
   --text-2:  #C7CED9;
   --muted:   #8C95A5;
-  --muted-2: #626A78;
+  --muted-2: #788296;
 
   --border:  rgba(255,255,255,.04);
   --line:    rgba(255,255,255,.04);
@@ -154,7 +154,7 @@
   --text:    #E6EDF7;
   --text-2:  #A4B3CC;
   --muted:   #72819B;
-  --muted-2: #55627A;
+  --muted-2: #6E7D94;
 
   --border:  rgba(255,255,255,.05);
   --line:    rgba(255,255,255,.05);
