@@ -1275,6 +1275,16 @@ window.doConfirmShare = async function(tokenId) {
 
 // Inline confirm/reject from entries list — updates IN PLACE, no page jump
 window.doPendingConfirm = async function(tokenId) {
+  // Look up share details for the toast message
+  const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'bill','bill':'invoice' };
+  const share = (_pendingSharesAll || []).find(s => s.id === tokenId);
+  const snap = share?.entry_snapshot || {};
+  const fromName = snap.from_name || share?.sender_name || 'Contact';
+  const flippedCat = SNAP_FLIP[snap.tx_type] || snap.tx_type || '';
+  const txLabel = TX_LABELS[flippedCat] || snap.tx_type || 'Entry';
+  const amtCents = snap.amount !== undefined ? snap.amount : 0;
+  const cur = snap.currency || 'USD';
+
   // Disable the row's buttons immediately for feedback
   const row = document.querySelector(`[data-pending-id="${tokenId}"]`);
   if (row) {
@@ -1293,7 +1303,7 @@ window.doPendingConfirm = async function(tokenId) {
     return;
   }
   if (data?.entry_id) {
-    toast('Record confirmed and added to your ledger!', 'success');
+    toast(`✓ Confirmed: ${txLabel} — ${fmtMoney(amtCents, cur)} from ${fromName}`, 'success');
     _refreshPendingInPlace(tokenId, true);
   } else {
     toast('Could not confirm — please try again.', 'error');
@@ -1302,10 +1312,12 @@ window.doPendingConfirm = async function(tokenId) {
 };
 
 window.doPendingReject = async function(tokenId) {
+  const share = (_pendingSharesAll || []).find(s => s.id === tokenId);
+  const fromName = share?.entry_snapshot?.from_name || share?.sender_name || 'Contact';
   const row = document.querySelector(`[data-pending-id="${tokenId}"]`);
   if (row) row.querySelectorAll('button').forEach(b => { b.disabled = true; });
   await dismissShare(tokenId);
-  toast('Record rejected.', 'success');
+  toast(`Record from ${fromName} rejected.`, 'success');
   _refreshPendingInPlace(tokenId, false);
 };
 

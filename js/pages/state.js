@@ -23,17 +23,24 @@ export function getNotifChannel() { return _notifChannel; }
 
 // ── Contact color: deterministic per ID, stored in localStorage ───────────
 // Cache key includes version — bump to invalidate stale colors
-const _CC_KEY = 'mxi_cc_v6';
+const _CC_KEY = 'mxi_cc_v7';
 
-// Soft matte user color palette — 6 stable tones, no neon
-const USER_COLORS = ['#D88978','#A98AE0','#63C5B7','#71A8DB','#D5BA78','#D98DA0'];
+// Soft matte user color palette — 11 tones for better variety (prime count = fewer collisions)
+const USER_COLORS = [
+  '#D88978','#A98AE0','#63C5B7','#71A8DB','#D5BA78','#D98DA0',
+  '#7EAAC4','#C49B7A','#8FBE8F','#B896D4','#7ABFBF'
+];
 
 export function contactColor(id) {
   try {
     const stored = JSON.parse(localStorage.getItem(_CC_KEY) || '{}');
     if (stored[id]) return stored[id];
-    let h = 0;
-    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+    // FNV-1a hash — much better distribution across colors than simple polynomial
+    let h = 2166136261;
+    for (let i = 0; i < id.length; i++) {
+      h ^= id.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
     const color = USER_COLORS[h % USER_COLORS.length];
     stored[id] = color;
     localStorage.setItem(_CC_KEY, JSON.stringify(stored));
