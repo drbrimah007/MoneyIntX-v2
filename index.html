@@ -890,6 +890,7 @@ async function updateNotifBadge() {
     badge.style.display = count > 0 ? '' : 'none';
   }
 }
+window.updateNotifBadge = updateNotifBadge;
 
 // ── Navigation ────────────────────────────────────────────────────
 // Navigation history stack for in-app back button
