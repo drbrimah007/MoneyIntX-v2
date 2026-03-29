@@ -1072,9 +1072,43 @@ window.toast      = toast;
 
 // ── Auth tab toggle ───────────────────────────────────────────────
 window.showAuthTab = function(tab) {
+  const authForms = document.getElementById('auth-forms');
+  const loginForm = document.getElementById('login-form');
+  const signupForm = document.getElementById('signup-form');
+  // Remove any injected forms (forgot-form, reset-form-pw, etc.)
+  const injected = authForms?.querySelectorAll('#forgot-form, #reset-form-pw, #check-inbox-msg');
+  if (injected) injected.forEach(el => el.remove());
+  // If login/signup forms were destroyed by innerHTML replacement, restore them
+  if (!document.getElementById('login-form')) {
+    const lf = document.createElement('div');
+    lf.id = 'login-form';
+    lf.innerHTML = `
+      <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="you@example.com" autocomplete="email"></div>
+      <div class="form-group"><label>Password</label><input type="password" id="login-pass" placeholder="Your password" autocomplete="current-password"></div>
+      <button style="width:100%;margin-top:8px;padding:14px;font-size:15px;font-weight:700;border-radius:12px;background:#7fe0d0;color:#07111f;border:none;cursor:pointer;" onclick="handleLogin()">Log In →</button>
+      <p style="text-align:center;margin-top:12px;font-size:13px;"><a href="#" onclick="handleForgotPassword();return false;" style="color:#7fe0d0;text-decoration:none;">Forgot password?</a></p>`;
+    authForms?.prepend(lf);
+  }
+  if (!document.getElementById('signup-form')) {
+    const sf = document.createElement('div');
+    sf.id = 'signup-form';
+    sf.style.display = 'none';
+    sf.innerHTML = `
+      <div class="form-group"><label>Display Name</label><input type="text" id="signup-name" placeholder="Your name" autocomplete="name"></div>
+      <div class="form-group"><label>Email</label><input type="email" id="signup-email" placeholder="you@example.com" autocomplete="email"></div>
+      <div class="form-group"><label>Password</label><input type="password" id="signup-pass" placeholder="Choose a strong password" autocomplete="new-password"></div>
+      <button style="width:100%;margin-top:8px;padding:14px;font-size:15px;font-weight:700;border-radius:12px;background:#7fe0d0;color:#07111f;border:none;cursor:pointer;" onclick="handleSignup()">Create Free Account →</button>`;
+    authForms?.appendChild(sf);
+  }
   document.getElementById('login-form').style.display = tab === 'login' ? '' : 'none';
   document.getElementById('signup-form').style.display = tab === 'signup' ? '' : 'none';
   document.querySelectorAll('.landing-tab').forEach(t => t.classList.toggle('active', t.textContent.toLowerCase().includes(tab)));
+  // Clear recovery flag so login works after reset
+  window._isRecovery = false;
+  try { sessionStorage.removeItem('_mxi_recovery'); } catch(e) {}
+  // Scroll auth section into view on mobile
+  const authSection = document.getElementById('auth-section');
+  if (authSection) setTimeout(() => authSection.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
 };
 
 // ── Auth handlers ─────────────────────────────────────────────────
@@ -1095,16 +1129,27 @@ window.handleSignup = async function() {
 };
 
 window.handleForgotPassword = function() {
-  // Show inline reset-password request form in auth card
-  const forms = document.getElementById('auth-forms');
-  if (!forms) return;
-  forms.innerHTML = `
-    <div id="forgot-form">
-      <p style="font-size:13px;color:#8892a4;margin-bottom:14px;">Enter your email and we'll send you a reset link.</p>
-      <div class="form-group"><label>Email</label><input type="email" id="forgot-email" placeholder="you@example.com" autofocus></div>
-      <button class="btn btn-primary" style="width:100%;margin-top:4px;" onclick="doSendResetEmail()">Send Reset Link</button>
-      <p style="text-align:center;margin-top:12px;font-size:13px;"><a href="#" onclick="showAuthTab('login');return false;">← Back to log in</a></p>
-    </div>`;
+  // Hide login/signup forms and show forgot-password form inline (without destroying them)
+  const loginForm = document.getElementById('login-form');
+  const signupForm = document.getElementById('signup-form');
+  const authForms = document.getElementById('auth-forms');
+  if (!authForms) return;
+  if (loginForm) loginForm.style.display = 'none';
+  if (signupForm) signupForm.style.display = 'none';
+  // Remove any existing forgot/reset forms first
+  const old = authForms.querySelectorAll('#forgot-form, #reset-form-pw, #check-inbox-msg');
+  old.forEach(el => el.remove());
+  const ff = document.createElement('div');
+  ff.id = 'forgot-form';
+  ff.innerHTML = `
+    <p style="font-size:13px;color:#8892a4;margin-bottom:14px;">Enter your email and we'll send you a reset link.</p>
+    <div class="form-group"><label>Email</label><input type="email" id="forgot-email" placeholder="you@example.com" autofocus></div>
+    <button class="btn btn-primary" style="width:100%;margin-top:4px;" onclick="doSendResetEmail()">Send Reset Link</button>
+    <p style="text-align:center;margin-top:12px;font-size:13px;"><a href="#" onclick="showAuthTab('login');return false;">← Back to log in</a></p>`;
+  authForms.appendChild(ff);
+  // Scroll into view on mobile
+  const authSection = document.getElementById('auth-section');
+  if (authSection) setTimeout(() => authSection.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
 };
 
 window.doSendResetEmail = async function() {
@@ -1126,14 +1171,22 @@ window.doSendResetEmail = async function() {
     console.warn('[reset] fetch error', e);
     // Show success anyway — better UX
   }
-  const forms = document.getElementById('auth-forms');
-  if (forms) forms.innerHTML = `
-    <div style="text-align:center;padding:20px 0;">
-      <div style="font-size:40px;margin-bottom:12px;">📬</div>
-      <div style="font-size:16px;font-weight:700;margin-bottom:8px;">Check your inbox</div>
-      <p style="font-size:13px;color:#8892a4;margin-bottom:18px;">We sent a reset link to <strong>${esc(email)}</strong>. Click it to set a new password.</p>
-      <a href="#" onclick="showAuthTab('login');return false;" style="font-size:13px;">← Back to log in</a>
-    </div>`;
+  // Remove forgot form, show check-inbox message (without destroying login/signup forms)
+  const forgotForm = document.getElementById('forgot-form');
+  if (forgotForm) forgotForm.remove();
+  const authForms = document.getElementById('auth-forms');
+  if (authForms) {
+    const msg = document.createElement('div');
+    msg.id = 'check-inbox-msg';
+    msg.innerHTML = `
+      <div style="text-align:center;padding:20px 0;">
+        <div style="font-size:40px;margin-bottom:12px;">📬</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px;">Check your inbox</div>
+        <p style="font-size:13px;color:#8892a4;margin-bottom:18px;">We sent a reset link to <strong>${esc(email)}</strong>. Click it to set a new password.</p>
+        <a href="#" onclick="showAuthTab('login');return false;" style="font-size:13px;">← Back to log in</a>
+      </div>`;
+    authForms.appendChild(msg);
+  }
 };
 
 // Handle password reset from email link
@@ -1193,12 +1246,16 @@ window.doResetPassword = async function() {
     if (error) return toast(error.message || 'Failed to reset password.', 'error');
     toast('Password updated! Signing you in…', 'success');
     window._isRecovery = false;
+    try { sessionStorage.removeItem('_mxi_recovery'); } catch(e) {}
     window.location.hash = '';
     // Session is already active — enter the app
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
       setTimeout(() => enterApp(session.user), 1000);
     } else {
+      // Remove the reset form
+      const resetForm = document.getElementById('reset-form-pw');
+      if (resetForm) resetForm.remove();
       setTimeout(() => { showAuthTab('login'); }, 1200);
     }
   } catch(e) {
@@ -1417,8 +1474,22 @@ function navTo(page) {
     case 'settings': renderSettings(content); break;
     default: renderDash(content);
   }
-  history.replaceState(null, '', '#' + page);
+  history.pushState({ page }, '', '#' + page);
 }
+
+// ── Back-button handler ──────────────────────────────────────────
+window.addEventListener('popstate', (e) => {
+  if (!currentUser) return;          // on landing page, let browser handle
+  const hash = (window.location.hash || '').replace('#', '') || 'dash';
+  const validPages = ['dash','entries','contacts','settings','view-all','user-entries','notifications'];
+  if (validPages.includes(hash)) {
+    navTo(hash);
+  } else {
+    // unknown hash → go home instead of leaving the app
+    history.replaceState({ page: 'dash' }, '', '#dash');
+    navTo('dash');
+  }
+});
 
 window.goBack = function() {
   const prev = window._navHistory?.pop();
@@ -1756,13 +1827,14 @@ async function renderDash(el) {
       const snap = s.entry_snapshot || {};
       const fromName = snap.from_name || s.sender_name || 'Someone';
       const amt = snap.amount || 0;
+      const amtCents = snap.amount !== undefined ? snap.amount : toCents(amt);
       const cur = snap.currency || 'USD';
       // Flip tx_type to show recipient's perspective (sender's "Owed to me" → recipient's "I Owe")
       const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'bill','bill':'invoice' };
       const txLabel = TX_LABELS[SNAP_FLIP[snap.tx_type] || snap.tx_type] || snap.tx_type || '—';
       html += `<tr data-pending-id="${s.id}">
         <td style="font-weight:700;">${esc(fromName)}</td>
-        <td style="font-weight:700;color:#f59e0b;">${fmtMoney(amt, cur)}</td>
+        <td style="font-weight:700;color:#f59e0b;">${fmtMoney(amtCents, cur)}</td>
         <td class="hide-mobile" style="font-size:12px;color:var(--muted);">${esc(txLabel)}</td>
         <td style="white-space:nowrap;">
           <button class="btn btn-primary btn-sm" onclick="doPendingConfirm('${s.id}')" style="padding:5px 14px;font-size:12px;font-weight:700;">✓ Confirm</button>
@@ -2299,6 +2371,7 @@ async function renderEntries(el, page, forceRefresh) {
       const snap = s.entry_snapshot || {};
       const fromName = snap.from_name || s.sender_name || 'Someone';
       const amt = snap.amount || 0;
+      const amtCents = snap.amount !== undefined ? snap.amount : toCents(amt);
       const cur = snap.currency || 'USD';
       // Flip tx_type to show recipient's perspective
       const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'bill','bill':'invoice' };
@@ -2306,7 +2379,7 @@ async function renderEntries(el, page, forceRefresh) {
       const note = snap.note ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(snap.note)}</div>` : '';
       html += `<tr data-pending-id="${s.id}">
         <td style="font-weight:700;">${esc(fromName)}</td>
-        <td style="font-weight:700;color:#f59e0b;">${fmtMoney(amt, cur)}${note}</td>
+        <td style="font-weight:700;color:#f59e0b;">${fmtMoney(amtCents, cur)}${note}</td>
         <td class="hide-mobile" style="font-size:12px;color:var(--muted);">${esc(txLabel)}</td>
         <td class="hide-mobile" style="font-size:12px;color:var(--muted);">${fmtDate(snap.date)}</td>
         <td style="white-space:nowrap;">
@@ -3346,12 +3419,13 @@ window.openSharedWithMe = async function() {
       const snap = s.entry_snapshot || {};
       const fromName = snap.from_name || 'Unknown';
       const amt = snap.amount || s.entry?.amount || 0;
+      const amtCents = s.entry?.amount || toCents(amt);
       const cur = snap.currency || 'USD';
       const txLabel = TX_LABELS[snap.tx_type] || snap.tx_type || '—';
       const isConfirmed = s.status === 'confirmed';
       html += `<tr>
         <td style="font-weight:600;">${esc(fromName)}</td>
-        <td style="font-weight:700;">${fmtMoney(amt, cur)}</td>
+        <td style="font-weight:700;">${fmtMoney(amtCents, cur)}</td>
         <td>${esc(txLabel)}</td>
         <td style="color:var(--muted);">${fmtDate(snap.date)}</td>
         <td>${statusBadge(s.status)}</td>
@@ -4197,7 +4271,8 @@ window.saveNewEntry = async function() {
           amount: Math.round(parseFloat(amount) * 100), // cents — consistent with entries table & fmtMoney
           currency, tx_type: category,
           date, note, invoice_number: invNumber || '',
-          from_name: fromName, from_email: currentUser.email
+          from_name: fromName, from_email: currentUser.email,
+          formatted_amount: fmtMoney(toCents(parseFloat(amount)), currency)
         };
         const { data: shareResult, error: shareErr } = await supabase.rpc('auto_share_entry', {
           p_sender_id:       currentUser.id,

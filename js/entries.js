@@ -27,7 +27,7 @@ function _cacheSet(key, data) { _cache[key] = { ts: Date.now(), data }; }
 export function invalidateEntryCache(userId) { delete _cache['entries_' + userId]; }
 
 // ── List entries ──────────────────────────────────────────────────
-export async function listEntries(userId, { status, txType, contactId, limit, offset = 0, orderBy = 'created_at', ascending = false } = {}) {
+export async function listEntries(userId, { status, txType, contactId, limit, offset = 0, orderBy = 'updated_at', ascending = false } = {}) {
   // For full list (no filters, no explicit limit), use cache
   const useCache = !status && !txType && !contactId && !limit && !offset;
   const cacheKey = 'entries_' + userId;
