@@ -4,7 +4,8 @@
 import { getCurrentUser, getCurrentProfile } from './state.js';
 import { esc, toast, openModal, closeModal } from '../ui.js';
 import { supabase } from '../supabase.js';
-import { listTrustees } from '../nok.js';
+import { listTrustees, createTrustee, verifyTrustee, activateTrustee } from '../nok.js';
+import { sendOtpEmail, sendNokVerificationEmail, sendNokActivationEmail } from '../email.js';
 
 // LOCKER_TYPES may need to be defined globally
 // Various functions like _lockerIsUnlocked, requestLockerOtp, etc. are global window functions
@@ -13,6 +14,8 @@ import { listTrustees } from '../nok.js';
 const LOCKER_TYPES = ['physical','personal','digital','financial','legal','other'];
 
 async function renderNokPage(el) {
+  const currentUser = getCurrentUser();
+  const currentProfile = getCurrentProfile();
   el.innerHTML = '<p style="color:var(--muted);padding:20px;">Loading…</p>';
   const [trusteesResult, lockersResult] = await Promise.all([
     listTrustees(currentUser.id),
@@ -177,6 +180,7 @@ window._lockLockers = function() {
 };
 
 window.requestLockerOtp = async function() {
+  const currentUser = getCurrentUser();
   const email = currentUser.email;
   if (!email) return toast('No email on account.', 'error');
 
@@ -209,6 +213,7 @@ window.requestLockerOtp = async function() {
 };
 
 window._doSendLockerOtp = async function(email) {
+  const currentUser = getCurrentUser();
   const code = String(Math.floor(100000 + Math.random() * 900000));
   window._lockerOtp       = code;
   window._lockerOtpExpiry = Date.now() + 30 * 60 * 1000; // 30 min
@@ -235,6 +240,7 @@ window._doSendLockerOtp = async function(email) {
 };
 
 window.resendLockerOtp = async function() {
+  const currentUser = getCurrentUser();
   const email = currentUser.email;
   const statusEl  = document.getElementById('locker-otp-status');
   const resendBtn = document.getElementById('locker-resend-btn');
@@ -337,6 +343,7 @@ window._alAddTrusteeRow = function() {
 };
 
 window.saveAssetLockerModal = async function(lid) {
+  const currentUser = getCurrentUser();
   const title = document.getElementById('al_title')?.value?.trim();
   if (!title) return toast('Title is required.', 'error');
   const otherRows = Array.from(document.getElementById('alOtherTrusteesList')?.querySelectorAll('[id^=alTrusteeRow_]') || []);
@@ -400,6 +407,8 @@ window.openNewTrusteeModal = function() {
 };
 
 window.doCreateTrustee = async function() {
+  const currentUser = getCurrentUser();
+  const currentProfile = getCurrentProfile();
   const name = document.getElementById('nk-name').value.trim();
   const email = document.getElementById('nk-email').value.trim();
   if (!name || !email) return toast('Name and email required.', 'error');
@@ -428,6 +437,8 @@ window.doVerifyTrustee = async function(id) {
 };
 
 window.doActivateTrustee = async function(id) {
+  const currentUser = getCurrentUser();
+  const currentProfile = getCurrentProfile();
   if (!confirm('Activate access for this trustee? They will be able to view your records.')) return;
   const reason = prompt('Reason for activation (optional):') || '';
   const trustees = await listTrustees(currentUser.id);

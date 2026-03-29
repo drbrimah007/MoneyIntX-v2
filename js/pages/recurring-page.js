@@ -12,6 +12,7 @@ import { listRecurring, createRecurring, toggleRecurring, deleteRecurring, FREQU
 
 // ── Recurring ─────────────────────────────────────────────────────
 async function renderRecurringPage(el) {
+  const currentUser = getCurrentUser();
   el.innerHTML = '<div class="page-header"><h2>Recurring</h2></div><p style="color:var(--muted);">Loading...</p>';
   const rules = await listRecurring(currentUser.id);
   let html = `<div class="page-header"><h2>Recurring Rules</h2>
@@ -46,6 +47,7 @@ async function renderRecurringPage(el) {
 }
 
 window.openNewRecurringModal = async function() {
+  const currentUser = getCurrentUser();
   const contacts = await listContacts(currentUser.id);
   const contactOpts = contacts.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
   openModal(`
@@ -66,6 +68,7 @@ window.openNewRecurringModal = async function() {
 };
 
 window.doCreateRecurring = async function() {
+  const currentUser = getCurrentUser();
   const contactId = document.getElementById('nr-contact').value;
   const amount = parseFloat(document.getElementById('nr-amount').value);
   if (!contactId || !amount) return toast('Contact and amount required.', 'error');

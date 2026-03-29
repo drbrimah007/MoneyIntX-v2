@@ -3,12 +3,15 @@
 
 import { getCurrentUser, getCurrentProfile, setCurrentProfile } from './state.js';
 import { esc, toast, openModal, closeModal } from '../ui.js';
-import { supabase } from '../supabase.js';
+import { supabase, getProfile } from '../supabase.js';
+import { sendAppInviteEmail } from '../email.js';
 
 // Various UI helpers and functions needed from the main app
 
 // ── Settings ──────────────────────────────────────────────────────
 async function renderSettings(el) {
+  const currentUser = getCurrentUser();
+  const currentProfile = getCurrentProfile();
   const p = currentProfile || {};
   const isAdmin = p.role === 'platform_admin';
   const np = p.notif_prefs || {};
@@ -261,6 +264,8 @@ async function renderSettings(el) {
 }
 
 window.saveSettings = async function() {
+  let currentUser = getCurrentUser();
+  let currentProfile = getCurrentProfile();
   const photoUrl = (document.getElementById('s-photourl')?.value || '').trim();
   const updates = {
     display_name:  document.getElementById('s-name').value.trim(),
@@ -274,7 +279,7 @@ window.saveSettings = async function() {
   if (photoUrl !== undefined) updates.avatar_url = photoUrl;
   const { error } = await supabase.from('users').update(updates).eq('id', currentUser.id);
   if (error) return toast(error.message, 'error');
-  currentProfile = await getProfile(currentUser.id);
+  currentProfile = await getProfile(currentUser.id); setCurrentProfile(currentProfile);
   document.getElementById('sidebar-user-name').textContent = currentProfile.display_name;
   // Update sidebar avatar if it exists
   const sidebarAvatar = document.getElementById('sidebar-avatar-img');
@@ -283,6 +288,8 @@ window.saveSettings = async function() {
 };
 
 window.saveInvoiceInfo = async function() {
+  let currentUser = getCurrentUser();
+  let currentProfile = getCurrentProfile();
   const { error } = await supabase.from('users').update({
     logo_url:        document.getElementById('s-logourl').value.trim(),
     company_name:    document.getElementById('s-company').value.trim(),
@@ -292,11 +299,12 @@ window.saveInvoiceInfo = async function() {
     updated_at:      new Date().toISOString()
   }).eq('id', currentUser.id);
   if (error) return toast(error.message, 'error');
-  currentProfile = await getProfile(currentUser.id);
+  currentProfile = await getProfile(currentUser.id); setCurrentProfile(currentProfile);
   toast('Invoice info saved.', 'success');
 };
 
 window.uploadLogoFile = async function(input) {
+  const currentUser = getCurrentUser();
   const file = input.files[0];
   if (!file) return;
   const statusEl = document.getElementById('s-logo-upload-status');
@@ -322,6 +330,7 @@ window.uploadLogoFile = async function(input) {
 };
 
 window.uploadProfilePhoto = async function(input) {
+  const currentUser = getCurrentUser();
   const file = input.files[0];
   if (!file) return;
   const statusEl = document.getElementById('s-photo-upload-status');
@@ -376,6 +385,8 @@ window.clearLogo = function() {
 };
 
 window.saveNotifPrefs = async function() {
+  let currentUser = getCurrentUser();
+  let currentProfile = getCurrentProfile();
   const prefs = {
     inapp: document.getElementById('np-inapp').checked,
     email: document.getElementById('np-email').checked,
@@ -390,6 +401,7 @@ window.saveNotifPrefs = async function() {
 };
 
 window.loadEmailLog = async function() {
+  const currentUser = getCurrentUser();
   const el = document.getElementById('s-email-log');
   if (!el) return;
   el.innerHTML = '<span style="color:var(--muted);">Loading…</span>';
@@ -424,6 +436,8 @@ window.loadEmailLog = async function() {
 };
 
 window.sendTestEmail = async function() {
+  const currentUser = getCurrentUser();
+  const currentProfile = getCurrentProfile();
   const btn = document.getElementById('s-test-email-btn');
   const out = document.getElementById('s-test-email-out');
   const toEmail = currentProfile?.email || currentUser?.email;
@@ -463,6 +477,8 @@ window.sendTestEmail = async function() {
 };
 
 window.sendEmailInvite = async function() {
+  const currentUser = getCurrentUser();
+  const currentProfile = getCurrentProfile();
   const emailInput = document.getElementById('s-invite-email');
   const email = emailInput?.value.trim();
   if (!email) return toast('Enter an email address first.', 'error');
@@ -488,6 +504,8 @@ window.sendEmailInvite = async function() {
 };
 
 window.saveBranding = async function() {
+  let currentUser = getCurrentUser();
+  let currentProfile = getCurrentProfile();
   const { error } = await supabase.from('users').update({
     app_name:  document.getElementById('s-appname')?.value.trim(),
     tagline:   document.getElementById('s-tagline')?.value.trim(),
@@ -495,7 +513,7 @@ window.saveBranding = async function() {
     updated_at: new Date().toISOString()
   }).eq('id', currentUser.id);
   if (error) return toast(error.message, 'error');
-  currentProfile = await getProfile(currentUser.id);
+  currentProfile = await getProfile(currentUser.id); setCurrentProfile(currentProfile);
   toast('Branding saved.', 'success');
 };
 

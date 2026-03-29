@@ -5,14 +5,16 @@ import { getCurrentUser, getCurrentProfile } from './state.js';
 import { esc, toast, openModal, closeModal, fmtDate, fmtRelative, TX_LABELS } from '../ui.js';
 import { supabase } from '../supabase.js';
 import { listContacts } from '../contacts.js';
-import { fmtMoney } from '../entries.js';
-import { listTemplates } from '../templates.js';
+import { fmtMoney, createEntry } from '../entries.js';
+import { listTemplates, createTemplate, copyPublicTemplate } from '../templates.js';
 
 // Functions from other modules should be available
 // TX_LABELS, TX_COLORS, etc. on window
 
 // ── Templates ─────────────────────────────────────────────────────
 async function renderTemplatesPage(el) {
+  const currentUser = getCurrentUser();
+  const currentProfile = getCurrentProfile();
   el.innerHTML = '<div class="page-header"><h2>Templates</h2></div><p style="color:var(--muted);">Loading...</p>';
   const templates = await listTemplates(currentUser.id);
   let html = `<div class="page-header"><h2>Templates</h2>
@@ -365,6 +367,7 @@ function _collectFields() {
 }
 
 window.doCreateTemplate = async function() {
+  const currentUser = getCurrentUser();
   const fields = _collectFields();
   const name = document.getElementById('nt-name').value.trim();
   if (!name) return toast('Name required.', 'error');
@@ -419,6 +422,8 @@ window.doSaveTemplate = async function(id) {
 
 // ── Use Template for Entry ────────────────────────────────────────
 window.useTemplateForEntry = async function(templateId) {
+  const currentUser = getCurrentUser();
+  const currentProfile = getCurrentProfile();
   const tpl = await supabase.from('templates').select('*').eq('id', templateId).single();
   if (!tpl.data) return;
   const t = tpl.data;
@@ -684,6 +689,7 @@ window.recalcTemplateFields = function() {
 };
 
 window.saveTemplateEntry = async function(templateId, invNum) {
+  const currentUser = getCurrentUser();
   const contactId = document.getElementById('tfe-contact').value;
   const txType = document.getElementById('tfe-type').value;
   const amount = parseFloat(document.getElementById('tfe-amount').value);
@@ -821,6 +827,7 @@ window.previewPublicTemplate = function(id) {
 };
 
 window.doCopyTemplate = async function(id) {
+  const currentUser = getCurrentUser();
   await copyPublicTemplate(currentUser.id, id);
   toast('Template copied!', 'success'); navTo('templates');
 };
