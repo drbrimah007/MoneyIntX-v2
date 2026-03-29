@@ -949,17 +949,18 @@ window.goBack = function() {
 };
 
 // ── Optional modules ──────────────────────────────────────────────
-const OPTIONAL_MODULES = [
+window.OPTIONAL_MODULES = [
   { id:'groups',      label:'Groups',         icon:'👥', desc:'Group rounds, contributions and shared expenses.' },
   { id:'investments', label:'Investments',    icon:'📈', desc:'Track investment pools and member returns.' },
   { id:'business',    label:'Business Panel', icon:'📊', desc:'Structured table tool with sessions and P&L tracking.' },
   { id:'nok',         label:'Trusted Access', icon:'🔐', desc:'Designate trusted contacts to receive your records.' },
 ];
+const OPTIONAL_MODULES = window.OPTIONAL_MODULES;
 
 // Modules stored in localStorage — no DB column required
 function _modsKey() { return 'mxi_modules_' + (currentUser?.id || 'default'); }
 
-function _getModules() {
+window._getModules = function _getModules() {
   try {
     const raw = localStorage.getItem(_modsKey());
     if (raw) return JSON.parse(raw);
