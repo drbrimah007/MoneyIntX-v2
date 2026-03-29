@@ -35,6 +35,7 @@ export async function renderContacts(el, page = 1) {
     <div style="display:flex;gap:6px;align-items:center;">
       <input type="search" id="contacts-search" placeholder="Search…" oninput="filterAndRenderContacts(this.value)" style="width:160px;padding:6px 10px;font-size:13px;">
       <button class="btn btn-primary btn-sm" onclick="openNewContactModal()">+ Add</button>
+      <button class="bs sm" onclick="doExportContacts()" title="Export Contacts CSV">📥</button>
     </div>
   </div>`;
 
