@@ -477,12 +477,15 @@ window.useTemplateForEntry = async function(templateId) {
       ${t.tx_type ? `<option value="${t.tx_type}" selected>${TX_LABELS[t.tx_type]}</option>` : Object.entries(TX_LABELS).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}
     </select></div>
     <div class="form-row">
-      <div class="form-group"><label>Date</label><input type="date" id="tfe-date" value="${new Date().toISOString().slice(0,10)}"></div>
+      <div class="form-group"><label>Issue Date</label><input type="date" id="tfe-date" value="${new Date().toISOString().slice(0,10)}"></div>
+      <div class="form-group"><label>Due Date <span style="font-weight:400;color:var(--muted);">(optional)</span></label><input type="date" id="tfe-due-date" style="width:100%;"></div>
+    </div>
+    <div class="form-row">
       <div class="form-group">
-        <label>Currency${fields.some(f=>f.isFinalTotal)?'':' &amp; Amount'}</label>
+        <label>${fields.some(f=>f.isFinalTotal)?'Currency':'Amount'}</label>
         <div style="display:flex;gap:6px;">
+          <input type="number" id="tfe-amount" step="0.01" placeholder="${fields.some(f=>f.isFinalTotal)?'Auto':'0.00'}" style="flex:1;${fields.some(f=>f.isFinalTotal)?'display:none;':''}" oninput="this._userEdited = this.value !== ''">
           <select id="tfe-currency" style="flex:0 0 86px;padding:10px 4px;" onchange="window._activeTplCurrency=this.value;recalcTemplateFields()">${currencySelectHtml(t.currency || currentProfile?.default_currency)}</select>
-          <input type="number" id="tfe-amount" step="0.01" placeholder="Set by Final Total field" style="flex:1;${fields.some(f=>f.isFinalTotal)?'display:none;':''}" oninput="this._userEdited = this.value !== ''">
         </div>
       </div>
     </div>
@@ -718,13 +721,19 @@ window.saveTemplateEntry = async function(templateId, invNum) {
     }
   });
 
-  await createEntry(currentUser.id, {
+  const entry = await createEntry(currentUser.id, {
     contactId, txType, amount,
     currency: document.getElementById('tfe-currency')?.value || window._activeTplCurrency || 'USD',
     date: document.getElementById('tfe-date').value,
     note: document.getElementById('tfe-note').value.trim(),
     invoiceNumber: invNum, templateId, templateData: tplData
   });
+
+  // Persist due_date if provided
+  const tfeDueDate = document.getElementById('tfe-due-date')?.value || null;
+  if (entry?.id && tfeDueDate) {
+    await supabase.from('entries').update({ due_date: tfeDueDate }).eq('id', entry.id);
+  }
 
   // Increment template invoice counter
   const { data: tpl } = await supabase.from('templates').select('invoice_next_num').eq('id', templateId).single();
