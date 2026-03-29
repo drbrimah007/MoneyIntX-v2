@@ -152,7 +152,7 @@ export async function renderEntries(el, page, forceRefresh) {
         <td style="min-width:80px;">
           ${cId ? `<span style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;" onclick="openContactDetail('${cId}')">
             <span style="width:24px;height:24px;border-radius:50%;background:${col};display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;color:#fff;">${esc(cName.charAt(0).toUpperCase())}</span>
-            <span style="font-weight:600;color:var(--contact,#d88978);">${esc(cName)}</span>
+            <span style="font-weight:600;color:${col};">${esc(cName)}</span>
           </span>` : `<span style="color:var(--muted);">${esc(cName)}</span>`}
         </td>
         <td style="font-weight:700;cursor:pointer;" onclick="openEntryDetail('${e.id}')">${amtHtml}</td>

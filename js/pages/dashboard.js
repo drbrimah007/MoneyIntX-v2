@@ -263,7 +263,7 @@ export async function renderDash(el) {
         </div>
         <div style="flex:1;min-width:0;">
           <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-            <span style="font-size:13px;font-weight:600;">${esc(l.contact_name||'—')}</span>
+            <span style="font-size:13px;font-weight:600;color:${aColor};">${esc(l.contact_name||'—')}</span>
             <span style="font-size:13px;font-weight:800;color:${color};">${fmtMoney(Math.abs(nb))}</span>
           </div>
           <div style="height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;">
@@ -350,7 +350,7 @@ export async function renderDash(el) {
         <td style="min-width:80px;">
           ${cId ? `<span style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;" onclick="openContactDetail('${cId}')">
             <span style="width:24px;height:24px;border-radius:50%;background:${col};display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;color:#fff;">${esc(cName.charAt(0).toUpperCase())}</span>
-            <span style="font-weight:600;color:var(--contact,#d88978);">${esc(cName)}</span>
+            <span style="font-weight:600;color:${col};">${esc(cName)}</span>
           </span>` : `<span style="color:var(--muted);">${esc(cName)}</span>`}
         </td>
         <td style="font-weight:700;cursor:pointer;" onclick="openEntryDetail('${e.id}')">${amtHtml}</td>
