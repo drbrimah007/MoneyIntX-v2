@@ -819,6 +819,22 @@ async function enterApp(user) {
     if (bar) bar.textContent = '💡 ' + pick;
   })();
 
+  // Load site logo from app_settings (admin-set platform logo)
+  (async () => {
+    try {
+      const { data: logoRow } = await supabase.from('app_settings').select('value').eq('key','site_logo').maybeSingle();
+      if (logoRow?.value) {
+        const topbarLogo = document.getElementById('topbar-logo');
+        const topbarName = document.getElementById('topbar-brand-name');
+        if (topbarLogo) {
+          topbarLogo.src = logoRow.value;
+          topbarLogo.style.display = '';
+          if (topbarName) topbarName.style.display = 'none';
+        }
+      }
+    } catch(_) {}
+  })();
+
   // New user check — created within last 3 minutes = first login
   const isNewUser = currentProfile?.created_at && (Date.now() - new Date(currentProfile.created_at).getTime()) < 3 * 60 * 1000;
   const firstLoginKey = 'mxi_welcomed_' + user.id;

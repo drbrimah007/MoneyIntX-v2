@@ -198,9 +198,34 @@ async function renderSettings(el) {
       if (tipRow?.value && Array.isArray(tipRow.value)) currentTips = tipRow.value;
     } catch(_) {}
 
+    // Load current site logo from app_settings
+    let currentSiteLogo = '';
+    try {
+      const { data: logoRow } = await supabase.from('app_settings').select('value').eq('key','site_logo').maybeSingle();
+      if (logoRow?.value) currentSiteLogo = logoRow.value;
+    } catch(_) {}
+
     html += `<div class="card" style="margin-top:12px;border-color:rgba(251,191,36,.3);">
       <h3 style="font-size:16px;font-weight:700;margin-bottom:4px;">🛠 Admin: Platform Branding</h3>
       <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">These settings apply platform-wide.</p>
+      <div class="form-group">
+        <label>Site Logo</label>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div id="s-site-logo-preview" style="${currentSiteLogo ? '' : 'display:none;'}">
+            <img id="s-site-logo-img" src="${esc(currentSiteLogo)}" style="max-height:56px;max-width:160px;border-radius:8px;border:1px solid var(--border);object-fit:contain;" onerror="this.style.display='none'">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="cursor:pointer;display:inline-flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;">
+              <span>📁</span> Upload Site Logo
+              <input type="file" id="s-site-logo-file" accept="image/*" style="display:none;" onchange="uploadSiteLogo(this)">
+            </label>
+            <div id="s-site-logo-status" style="font-size:11px;color:var(--muted);"></div>
+            <div style="font-size:11px;color:var(--muted);">Max 5 MB · JPG, PNG, WebP, SVG — shown in topbar</div>
+          </div>
+          ${currentSiteLogo ? `<button class="bs sm" onclick="clearSiteLogo()" style="color:var(--red);font-size:12px;">✕ Remove</button>` : ''}
+        </div>
+        <input type="hidden" id="s-site-logo-url" value="${esc(currentSiteLogo)}">
+      </div>
       <div class="form-row">
         <div class="form-group"><label>App / Site Name</label><input type="text" id="s-appname" value="${esc(p.app_name || 'Money IntX')}"></div>
         <div class="form-group"><label>Tagline</label><input type="text" id="s-tagline" value="${esc(p.tagline || '')}"></div>
@@ -501,9 +526,45 @@ window.sendEmailInvite = async function() {
   if (btn) { btn.disabled = false; btn.textContent = '📧 Send Invite'; }
 };
 
+window.uploadSiteLogo = async function(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('s-site-logo-status');
+  const previewEl = document.getElementById('s-site-logo-preview');
+  const imgEl = document.getElementById('s-site-logo-img');
+  if (file.size > 5 * 1024 * 1024) {
+    statusEl.textContent = '❌ File too large — max 5 MB';
+    input.value = '';
+    return;
+  }
+  statusEl.textContent = '⏳ Uploading…';
+  const ext = file.name.split('.').pop();
+  const path = `site-branding/site-logo.${ext}`;
+  const { error } = await supabase.storage.from('user-logos').upload(path, file, { upsert: true });
+  if (error) { statusEl.textContent = '❌ ' + error.message; return; }
+  const { data } = supabase.storage.from('user-logos').getPublicUrl(path);
+  const url = data.publicUrl + '?t=' + Date.now();
+  document.getElementById('s-site-logo-url').value = url;
+  if (imgEl) { imgEl.src = url; imgEl.style.display = ''; }
+  if (previewEl) previewEl.style.display = '';
+  statusEl.textContent = '✅ Uploaded — click Save Branding to apply';
+};
+
+window.clearSiteLogo = function() {
+  document.getElementById('s-site-logo-url').value = '';
+  const previewEl = document.getElementById('s-site-logo-preview');
+  const imgEl = document.getElementById('s-site-logo-img');
+  if (imgEl) { imgEl.src = ''; imgEl.style.display = 'none'; }
+  if (previewEl) previewEl.style.display = 'none';
+  const statusEl = document.getElementById('s-site-logo-status');
+  if (statusEl) statusEl.textContent = 'Logo removed — click Save Branding to apply';
+};
+
 window.saveBranding = async function() {
   let currentUser = getCurrentUser();
   let currentProfile = getCurrentProfile();
+
+  // Save user-level branding fields
   const { error } = await supabase.from('users').update({
     app_name:  document.getElementById('s-appname')?.value.trim(),
     tagline:   document.getElementById('s-tagline')?.value.trim(),
@@ -511,6 +572,30 @@ window.saveBranding = async function() {
     updated_at: new Date().toISOString()
   }).eq('id', currentUser.id);
   if (error) return toast(error.message, 'error');
+
+  // Save site logo to app_settings (platform-wide)
+  const siteLogoUrl = document.getElementById('s-site-logo-url')?.value.trim() || '';
+  const { error: logoErr } = await supabase.from('app_settings').upsert({
+    key: 'site_logo',
+    value: siteLogoUrl,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'key' });
+  if (logoErr) console.error('[saveBranding] site_logo:', logoErr.message);
+
+  // Update topbar logo immediately
+  const topbarLogo = document.getElementById('topbar-logo');
+  const topbarName = document.getElementById('topbar-brand-name');
+  if (topbarLogo) {
+    if (siteLogoUrl) {
+      topbarLogo.src = siteLogoUrl;
+      topbarLogo.style.display = '';
+      if (topbarName) topbarName.style.display = 'none';
+    } else {
+      topbarLogo.src = 'money.png'; // fallback to default
+      topbarLogo.style.display = '';
+    }
+  }
+
   currentProfile = await getProfile(currentUser.id); setCurrentProfile(currentProfile);
   toast('Branding saved.', 'success');
 };

@@ -46,12 +46,28 @@ export async function renderNotifications(el) {
     html += `<div class="card"><div class="tbl-wrap"><table><thead><tr>
       <th>Contact</th><th>Amount</th><th class="hide-mobile">Message</th><th>Date</th><th>Event</th><th></th>
     </tr></thead><tbody>`;
+    // Sort: actionable items (settlement_pending, payment_received) first, then newest
+    const ACTIONABLE = new Set(['settlement_pending','payment_received','payment_sent','shared_record']);
+    notifs.sort((a, b) => {
+      const aAct = ACTIONABLE.has(a.type) ? 0 : 1;
+      const bAct = ACTIONABLE.has(b.type) ? 0 : 1;
+      if (aAct !== bAct) return aAct - bAct;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+
     notifs.forEach(n => {
-      const actionBtn = n.type === 'shared_record'
-        ? `<button onclick="navTo('entries')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View</button>`
-        : '';
+      const nColor = n.contact_id ? contactColor(n.contact_id) : null;
+      // Action button: any notification with an entry_id gets a "View" that opens the entry detail
+      let actionBtn = '';
+      if (n.entry_id && (n.type === 'settlement_pending' || n.type === 'payment_received')) {
+        actionBtn = `<button onclick="openEntryDetail('${n.entry_id}')" style="background:var(--amber,#D5BA78);color:#000;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:700;margin-right:4px;">Review</button>`;
+      } else if (n.entry_id) {
+        actionBtn = `<button onclick="openEntryDetail('${n.entry_id}')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View</button>`;
+      } else if (n.type === 'shared_record') {
+        actionBtn = `<button onclick="navTo('entries')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View</button>`;
+      }
       html += `<tr>
-        <td style="font-weight:600;font-size:13px;"><span style="display:inline-flex;align-items:center;gap:6px;">${n.contact_id ? `<span style="width:22px;height:22px;border-radius:50%;background:${contactColor(n.contact_id)};display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0;">${esc((n.contact_name||'?').charAt(0).toUpperCase())}</span>` : ''}<span style="color:var(--text);">${esc(n.contact_name || '—')}</span></span></td>
+        <td style="font-weight:600;font-size:13px;"><span style="display:inline-flex;align-items:center;gap:6px;">${nColor ? `<span style="width:22px;height:22px;border-radius:50%;background:${nColor};display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0;">${esc((n.contact_name||'?').charAt(0).toUpperCase())}</span>` : ''}<span style="color:${nColor || 'var(--text)'};">${esc(n.contact_name || '—')}</span></span></td>
         <td style="font-weight:700;font-size:13px;">${n.amount ? fmtMoney(n.amount, n.currency || 'USD') : '—'}</td>
         <td class="hide-mobile" style="font-size:13px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(n.message)}">${esc(n.message)}</td>
         <td style="font-size:12px;color:var(--muted);">${fmtRelative(n.created_at)}</td>

@@ -8,6 +8,7 @@ import { listTemplates } from '../templates.js';
 import { createScheduledReminder } from '../reminders.js';
 import { esc, statusBadge, TX_LABELS, TX_COLORS, DIRECTION_SIGN, fmtDate, toast, openModal, closeModal } from '../ui.js';
 import { supabase } from '../supabase.js';
+import { reviewSettlement, deleteSettlement } from '../settlements.js';
 import { sendNotificationEmail } from '../email.js';
 
 let _entriesAll = [];
@@ -152,7 +153,7 @@ export async function renderEntries(el, page, forceRefresh) {
         <td style="min-width:80px;">
           ${cId ? `<span style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;" onclick="openContactDetail('${cId}')">
             <span style="width:24px;height:24px;border-radius:50%;background:${col};display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;color:#fff;">${esc(cName.charAt(0).toUpperCase())}</span>
-            <span style="font-weight:600;color:var(--text);">${esc(cName)}</span>
+            <span style="font-weight:600;color:${col};">${esc(cName)}</span>
           </span>` : `<span style="color:var(--muted);">${esc(cName)}</span>`}
         </td>
         <td style="font-weight:700;cursor:pointer;" onclick="openEntryDetail('${e.id}')">${amtHtml}</td>
@@ -208,12 +209,19 @@ window.openEntryDetail = async function(id) {
   if (settlements.length > 0) {
     settleHtml = `<div style="margin-top:16px;"><h4 style="font-size:14px;margin-bottom:8px;">Settlements</h4>`;
     settlements.forEach(s => {
-      const statusBadgeHtml = s.status === 'pending'
-        ? `<span style="background:rgba(251,191,36,.15);color:var(--amber);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">⏳ Pending</span>`
+      const isPending = s.status === 'pending';
+      const statusBadgeHtml = isPending
+        ? `<span style="background:rgba(213,186,120,.15);color:var(--gold, #D5BA78);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">⏳ Pending Review</span>`
         : s.status === 'confirmed'
           ? `<span style="background:rgba(95,211,154,.15);color:var(--green);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">✓ Confirmed</span>`
           : '';
-      settleHtml += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">
+      const pendingActions = isPending
+        ? `<div style="display:flex;gap:6px;margin-top:6px;">
+            <button class="btn btn-primary btn-sm" onclick="confirmSettlement('${s.id}','${entry.id}')" style="padding:4px 12px;font-size:11px;font-weight:700;">✓ Confirm</button>
+            <button class="bs sm" onclick="rejectSettlement('${s.id}','${entry.id}')" style="padding:4px 10px;font-size:11px;color:var(--red);border-color:var(--red);">✕ Reject</button>
+          </div>`
+        : '';
+      settleHtml += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;${isPending ? 'background:rgba(213,186,120,.05);margin:0 -12px;padding:8px 12px;border-radius:8px;border:1px solid rgba(213,186,120,.2);margin-bottom:6px;' : ''}">
         <div>
           <strong>${fmtMoney(s.amount, entry.currency)}</strong>
           ${s.method ? `<span style="color:var(--muted);margin-left:8px;">${esc(s.method)}</span>` : ''}
@@ -224,6 +232,7 @@ window.openEntryDetail = async function(id) {
               ? `<img src="${esc(s.proof_url)}" style="max-width:100px;max-height:80px;border-radius:4px;border:1px solid var(--border);cursor:pointer;margin-top:2px;" onclick="window.open('${esc(s.proof_url)}','_blank')" title="Click to view full size">`
               : `<a href="${esc(s.proof_url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);font-size:12px;text-decoration:underline;">📎 View Proof</a>`}
           </div>` : ''}
+          ${pendingActions}
         </div>
         <div style="color:var(--muted);font-size:12px;">${fmtDate(s.created_at)}</div>
       </div>`;
@@ -296,6 +305,46 @@ window.openEntryDetail = async function(id) {
       <button class="bs sm" onclick="confirmDeleteEntry('${entry.id}');closeModal();" style="color:var(--red);">Delete</button>
     </div>
   `, { maxWidth: '560px' });
+};
+
+// ── Confirm / Reject Settlement ──────────────────────────────────
+window.confirmSettlement = async function(settlementId, entryId) {
+  try {
+    const result = await reviewSettlement(settlementId, {
+      status: 'confirmed',
+      reviewedBy: getCurrentUser().id
+    });
+    if (!result) {
+      toast('Failed to confirm settlement.', 'error');
+      return;
+    }
+    toast('Settlement confirmed.', 'success');
+    invalidateEntryCache(getCurrentUser().id);
+    closeModal();
+    // Re-open the entry detail to show updated state
+    await window.openEntryDetail(entryId);
+  } catch (err) {
+    console.error('[confirmSettlement]', err);
+    toast('Error confirming settlement: ' + (err?.message || err), 'error');
+  }
+};
+
+window.rejectSettlement = async function(settlementId, entryId) {
+  if (!confirm('Reject this settlement? It will be removed.')) return;
+  try {
+    const ok = await deleteSettlement(settlementId);
+    if (!ok) {
+      toast('Failed to reject settlement.', 'error');
+      return;
+    }
+    toast('Settlement rejected and removed.', 'success');
+    invalidateEntryCache(getCurrentUser().id);
+    closeModal();
+    await window.openEntryDetail(entryId);
+  } catch (err) {
+    console.error('[rejectSettlement]', err);
+    toast('Error rejecting settlement: ' + (err?.message || err), 'error');
+  }
 };
 
 // ── Edit Entry Modal ──────────────────────────────────────────────
