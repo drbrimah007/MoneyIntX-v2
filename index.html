@@ -1397,7 +1397,7 @@ async function renderDash(el) {
       <th>Contact</th><th>Amount</th><th class="hide-mobile">Doc #</th><th class="hide-mobile">Type</th><th>Date</th><th>Status</th><th style="width:44px;"></th>
     </tr></thead><tbody>`;
     recent.forEach(e => {
-      const cName = e.contact?.name || '—';
+      const cName = e.contact?.name || e.from_name || '—';
       const cId = e.contact?.id || '';
       const _txKey = e.category || e.tx_type;
       const txLabel = TX_LABELS[_txKey] || _txKey;
@@ -1873,7 +1873,7 @@ async function renderEntries(el, page, forceRefresh) {
   const query = (_entriesFilter || '').toLowerCase();
   const filtered = query
     ? _entriesAll.filter(e => {
-        const cName = e.contact?.name || '';
+        const cName = e.contact?.name || e.from_name || '';
         const lbl = TX_LABELS[e.tx_type] || e.tx_type;
         return (cName + ' ' + lbl + ' ' + (e.invoice_number||'') + ' ' + e.status).toLowerCase().includes(query);
       })
@@ -5218,7 +5218,7 @@ async function renderTrash(el) {
       <th>Contact</th><th>Amount</th><th>Type</th><th>Date</th><th>Deleted</th><th></th>
     </tr></thead><tbody>`;
     archived.forEach(e => {
-      const cName = e.contact?.name || '—';
+      const cName = e.contact?.name || e.from_name || '—';
       const txLabel = TX_LABELS[e.tx_type] || e.tx_type;
       const deletedDate = e.archived_at ? new Date(e.archived_at).toLocaleDateString() : '—';
       html += `<tr style="opacity:0.7;">
@@ -7003,7 +7003,7 @@ window.doGlobalSearch = function(q) {
       html += '<div style="padding:8px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;border-top:1px solid var(--border);">Entries</div>';
       results.entries.forEach(e => {
         html += `<div style="padding:8px 12px;cursor:pointer;font-size:13px;" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''" onclick="openEntryDetail('${e.id}');document.getElementById('search-results').style.display='none';document.getElementById('global-search').value='';">
-          <strong>${fmtMoney(e.amount, e.currency)}</strong> <span style="color:var(--muted);">${esc(e.contact?.name || '')} · ${esc(e.invoice_number || '')}</span>
+          <strong>${fmtMoney(e.amount, e.currency)}</strong> <span style="color:var(--muted);">${esc(e.contact?.name || e.from_name || '')} · ${esc(e.invoice_number || '')}</span>
         </div>`;
       });
     }
