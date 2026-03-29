@@ -1866,10 +1866,22 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
         ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'].map(c => `<option value="${c}" ${(getCurrentProfile()?.default_currency||'USD')===c?'selected':''}>${c}</option>`).join('')}
       </select></div>
     </div>
+    <div id="ne-items-section" style="display:none;margin-bottom:14px;">
+      <label style="font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:6px;display:block;">Line Items</label>
+      <div style="display:flex;gap:6px;margin-bottom:4px;">
+        <span style="flex:2;font-size:11px;font-weight:600;color:var(--muted);padding-left:4px;">Item</span>
+        <span style="width:60px;font-size:11px;font-weight:600;color:var(--muted);text-align:center;">Qty</span>
+        <span style="flex:1;font-size:11px;font-weight:600;color:var(--muted);text-align:center;">Price</span>
+        <span style="width:28px;"></span>
+      </div>
+      <div id="ne-items-rows"></div>
+      <button type="button" class="bs sm" onclick="addNeItemRow()" style="margin-top:4px;">+ Add Row</button>
+    </div>
     <div id="ne-extra-fields"></div>
-    <div class="form-group"><label>Issue Date</label><input type="date" id="ne-date" value="${new Date().toISOString().slice(0,10)}"></div>
-    <div class="form-group"><label>Due Date <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
-      <input type="date" id="ne-due-date" style="width:100%;"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Issue Date</label><input type="date" id="ne-date" value="${new Date().toISOString().slice(0,10)}"></div>
+      <div class="form-group"><label>Due Date <span style="font-weight:400;color:var(--muted);">(optional)</span></label><input type="date" id="ne-due-date" style="width:100%;"></div>
+    </div>
     <!-- EMAIL section with ON/OFF toggle -->
     <div style="margin-bottom:12px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg3);cursor:pointer;" onclick="toggleNeNotify()">
@@ -2019,6 +2031,36 @@ window.selectNeContact = function(id, name) {
   setNeNotifyWho(who);
 };
 
+// ── Item Lister for Invoices/Bills ─────────────────────────────────────────────
+
+window.addNeItemRow = function() {
+  const container = document.getElementById('ne-items-rows');
+  if (!container) return;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:6px;margin-bottom:4px;align-items:center;';
+  row.innerHTML = `
+    <input type="text" placeholder="Description" style="flex:2;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text);font-size:13px;">
+    <input type="number" placeholder="1" value="1" min="1" step="1" class="ne-item-qty" style="width:60px;padding:7px 6px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text);font-size:13px;text-align:center;" oninput="recalcNeItems()">
+    <input type="number" placeholder="0.00" step="0.01" min="0" class="ne-item-price" style="flex:1;padding:7px 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text);font-size:13px;" oninput="recalcNeItems()">
+    <button type="button" onclick="this.parentElement.remove();recalcNeItems();" style="width:28px;background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0;">✕</button>
+  `;
+  container.appendChild(row);
+};
+
+window.recalcNeItems = function() {
+  const rows = document.querySelectorAll('#ne-items-rows > div');
+  let total = 0;
+  rows.forEach(row => {
+    const qty = parseFloat(row.querySelector('.ne-item-qty')?.value) || 0;
+    const price = parseFloat(row.querySelector('.ne-item-price')?.value) || 0;
+    total += qty * price;
+  });
+  const amtField = document.getElementById('ne-amount');
+  if (amtField && total > 0) {
+    amtField.value = total.toFixed(2);
+  }
+};
+
 // ── New 3-tab entry modal helpers ─────────────────────────────────────────────
 
 // Build action row HTML for a given tab + selected category
@@ -2146,6 +2188,17 @@ function _neRenderExtraFields(action) {
     </div>`;
   }
   el.innerHTML = html;
+
+  // Show/hide item lister for invoice/bill types
+  const itemsSection = document.getElementById('ne-items-section');
+  if (itemsSection) {
+    const showItems = ['invoice_sent','invoice_received','bill_sent','bill_received'].includes(window._neCategory);
+    itemsSection.style.display = showItems ? '' : 'none';
+    if (showItems && document.querySelectorAll('#ne-items-rows > div').length === 0) {
+      addNeItemRow(); // Add first empty row
+    }
+  }
+
   // Live preview: update "X day(s) before" label as user types
   const daysInp = document.getElementById('ne-adv-days');
   const preview = document.getElementById('ne-adv-days-preview');
