@@ -1873,9 +1873,9 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
     </div>
     <div class="form-group">
       <label>Amount * <span id="ne-amount-hint" style="display:none;font-size:10px;font-weight:400;color:var(--accent);">(auto from items)</span></label>
-      <div style="display:flex;gap:8px;">
-        <input type="number" id="ne-amount" min="0" step="0.01" placeholder="0.00" style="flex:1;min-width:0;">
-        <select id="ne-currency" style="flex:0 0 90px;">
+      <div style="display:flex;gap:8px;flex-wrap:nowrap;">
+        <input type="number" id="ne-amount" min="0" step="0.01" placeholder="0.00" style="flex:1;min-width:0;width:auto;">
+        <select id="ne-currency" style="flex:0 0 90px;width:auto;">
           ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'].map(c => `<option value="${c}" ${(getCurrentProfile()?.default_currency||'USD')===c?'selected':''}>${c}</option>`).join('')}
         </select>
       </div>
@@ -2103,6 +2103,7 @@ window.neSelectTab = function(tabId) {
   document.getElementById('ne-action-row').innerHTML = _neActionRow(tab, firstAction.category);
   document.getElementById('ne-category').value = firstAction.category;
   _neRenderExtraFields(firstAction);
+  _neToggleItems(); // ensure items section visibility
 
   // Update save button label
   const saveBtn = document.getElementById('ne-save-btn');
@@ -2119,9 +2120,23 @@ window.neSelectCategory = function(category) {
   document.getElementById('ne-category').value = category;
   document.getElementById('ne-action-row').innerHTML = _neActionRow(tab, category);
   _neRenderExtraFields(action);
+  _neToggleItems(); // ensure items section visibility
   const saveBtn = document.getElementById('ne-save-btn');
   if (saveBtn) saveBtn.textContent = action.email ? '📤 Send & Save' : 'Save Entry';
 };
+
+// Toggle Line Items section visibility based on current category
+function _neToggleItems() {
+  const itemsSection = document.getElementById('ne-items-section');
+  const amtHint = document.getElementById('ne-amount-hint');
+  if (!itemsSection) return;
+  const showItems = ['invoice_sent','invoice_received','bill_sent','bill_received'].includes(window._neCategory);
+  itemsSection.style.display = showItems ? '' : 'none';
+  if (amtHint) amtHint.style.display = showItems ? '' : 'none';
+  if (showItems && document.querySelectorAll('#ne-items-rows > div').length === 0) {
+    addNeItemRow(); // Add first empty row
+  }
+}
 
 // Render extra fields based on action extras list
 function _neRenderExtraFields(action) {
@@ -2192,17 +2207,7 @@ function _neRenderExtraFields(action) {
   }
   el.innerHTML = html;
 
-  // Show/hide item lister for invoice/bill types
-  const itemsSection = document.getElementById('ne-items-section');
-  const amtHint = document.getElementById('ne-amount-hint');
-  if (itemsSection) {
-    const showItems = ['invoice_sent','invoice_received','bill_sent','bill_received'].includes(window._neCategory);
-    itemsSection.style.display = showItems ? '' : 'none';
-    if (amtHint) amtHint.style.display = showItems ? '' : 'none';
-    if (showItems && document.querySelectorAll('#ne-items-rows > div').length === 0) {
-      addNeItemRow(); // Add first empty row
-    }
-  }
+  _neToggleItems(); // Show/hide item lister for invoice/bill types
 
   // Live preview: update "X day(s) before" label as user types
   const daysInp = document.getElementById('ne-adv-days');
