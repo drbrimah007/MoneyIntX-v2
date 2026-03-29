@@ -1,5 +1,9 @@
 # MoneyIntX Index.html Refactoring Status
 
+## Status: COMPLETE (2026-03-28)
+
+All page modules have been extracted, imports fixed, and the site is live with zero console errors.
+
 ## Completed
 
 ### 1. `/js/pages/state.js` ✅
@@ -30,7 +34,7 @@
 - Uses window._impersonatedData if available (admin view)
 - All onclick handlers remain as `window.xxx()` calls (backward compatible)
 
-## To Do — Remaining Page Modules
+## All Page Modules — Completed
 
 Each page module should follow the pattern:
 1. Import necessary dependencies (from ../entries.js, ../contacts.js, etc.)
@@ -38,7 +42,7 @@ Each page module should follow the pattern:
 3. Export the main render function
 4. All window.xxx = function assignments stay as-is for onclick handlers
 
-### 3. `/js/pages/contacts-page.js` (lines 1409-1810)
+### 3. `/js/pages/contacts-page.js` ✅
 **Functions to extract:**
 - `renderContacts(el, page = 1)` — main contacts list with pagination
 - `window.renderContactsPage(p)` — pagination callback
@@ -57,7 +61,7 @@ Each page module should follow the pattern:
 
 **Dependencies:** state.js, entries.js, contacts.js, sharing.js, ui.js, supabase.js
 
-### 4. `/js/pages/entries-page.js` (lines 1819-4296)
+### 4. `/js/pages/entries-page.js` ✅
 **Note:** This is the largest module (~2480 lines). Contains:
 - Main entries list render function
 - Entry detail modal with all tabs (preview, splits, attachments, history, actions)
@@ -79,7 +83,7 @@ Each page module should follow the pattern:
 
 ### 5. `/js/pages/contacts-page.js` already identified above
 
-### 6. `/js/pages/settings-page.js` (lines 6268-6786)
+### 6. `/js/pages/settings-page.js` ✅
 **Functions to extract:**
 - `renderSettings(el)` — async settings page with tabs
 - All form handlers and save functions
@@ -87,7 +91,7 @@ Each page module should follow the pattern:
 
 **Dependencies:** state.js, supabase.js, ui.js, entries.js
 
-### 7. `/js/pages/templates-page.js` (lines 5368-6189)
+### 7. `/js/pages/templates-page.js` ✅
 **Functions to extract:**
 - `renderTemplatesPage(el)` — main templates list
 - `renderFieldList(scrollToBottom)` — template field builder UI
@@ -97,49 +101,47 @@ Each page module should follow the pattern:
 
 **Dependencies:** state.js, templates.js, template-engine.js, ui.js
 
-### 8. `/js/pages/view-all.js` (lines 4297-4495)
+### 8. `/js/pages/view-all.js` ✅
 **Functions to extract:**
 - `renderViewAll(el, page)` — paginated view of all user entries
 
 **Dependencies:** state.js, entries.js, ui.js
 
-### 9. `/js/pages/user-entries.js` (lines 4496-4895) + NOK (lines 4729-4895)
+### 9. `/js/pages/nok-page.js` ✅
 **Functions to extract:**
 - `renderNokPage(el)` — trusted contacts/Next of Kin management
 - All NOK-related modals and handlers
 
 **Dependencies:** state.js, nok.js, ui.js
 
-### 10. `/js/pages/asset-lockers.js` (lines 4896-5170)
+### 10. `/js/pages/asset-lockers.js` ✅
 **Functions to extract:**
 - Asset/Locker management page renderer (if exists in provided range)
 
-### 11. `/js/pages/trash-page.js` (lines 5172-5218)
+### 11. `/js/pages/trash-page.js` ✅
 **Functions to extract:**
 - `renderTrash(el)` — trashed/voided entries with restore/delete options
 
 **Dependencies:** state.js, entries.js, ui.js
 
-### 12. `/js/pages/admin-page.js` (lines 5220-5367)
+### 12. `/js/pages/admin-page.js` ✅
 **Functions to extract:**
 - `renderAdmin(el)` — admin dashboard with user management, audit log, etc.
 
 **Dependencies:** state.js, admin.js, ui.js
 
-### 13. `/js/pages/recurring-page.js` (lines 6191-6267)
+### 13. `/js/pages/recurring-page.js` ✅
 **Functions to extract:**
 - `renderRecurringPage(el)` — recurring entry management
 
 **Dependencies:** state.js, recurring.js, ui.js
 
-### 14. `/js/pages/investments.js` and `/js/pages/groups.js`
-**Lines:** 3979-4330 (investments), 4331-4728 (groups)
+### 14. `/js/pages/investments-page.js` and `/js/pages/groups-page.js` ✅
 - `renderInvestments(el)` — investment tracking
 - `renderGroups(el)` — group management
 - Note: These may be already partially in /js/investments.js and /js/groups.js
 
-### 15. `/js/pages/notifications.js`
-**Lines:** 3915-3978
+### 15. `/js/pages/notifications-page.js` ✅
 - `renderNotifications(el)` — notification list
 
 ## Index.html Changes Required
