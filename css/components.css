@@ -93,17 +93,14 @@ td { padding: 10px; border-bottom: 1px solid var(--line, var(--border)); vertica
 tr:last-child td { border-bottom: none; }
 tr.row-selected td { background: rgba(108,99,255,.1) !important; }
 /* Amount cells: allow wrapping and reduce font on mobile for very large numbers */
-td[style*="font-weight:700"], td[style*="font-weight: 700"], td[style*="strong"] {
+td[style*="font-weight:700"], td[style*="font-weight: 700"] {
   overflow-wrap: break-word;
-  word-break: break-word;
-  word-spacing: 100vw;
+  word-break: normal;
 }
 @media(max-width:640px) {
   td { font-size: 13px; padding: 8px 6px; }
-  td[style*="font-weight:700"], td[style*="font-weight: 700"], td[style*="strong"] {
+  td[style*="font-weight:700"], td[style*="font-weight: 700"] {
     font-size: 12px;
-    overflow-wrap: break-word;
-    word-break: break-word;
   }
 }
 .show-mobile { display: none; }
