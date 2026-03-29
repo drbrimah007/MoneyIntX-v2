@@ -6,7 +6,7 @@ import { listContacts, createContact } from '../contacts.js';
 import { createShareToken, getShareUrl, listReceivedShares, dismissShare } from '../sharing.js';
 import { listTemplates } from '../templates.js';
 import { createScheduledReminder } from '../reminders.js';
-import { esc, statusBadge, TX_LABELS, TX_COLORS, fmtDate, toast, openModal, closeModal } from '../ui.js';
+import { esc, statusBadge, TX_LABELS, TX_COLORS, DIRECTION_SIGN, fmtDate, toast, openModal, closeModal } from '../ui.js';
 import { supabase } from '../supabase.js';
 import { sendNotificationEmail } from '../email.js';
 
@@ -70,10 +70,10 @@ export async function renderEntries(el, page, forceRefresh) {
 
   // ── Pending Shared Records banner (from other users, awaiting confirm/reject) ──
   if (_pendingSharesAll && _pendingSharesAll.length > 0) {
-    html += `<div class="card" style="padding:0;overflow:hidden;border:2px solid rgba(245,158,11,.5);margin-bottom:14px;">
-      <div style="background:rgba(245,158,11,.1);padding:10px 16px;border-bottom:1px solid rgba(245,158,11,.2);display:flex;align-items:center;gap:8px;">
+    html += `<div class="card" style="padding:0;overflow:hidden;border:2px solid rgba(213,186,120,.5);margin-bottom:14px;">
+      <div style="background:rgba(213,186,120,.1);padding:10px 16px;border-bottom:1px solid rgba(213,186,120,.2);display:flex;align-items:center;gap:8px;">
         <span style="font-size:15px;">⏳</span>
-        <span style="font-weight:700;font-size:13px;color:#f59e0b;">Pending — Records Shared With You (${_pendingSharesAll.length})</span>
+        <span style="font-weight:700;font-size:13px;color:var(--gold, #D5BA78);">Pending — Records Shared With You (${_pendingSharesAll.length})</span>
         <span style="color:var(--muted);font-size:12px;">Confirm to add to your ledger, or reject to dismiss</span>
       </div>
       <div class="tbl-wrap"><table><thead><tr>
@@ -91,7 +91,7 @@ export async function renderEntries(el, page, forceRefresh) {
       const note = snap.note ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(snap.note)}</div>` : '';
       html += `<tr data-pending-id="${s.id}">
         <td style="font-weight:700;">${esc(fromName)}</td>
-        <td style="font-weight:700;color:#f59e0b;">${fmtMoney(amtCents, cur)}${note}</td>
+        <td style="font-weight:700;color:var(--gold, #D5BA78);">${fmtMoney(amtCents, cur)}${note}</td>
         <td class="hide-mobile" style="font-size:12px;color:var(--muted);">${esc(txLabel)}</td>
         <td class="hide-mobile" style="font-size:12px;color:var(--muted);">${fmtDate(snap.date)}</td>
         <td style="white-space:nowrap;">
@@ -207,7 +207,7 @@ window.openEntryDetail = async function(id) {
       const statusBadgeHtml = s.status === 'pending'
         ? `<span style="background:rgba(251,191,36,.15);color:var(--amber);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">⏳ Pending</span>`
         : s.status === 'confirmed'
-          ? `<span style="background:rgba(74,222,128,.15);color:var(--green);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">✓ Confirmed</span>`
+          ? `<span style="background:rgba(95,211,154,.15);color:var(--green);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">✓ Confirmed</span>`
           : '';
       settleHtml += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">
         <div>
@@ -328,7 +328,7 @@ window.openEditEntryModal = async function(id) {
         if (_hasCalcs) {
           const _isFinal = f.isFinalTotal;
           const savedVal = sv?.value || 0;
-          return `<div class="form-group"><label>${esc(f.label)} <span style="font-size:10px;color:${_isFinal?'#22c55e':'#60a5fa'};font-weight:600;">${_isFinal?'✓ TOTAL':'⚡ auto'}</span></label><div id="tf-${f.id}" class="tpl-field" style="padding:12px 16px;background:${_isFinal?'#052e16':'#0d1f3c'};border:2px solid ${_isFinal?'#22c55e':'#2563eb'};border-radius:10px;font-weight:800;font-size:${_isFinal?'22':'16'}px;color:${_isFinal?'#4ade80':'#93c5fd'};" data-computed="${savedVal}">${_tplFmt(savedVal, window._activeTplCurrency)}</div></div>`;
+          return `<div class="form-group"><label>${esc(f.label)} <span style="font-size:10px;color:${_isFinal?'var(--green, #5FD39A)':'var(--blue, #7B92B0)'};font-weight:600;">${_isFinal?'✓ TOTAL':'⚡ auto'}</span></label><div id="tf-${f.id}" class="tpl-field" style="padding:12px 16px;background:${_isFinal?'rgba(95,211,154,.08)':'rgba(123,146,176,.08)'};border:2px solid ${_isFinal?'var(--green, #5FD39A)':'var(--blue, #7B92B0)'};border-radius:10px;font-weight:800;font-size:${_isFinal?'22':'16'}px;color:${_isFinal?'var(--green, #5FD39A)':'var(--blue, #7B92B0)'};" data-computed="${savedVal}">${_tplFmt(savedVal, window._activeTplCurrency)}</div></div>`;
         }
         const val = sv?.value || f.defaultValue || '';
         return `<div class="form-group"><label>${esc(f.label)}${f.required?' *':''}</label><input type="number" id="tf-${f.id}" step="0.01" class="tpl-field" value="${esc(String(val))}" oninput="recalcTemplateFields()"></div>`;
@@ -1356,8 +1356,8 @@ window.openSendReminderModal = async function(id) {
       </div>
     </div>
     <div id="rem-no-email-wrap" data-has-email="${hasEmail ? '1' : '0'}" style="${hasEmail ? 'display:none;' : ''}margin-bottom:12px;">
-      <div style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:8px;padding:10px 14px;">
-        <div style="font-size:13px;color:#f59e0b;margin-bottom:8px;">⚠️ <strong>${esc(cName)}</strong> has no email on file.</div>
+      <div style="background:rgba(213,186,120,.1);border:1px solid rgba(213,186,120,.3);border-radius:8px;padding:10px 14px;">
+        <div style="font-size:13px;color:var(--gold, #D5BA78);margin-bottom:8px;">⚠️ <strong>${esc(cName)}</strong> has no email on file.</div>
         <input type="email" id="rem-contact-email" placeholder="Enter email to send reminder"
           style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg2);color:var(--text);" />
         <div style="font-size:11px;color:var(--muted);margin-top:4px;">Email will be saved to this contact.</div>
@@ -1586,7 +1586,7 @@ window.doSendReminder = async function(entryId) {
 const NE_TABS = [
   {
     id: 'owe-me', emoji: '+', label: 'They Owe Me', color: 'var(--green)',
-    borderActive: 'rgba(74,222,128,.3)', bgActive: 'rgba(74,222,128,.1)',
+    borderActive: 'rgba(95,211,154,.3)', bgActive: 'rgba(95,211,154,.1)',
     actions: [
       { category: 'owed_to_me',    label: 'They owe me',      icon: '💰', extra: [] },
       { category: 'bill_sent',     label: 'Send a bill',      icon: '📄', extra: ['due_date','ref_number'], email: true },
@@ -1603,8 +1603,8 @@ const NE_TABS = [
     ]
   },
   {
-    id: 'advance', emoji: '+', label: 'Advances', color: '#f59e0b',
-    borderActive: 'rgba(245,158,11,.3)', bgActive: 'rgba(245,158,11,.1)',
+    id: 'advance', emoji: '+', label: 'Advances', color: 'var(--gold, #D5BA78)',
+    borderActive: 'rgba(213,186,120,.3)', bgActive: 'rgba(213,186,120,.1)',
     actions: [
       { category: 'advance_paid',     label: 'Advance Out',  icon: '⬆️', extra: ['advance_note','fulfillment'] },
       { category: 'advance_received', label: 'Advance In',   icon: '⬇️', extra: ['advance_note','fulfillment'] }
