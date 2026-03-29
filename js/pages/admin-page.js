@@ -158,6 +158,3 @@ window.activateUser = async function(userId) {
   toast('User activated.', 'success'); navTo('admin');
 };
 
-
-
-export { renderAdmin };

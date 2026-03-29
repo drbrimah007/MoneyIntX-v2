@@ -410,6 +410,3 @@ window.confirmDeleteGroup = async function(id) {
   window.navTo('groups');
 };
 
-
-// Export the main render function
-export { renderGroups };

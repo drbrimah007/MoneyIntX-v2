@@ -59,6 +59,3 @@ window.doRestoreEntry = async function(id) {
   toast('Entry restored!', 'success');
   window.navTo('trash');
 };
-
-
-export { renderTrash };
