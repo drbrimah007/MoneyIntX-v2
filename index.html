@@ -26,7 +26,10 @@
 <meta name="twitter:description" content="Track debts, send invoices, schedule reminders. Free personal &amp; commercial financial tracker.">
 <meta name="twitter:image" content="https://moneyinteractions.com/og-image.png">
 <meta name="twitter:image:alt" content="Money IntX dashboard">
+<!-- Preconnect to external origins (fonts, CDN, Supabase API) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://nczneamvffmzdbeuvloo.supabase.co" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- CSS modules -->
 <link rel="stylesheet" href="/css/themes.css">
@@ -34,6 +37,30 @@
 <link rel="stylesheet" href="/css/components.css">
 <link rel="stylesheet" href="/css/landing.css">
 <link rel="stylesheet" href="/css/utilities.css">
+<!-- Modulepreload: tell browser to fetch ALL JS modules in parallel instead of discovering them one-by-one -->
+<link rel="modulepreload" href="/config.js">
+<link rel="modulepreload" href="/js/supabase.js">
+<link rel="modulepreload" href="/js/auth.js">
+<link rel="modulepreload" href="/js/contacts.js">
+<link rel="modulepreload" href="/js/entries.js">
+<link rel="modulepreload" href="/js/settlements.js">
+<link rel="modulepreload" href="/js/notifications.js">
+<link rel="modulepreload" href="/js/sharing.js">
+<link rel="modulepreload" href="/js/reminders.js">
+<link rel="modulepreload" href="/js/groups.js">
+<link rel="modulepreload" href="/js/investments.js">
+<link rel="modulepreload" href="/js/templates.js">
+<link rel="modulepreload" href="/js/template-engine.js">
+<link rel="modulepreload" href="/js/admin.js">
+<link rel="modulepreload" href="/js/search.js">
+<link rel="modulepreload" href="/js/export.js">
+<link rel="modulepreload" href="/js/realtime.js">
+<link rel="modulepreload" href="/js/invoices.js">
+<link rel="modulepreload" href="/js/nok.js">
+<link rel="modulepreload" href="/js/bp-engine.js">
+<link rel="modulepreload" href="/js/recurring.js">
+<link rel="modulepreload" href="/js/ui.js">
+<link rel="modulepreload" href="/js/email.js">
 </head>
 <body>
 
@@ -1823,21 +1850,22 @@ async function renderEntries(el, page, forceRefresh) {
   if (!window._selectedEntries) window._selectedEntries = new Set();
 
   // Re-fetch only when: first nav to page with empty cache, or explicitly forced
-  if (_entriesAll.length === 0 || forceRefresh) {
-    if (window._impersonatedData) {
-      _entriesAll = window._impersonatedData.entries || [];
-    } else {
-      _entriesAll = await listEntries(currentUser.id);
-    }
-  }
-
-  // Load pending received shares (from other users) — shown inline at top
-  if (_pendingSharesAll === null || forceRefresh) {
-    try {
-      const allShares = await listReceivedShares(currentUser.id);
-      _pendingSharesAll = (allShares || []).filter(s => s.status !== 'confirmed' && s.status !== 'dismissed');
-    } catch(e) {
-      _pendingSharesAll = [];
+  // Parallelise entries + pending shares to avoid sequential waterfall
+  {
+    const needEntries = _entriesAll.length === 0 || forceRefresh;
+    const needShares  = _pendingSharesAll === null || forceRefresh;
+    if (needEntries || needShares) {
+      if (window._impersonatedData) {
+        if (needEntries) _entriesAll = window._impersonatedData.entries || [];
+        if (needShares)  _pendingSharesAll = [];
+      } else {
+        const promises = [];
+        promises.push(needEntries ? listEntries(currentUser.id) : Promise.resolve(null));
+        promises.push(needShares  ? listReceivedShares(currentUser.id).catch(() => []) : Promise.resolve(null));
+        const [entriesResult, sharesResult] = await Promise.all(promises);
+        if (entriesResult !== null) _entriesAll = entriesResult;
+        if (sharesResult !== null) _pendingSharesAll = (sharesResult || []).filter(s => s.status !== 'confirmed' && s.status !== 'dismissed');
+      }
     }
   }
 
@@ -3980,18 +4008,18 @@ async function renderInvestments(el) {
   el.innerHTML = '<div class="page-header"><h2>📈 Investments</h2></div><p style="color:var(--muted);padding:20px;">Loading...</p>';
   let investments = [];
   try {
-    const { data, error } = await supabase
-      .from('investments')
-      .select('*, members:investment_members(*), transactions:investment_transactions(*)')
-      .eq('user_id', currentUser.id)
-      .is('archived_at', null)
-      .order('created_at', { ascending: false });
+    // Parallelise: owned investments + membership rows fetched simultaneously
+    const [ownedRes, memberRes] = await Promise.all([
+      supabase.from('investments')
+        .select('*, members:investment_members(*), transactions:investment_transactions(*)')
+        .eq('user_id', currentUser.id).is('archived_at', null)
+        .order('created_at', { ascending: false }),
+      supabase.from('investment_members')
+        .select('investment_id').eq('user_id', currentUser.id)
+    ]);
+    const { data, error } = ownedRes;
     if (error) throw error;
-    // Also get investments where user is a member
-    const { data: memberRows } = await supabase
-      .from('investment_members')
-      .select('investment_id')
-      .eq('user_id', currentUser.id);
+    const memberRows = memberRes.data;
     const memberIds = (memberRows || []).map(r => r.investment_id).filter(id => !data?.find(d => d.id === id));
     if (memberIds.length > 0) {
       const { data: memberInvs } = await supabase
@@ -4332,19 +4360,18 @@ async function renderGroups(el) {
   el.innerHTML = '<div class="page-header"><h2>👥 Groups</h2></div><p style="color:var(--muted);padding:20px;">Loading...</p>';
   let groups = [];
   try {
-    const { data, error } = await supabase
-      .from('groups')
-      .select('*, members:group_members(*), rounds:group_rounds(*, contributions:group_contributions(*))')
-      .eq('user_id', currentUser.id)
-      .is('archived_at', null)
-      .order('created_at', { ascending: false });
+    // Parallelise: owned groups + membership rows fetched simultaneously
+    const [ownedRes, memberRes] = await Promise.all([
+      supabase.from('groups')
+        .select('*, members:group_members(*), rounds:group_rounds(*, contributions:group_contributions(*))')
+        .eq('user_id', currentUser.id).is('archived_at', null)
+        .order('created_at', { ascending: false }),
+      supabase.from('group_members')
+        .select('group_id').eq('user_id', currentUser.id).eq('status', 'active')
+    ]);
+    const { data, error } = ownedRes;
     if (error) throw error;
-    // Also get groups where user is a member
-    const { data: memberRows } = await supabase
-      .from('group_members')
-      .select('group_id')
-      .eq('user_id', currentUser.id)
-      .eq('status', 'active');
+    const memberRows = memberRes.data;
     const memberGroupIds = (memberRows || []).map(r => r.group_id).filter(id => !data?.find(d => d.id === id));
     if (memberGroupIds.length > 0) {
       const { data: memberGroups } = await supabase
