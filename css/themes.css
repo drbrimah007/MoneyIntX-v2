@@ -1,16 +1,16 @@
-/* Theme: Classic Dark — final production tokens */
+/* Theme: Classic Dark — near-black on slightly-lighter-black, neutral (no blue tint) */
 :root, [data-theme="classic"] {
   --accent: #6c63ff;
   --accent-hover: #5a52e0;
   --accent-light: rgba(108,99,255,0.10);
 
-  /* Backgrounds — jet black center, lighter outer shell */
-  --bg:       #0d1120;  /* outer body — slightly lighter (was the center) */
-  --bg2:      #000000;  /* jet black — cards, nav, topbar */
-  --bg3:      #060608;  /* near-black — inputs, nested panels */
-  --bg-soft:  #000000;
-  --panel:    #000000;
-  --panel-2:  #060608;
+  /* Backgrounds — neutral grays, no blue tint. Cards near-black, body slightly lifted */
+  --bg:       #111116;  /* outer body — dark gray, slightly lifted */
+  --bg2:      #09090d;  /* near-black — cards, nav, topbar */
+  --bg3:      #0d0d12;  /* inputs, nested panels */
+  --bg-soft:  #09090d;
+  --panel:    #09090d;
+  --panel-2:  #0d0d12;
 
   /* Text hierarchy */
   --text:     #eef2f7;
@@ -18,10 +18,10 @@
   --muted:    #8f98ab;
   --muted-2:  #6f7788;
 
-  /* Borders */
-  --border:   rgba(255,255,255,.05);
-  --line:     rgba(255,255,255,.05);
-  --line-2:   rgba(255,255,255,.08);
+  /* Borders — visible dividers */
+  --border:   rgba(255,255,255,.10);
+  --line:     rgba(255,255,255,.08);
+  --line-2:   rgba(255,255,255,.12);
 
   /* Contact name/avatar accent */
   --contact:  #d88978;
