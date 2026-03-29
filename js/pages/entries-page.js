@@ -311,7 +311,7 @@ window.openEditEntryModal = async function(id) {
     if (!tpl) return toast('Template not found.', 'error');
 
     window._activeTpl = tpl;
-    window._activeTplCurrency = entry.currency || tpl.currency || currentProfile?.default_currency || 'USD';
+    window._activeTplCurrency = entry.currency || tpl.currency || getCurrentProfile()?.default_currency || 'USD';
     window._tplFields = tpl.fields || [];
     const fields = tpl.fields || [];
     const saved = entry.template_data || {};
@@ -511,7 +511,7 @@ window.openSettleModal = async function(id) {
     <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <div class="form-group"><label>Amount to settle *</label><input type="number" id="settle-amount" min="0.01" step="0.01" max="${remaining}" value="${remaining}"></div>
       <div class="form-group"><label>Currency</label><select id="settle-currency">
-        ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'].map(c => `<option value="${c}" ${(entry.currency || currentProfile?.default_currency || 'USD')===c?'selected':''}>${c}</option>`).join('')}
+        ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'].map(c => `<option value="${c}" ${(entry.currency || getCurrentProfile()?.default_currency || 'USD')===c?'selected':''}>${c}</option>`).join('')}
       </select></div>
     </div>
     <div class="form-group"><label>Method</label><select id="settle-method">
@@ -708,7 +708,7 @@ window.saveMarkPaid = async function(entryId, currency) {
 
     const cur = currency || entry?.currency || 'USD';
     const fmtAmt = fmtMoney(amountCents, cur);
-    const fromName = currentProfile?.display_name || currentProfile?.full_name || 'Someone';
+    const fromName = getCurrentProfile()?.display_name || getCurrentProfile()?.full_name || 'Someone';
 
     // 3. Determine direction — if user who owes records, contact must verify
     const iOwe = ['i_owe','bill_received','invoice_received','you_owe_them','advance_received'].includes(entry.category || entry.tx_type);
@@ -935,7 +935,7 @@ window.copyNotifLink = async function(entryId) {
       const snapshot = {
         amount: entry.amount, currency: entry.currency, tx_type: entry.tx_type,
         date: entry.date, note: entry.note, invoice_number: entry.invoice_number,
-        status: entry.status, from_name: currentProfile?.display_name || '',
+        status: entry.status, from_name: getCurrentProfile()?.display_name || '',
         from_email: getCurrentUser().email
       };
       const contactEmail = entry.contact?.email || '';
@@ -962,7 +962,7 @@ window.copyNotifMessage = async function(entryId) {
       const snapshot = {
         amount: entry.amount, currency: entry.currency, tx_type: entry.tx_type,
         date: entry.date, note: entry.note, invoice_number: entry.invoice_number,
-        status: entry.status, from_name: currentProfile?.display_name || '',
+        status: entry.status, from_name: getCurrentProfile()?.display_name || '',
         from_email: getCurrentUser().email
       };
       const contactEmail = entry.contact?.email || '';
@@ -993,9 +993,9 @@ window.sendInvoiceNotification = async function(entryId) {
       await supabase.from('notifications').insert({
         user_id: contact.linked_user_id,
         type: 'invoice',
-        message: `Invoice notification from ${currentProfile?.display_name || 'Someone'}: ${message}`,
+        message: `Invoice notification from ${getCurrentProfile()?.display_name || 'Someone'}: ${message}`,
         entry_id: entryId,
-        contact_name: currentProfile?.display_name || '',
+        contact_name: getCurrentProfile()?.display_name || '',
         amount: entry.amount,
         currency: entry.currency,
         read: false
@@ -1005,7 +1005,7 @@ window.sendInvoiceNotification = async function(entryId) {
     const emailTo = contact?.email || cEmail;
     if (sendEmail && emailTo) {
       try {
-        const fromName = currentProfile?.display_name || currentProfile?.company_name || 'Money IntX';
+        const fromName = getCurrentProfile()?.display_name || getCurrentProfile()?.company_name || 'Money IntX';
         const result = await sendNotificationEmail(getCurrentUser().id, {
           to: emailTo, fromName, txType: entry.category || entry.tx_type,
           amount: entry.amount,
@@ -1038,7 +1038,7 @@ window.sendInvoiceNotification = async function(entryId) {
 
   // Self-email copy
   if (getCurrentUser()?.email) {
-    const fromName = currentProfile?.display_name || currentProfile?.company_name || 'Money IntX';
+    const fromName = getCurrentProfile()?.display_name || getCurrentProfile()?.company_name || 'Money IntX';
     try {
       await sendNotificationEmail(getCurrentUser().id, {
         to: getCurrentUser().email, fromName, txType: entry.category || entry.tx_type,
@@ -1136,7 +1136,7 @@ window.doShareEntry = async function(entryId) {
   const snapshot = {
     amount: entry.amount, currency: entry.currency, tx_type: entry.tx_type,
     date: entry.date, note: entry.note, invoice_number: entry.invoice_number,
-    status: entry.status, from_name: currentProfile?.display_name || '',
+    status: entry.status, from_name: getCurrentProfile()?.display_name || '',
     from_email: getCurrentUser().email
   };
   const token = await createShareToken(getCurrentUser().id, entryId, {
@@ -1155,9 +1155,9 @@ window.doShareEntry = async function(entryId) {
       await supabase.from('notifications').insert({
         user_id: recipientId,
         type: 'shared_record',
-        message: `${currentProfile?.display_name || 'Someone'} shared a record with you: ${fmtMoney(entry.amount, entry.currency)}`,
+        message: `${getCurrentProfile()?.display_name || 'Someone'} shared a record with you: ${fmtMoney(entry.amount, entry.currency)}`,
         entry_id: entryId,
-        contact_name: currentProfile?.display_name || '',
+        contact_name: getCurrentProfile()?.display_name || '',
         amount: entry.amount, currency: entry.currency,
         read: false
       });
@@ -1173,7 +1173,7 @@ window.doShareEntry = async function(entryId) {
 
   const encodedMsg = encodeURIComponent(finalMsg);
   const waUrl = `https://wa.me/?text=${encodedMsg}`;
-  const emailUrl = `mailto:${email || ''}?subject=${encodeURIComponent('Record from ' + (currentProfile?.display_name || 'Money IntX'))}&body=${encodedMsg}`;
+  const emailUrl = `mailto:${email || ''}?subject=${encodeURIComponent('Record from ' + (getCurrentProfile()?.display_name || 'Money IntX'))}&body=${encodedMsg}`;
   const safeFinalMsg = finalMsg.replace(/'/g, '&#39;');
 
   closeModal();
@@ -1504,15 +1504,15 @@ window.doSendReminder = async function(entryId) {
       if (linkedUserId) {
         await supabase.from('notifications').insert({
           user_id: linkedUserId, type: 'reminder',
-          message: `Reminder from ${currentProfile?.display_name || 'Someone'}: ${message}`,
-          entry_id: entryId, contact_name: currentProfile?.display_name || '',
+          message: `Reminder from ${getCurrentProfile()?.display_name || 'Someone'}: ${message}`,
+          entry_id: entryId, contact_name: getCurrentProfile()?.display_name || '',
           amount: entry.amount, currency: entry.currency,
           read: false
         });
       }
       if (cEmail) {
         try {
-          const fromName = currentProfile?.display_name || currentProfile?.company_name || 'Money IntX';
+          const fromName = getCurrentProfile()?.display_name || getCurrentProfile()?.company_name || 'Money IntX';
           const result = await sendNotificationEmail(getCurrentUser().id, {
             to: cEmail, fromName, txType: entry.category || entry.tx_type,
             amount: entry.amount,
@@ -1528,7 +1528,7 @@ window.doSendReminder = async function(entryId) {
 
     // Self-email copy when user wants their own notification
     if (notifySelf && getCurrentUser()?.email) {
-      const fromNameSelf = currentProfile?.display_name || currentProfile?.company_name || 'Money IntX';
+      const fromNameSelf = getCurrentProfile()?.display_name || getCurrentProfile()?.company_name || 'Money IntX';
       try {
         await sendNotificationEmail(getCurrentUser().id, {
           to: getCurrentUser().email, fromName: fromNameSelf, txType: entry.category || entry.tx_type,
@@ -1594,8 +1594,8 @@ const NE_TABS = [
     ]
   },
   {
-    id: 'i-owe', emoji: '+', label: 'I Owe Them', color: 'var(--red)',
-    borderActive: 'rgba(248,113,113,.3)', bgActive: 'rgba(248,113,113,.1)',
+    id: 'i-owe', emoji: '+', label: 'I Owe Them', color: 'var(--owe-color, var(--red))',
+    borderActive: 'rgba(124,140,255,.3)', bgActive: 'rgba(124,140,255,.1)',
     actions: [
       { category: 'i_owe',             label: 'I owe them',         icon: '💸', extra: [] },
       { category: 'bill_received',     label: 'Receive a bill',     icon: '📬', extra: ['due_date','ref_number'] },
@@ -1621,7 +1621,7 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
   window._neSelectedContactId = preselectedContactId || (contacts.length === 1 ? contacts[0].id : '');
 
   // Determine initial tab from legacy defaultDirection arg
-  const initTabId = defaultDirection === 'you_owe_them' ? 'i-owe'
+  const initTabId = (defaultDirection === 'you_owe_them' || defaultDirection === 'i-owe') ? 'i-owe'
                   : defaultDirection === 'advance'      ? 'advance'
                   : 'owe-me';
   window._neTab      = initTabId;
@@ -1674,7 +1674,7 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
     <div class="form-row">
       <div class="form-group"><label>Amount *</label><input type="number" id="ne-amount" min="0" step="0.01" placeholder="0.00"></div>
       <div class="form-group"><label>Currency</label><select id="ne-currency">
-        ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'].map(c => `<option value="${c}" ${(currentProfile?.default_currency||'USD')===c?'selected':''}>${c}</option>`).join('')}
+        ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'].map(c => `<option value="${c}" ${(getCurrentProfile()?.default_currency||'USD')===c?'selected':''}>${c}</option>`).join('')}
       </select></div>
     </div>
     <div id="ne-extra-fields"></div>
@@ -1984,7 +1984,7 @@ window.saveNewEntry = async function() {
   const contactId  = (document.getElementById('ne-contact')?.value || '').trim();
   const category   = document.getElementById('ne-category')?.value || 'owed_to_me';
   const amount     = document.getElementById('ne-amount').value;
-  const currency   = document.getElementById('ne-currency')?.value || currentProfile?.default_currency || 'USD';
+  const currency   = document.getElementById('ne-currency')?.value || getCurrentProfile()?.default_currency || 'USD';
   const date       = document.getElementById('ne-date').value;
   const note       = document.getElementById('ne-note').value.trim();
   const notifyOn   = document.getElementById('ne-notify')?.value === '1';
@@ -2075,7 +2075,7 @@ window.saveNewEntry = async function() {
         .select('email').eq('id', contactId).single();
       const recipientEmail = cRow?.email?.trim() || '';
       if (recipientEmail) {
-        const fromName = currentProfile?.display_name || currentProfile?.company_name || 'Someone';
+        const fromName = getCurrentProfile()?.display_name || getCurrentProfile()?.company_name || 'Someone';
         const autoSnap = {
           amount: Math.round(parseFloat(amount) * 100), // cents — consistent with entries table & fmtMoney
           currency, tx_type: category,
@@ -2105,7 +2105,7 @@ window.saveNewEntry = async function() {
   if (!notifyOn) return;
   try {
     const contactName = window._neContacts?.find(c => c.id === contactId)?.name || 'Contact';
-    const fromName    = currentProfile?.display_name || currentProfile?.company_name || 'Someone';
+    const fromName    = getCurrentProfile()?.display_name || getCurrentProfile()?.company_name || 'Someone';
     const txLabel     = TX_LABELS[category] || category;
     const amtLabel    = `${currency} ${parseFloat(amount).toLocaleString()}`;
     const entryId     = entry?.id;
@@ -2170,9 +2170,9 @@ window.saveNewEntry = async function() {
           to: contactEmail, fromName,
           invoiceNumber: invoiceNum,
           amount: parseFloat(amount), currency,
-          companyName: currentProfile?.company_name,
+          companyName: getCurrentProfile()?.company_name,
           companyEmail: getCurrentProfile()?.company_email,
-          companyAddress: currentProfile?.company_address,
+          companyAddress: getCurrentProfile()?.company_address,
           logoUrl: getCurrentProfile()?.logo_url,
           dueDate, message: combinedMsg || note, entryId
         });

@@ -1,23 +1,11 @@
 // Money IntX — Notifications Page Module
 // Extracted from index.html page modules
 
-import { getCurrentUser } from './state.js';
+import { getCurrentUser, contactColor } from './state.js';
 import { esc, toast, fmtRelative } from '../ui.js';
 import { fmtMoney } from '../entries.js';
 import { supabase } from '../supabase.js';
 import { listNotifications, markAllRead } from '../notifications.js';
-
-// ── Deterministic contact color from name hash ───────────────────
-function contactColor(name) {
-  if (!name || name === '—') return 'var(--text)';
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  const hues = [4,15,30,48,140,158,175,196,210,225,240,255,270,285,300,318,330,347,95,115,62,200,80,168];
-  const hue = hues[h % hues.length];
-  const sat = 60 + (h % 15);
-  const lit = 60 + ((h >> 4) % 10);
-  return `hsl(${hue}, ${sat}%, ${lit}%)`;
-}
 
 // ── Notifications ─────────────────────────────────────────────────
 export async function renderNotifications(el) {
@@ -60,10 +48,10 @@ export async function renderNotifications(el) {
     </tr></thead><tbody>`;
     notifs.forEach(n => {
       const actionBtn = n.type === 'shared_record'
-        ? `<button onclick="navTo('entries')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View in Entries →</button>`
+        ? `<button onclick="navTo('entries')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View</button>`
         : '';
       html += `<tr>
-        <td style="font-weight:600;font-size:13px;color:${contactColor(n.contact_name)}">${esc(n.contact_name || '—')}</td>
+        <td style="font-weight:600;font-size:13px;color:${n.contact_id ? contactColor(n.contact_id) : 'var(--text)'}">${esc(n.contact_name || '—')}</td>
         <td style="font-weight:700;font-size:13px;">${n.amount ? fmtMoney(n.amount, n.currency || 'USD') : '—'}</td>
         <td class="hide-mobile" style="font-size:13px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(n.message)}">${esc(n.message)}</td>
         <td style="font-size:12px;color:var(--muted);">${fmtRelative(n.created_at)}</td>

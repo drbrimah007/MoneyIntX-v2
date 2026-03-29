@@ -178,12 +178,12 @@ export const TX_COLORS = {
   bill_sent:        '#63d69a',
   they_owe_you:     '#63d69a',
   they_paid_you:    '#63d69a',
-  // Payable / I owe → muted red
-  i_owe:            '#d07878',
-  invoice_received: '#d07878',
-  bill_received:    '#d07878',
-  you_owe_them:     '#d07878',
-  you_paid_them:    '#d07878',
+  // Payable / I owe → indigo-blue
+  i_owe:            '#7C8CFF',
+  invoice_received: '#7C8CFF',
+  bill_received:    '#7C8CFF',
+  you_owe_them:     '#7C8CFF',
+  you_paid_them:    '#7C8CFF',
   // Neutral invoice/bill → posted blue
   invoice:          '#9db2db',
   bill:             '#9db2db',

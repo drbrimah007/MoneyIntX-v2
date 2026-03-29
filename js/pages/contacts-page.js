@@ -63,11 +63,10 @@ export async function renderContacts(el, page = 1) {
         <td style="padding:8px 6px 8px 12px;"><span class="contact-avatar" style="width:30px;height:30px;font-size:13px;background:${col};">${esc(c.name.charAt(0).toUpperCase())}</span></td>
         <td>
           <div style="font-weight:600;font-size:14px;">${esc(c.name)}</div>
-          ${c.email ? `<div style="font-size:11px;color:var(--muted);">${esc(c.email)}</div>` : ''}
         </td>
         <td style="color:var(--green);font-weight:600;font-size:13px;">${toy > 0 ? fmtMoney(toy) : '<span style="color:var(--muted);">—</span>'}</td>
-        <td class="hide-mobile" style="color:var(--red);font-size:13px;">${yot > 0 ? fmtMoney(yot) : '<span style="color:var(--muted);">—</span>'}</td>
-        <td style="font-weight:700;color:${net > 0 ? 'var(--green)' : net < 0 ? 'var(--red)' : 'var(--muted)'};">${net !== 0 ? fmtMoney(Math.abs(net)) : '—'}</td>
+        <td class="hide-mobile" style="color:var(--owe-color, var(--red));font-size:13px;">${yot > 0 ? fmtMoney(yot) : '<span style="color:var(--muted);">—</span>'}</td>
+        <td style="font-weight:700;color:${net > 0 ? 'var(--green)' : net < 0 ? 'var(--owe-color, var(--red))' : 'var(--muted)'};">${net !== 0 ? fmtMoney(Math.abs(net)) : '—'}</td>
         <td onclick="event.stopPropagation();">
           <div class="action-menu">
             <button class="action-menu-btn" onclick="toggleActionMenu(this)">⋮</button>
@@ -129,7 +128,6 @@ function _cpEntriesTable(entries, page) {
     return `<tr>
       <td style="font-weight:700;cursor:pointer;" onclick="openEntryDetail('${e.id}')">${amtHtml}</td>
       <td style="max-width:90px;">${e.invoice_number ? `<span style="font-size:11px;font-family:monospace;color:var(--accent);font-weight:700;">${esc(e.invoice_number)}</span>` : e.entry_number ? `<span style="font-size:11px;font-family:monospace;color:var(--muted);font-weight:700;">#${String(e.entry_number).padStart(4,'0')}</span>` : '<span style="color:var(--muted-2);">—</span>'}</td>
-      <td><span style="font-weight:600;font-size:12px;color:${txColor};">${esc(txLabel)}</span></td>
       <td style="color:var(--muted);font-size:12px;">${fmtDate(e.date)}</td>
       <td>${statusBadge(e.status)}${reminderHtml}${noLedgerHtml}</td>
       <td style="width:44px;">
@@ -149,7 +147,7 @@ function _cpEntriesTable(entries, page) {
 
   return `<div class="tbl-wrap" style="margin-top:0;">
     <table style="font-size:13px;">
-      <thead><tr><th>Amount</th><th>Doc #</th><th>Type</th><th>Date</th><th>Status</th><th style="width:44px;"></th></tr></thead>
+      <thead><tr><th>Amount</th><th>Doc #</th><th>Date</th><th>Status</th><th style="width:44px;"></th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   </div>${pgHtml}`;
@@ -313,7 +311,7 @@ window.showCPTab = function(tab, contactId) {
       <div style="background:var(--bg2);border-radius:12px;overflow:hidden;">
         ${[
           ['Charges / Loans to them', d.toyEntries.length, 'var(--green)'],
-          ['Amounts I owe them', d.yotEntries.length, 'var(--red)'],
+          ['Amounts I owe them', d.yotEntries.length, 'var(--owe-color, var(--red))'],
           ['Payments received', d.toyCredits.length, 'var(--blue)'],
           ['Payments I made', d.yotCredits.length, 'var(--muted)'],
         ].map(([label, count, color]) => `

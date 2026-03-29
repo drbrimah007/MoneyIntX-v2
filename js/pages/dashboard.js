@@ -196,7 +196,7 @@ export async function renderDash(el) {
         + They Owe Me
       </button>
       <button onclick="openNewEntryModal('i-owe')"
-        style="${_qaBtnBase}background:rgba(208,120,120,.10);border-color:rgba(208,120,120,.20);color:#d07878;"
+        style="${_qaBtnBase}background:rgba(124,140,255,.10);border-color:rgba(124,140,255,.20);color:#7C8CFF;"
         onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
         + I Owe Them
       </button>
@@ -254,7 +254,7 @@ export async function renderDash(el) {
     topContacts.forEach(l => {
       const nb = l.net_balance || 0;
       const pct = maxAbs > 0 ? Math.abs(nb) / maxAbs * 100 : 0;
-      const color = nb > 0 ? 'var(--green)' : 'var(--red)';
+      const color = nb > 0 ? 'var(--green)' : 'var(--owe-color, var(--red))';
       const label = nb > 0 ? 'owes you' : 'you owe';
       const aColor = contactColor(l.contact_id);
       html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:pointer;" onclick="openContactDetail('${l.contact_id}')">
