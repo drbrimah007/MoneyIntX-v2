@@ -205,10 +205,19 @@ export async function confirmShare(tokenId, recipientId) {
 
   // Notify the sender that the share was confirmed
   if (newEntry && token.sender_id) {
+    // Get recipient name for the notification
+    let recipientName = 'Recipient';
+    try {
+      const { data: rUser } = await supabase.from('users').select('display_name').eq('id', recipientId).single();
+      recipientName = rUser?.display_name || recipientName;
+    } catch(_) {}
+    const amtFmt = token.entry.currency + ' ' + ((token.entry.amount || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
     await supabase.from('notifications').insert({
       user_id:      token.sender_id,
-      type:         'shared_record',
-      message:      `Your shared record was confirmed by the recipient.`,
+      type:         'confirmed',
+      contact_name: recipientName,
+      contact_id:   contactId || null,
+      message:      `${recipientName} confirmed your shared record — ${amtFmt}`,
       entry_id:     token.entry_id,
       amount:       token.entry.amount,
       currency:     token.entry.currency,

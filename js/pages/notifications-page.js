@@ -26,12 +26,12 @@ export async function renderNotifications(el) {
       reminder:           { bg:'rgba(248,113,113,.15)', color:'var(--red)',    label:'🚩 Reminder' },
       notification:       { bg:'rgba(96,165,250,.15)',  color:'var(--accent)', label:'📬 Sent' },
       payment_sent:       { bg:'rgba(96,165,250,.15)',  color:'var(--accent)', label:'📤 Sent' },
-      payment_received:   { bg:'rgba(74,222,128,.15)',  color:'var(--green)',  label:'📩 Received' },
+      payment_received:   { bg:'rgba(95,211,154,.15)',  color:'var(--green)',  label:'📩 Received' },
       settlement_pending: { bg:'rgba(251,191,36,.15)',  color:'var(--amber)',  label:'⏳ Review' },
       viewed:             { bg:'rgba(108,99,255,.12)',  color:'var(--accent)', label:'👁 Viewed' },
-      confirmed:          { bg:'rgba(74,222,128,.15)',  color:'var(--green)',  label:'✅ Confirmed' },
+      confirmed:          { bg:'rgba(95,211,154,.15)',  color:'var(--green)',  label:'✅ Confirmed' },
       shared_record:      { bg:'rgba(108,99,255,.12)',  color:'var(--accent)', label:'🔗 Shared' },
-      fulfilled:          { bg:'rgba(74,222,128,.15)',  color:'var(--green)',  label:'✅ Fulfilled' },
+      fulfilled:          { bg:'rgba(95,211,154,.15)',  color:'var(--green)',  label:'✅ Fulfilled' },
     };
     const m = map[t] || { bg:'var(--bg3)', color:'var(--muted)', label:t||'📤 Sent' };
     return `<span class="badge" style="background:${m.bg};color:${m.color};">${m.label}</span>`;
@@ -51,7 +51,7 @@ export async function renderNotifications(el) {
         ? `<button onclick="navTo('entries')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View</button>`
         : '';
       html += `<tr>
-        <td style="font-weight:600;font-size:13px;color:${n.contact_id ? contactColor(n.contact_id) : 'var(--text)'}">${esc(n.contact_name || '—')}</td>
+        <td style="font-weight:600;font-size:13px;"><span style="display:inline-flex;align-items:center;gap:6px;">${n.contact_id ? `<span style="width:22px;height:22px;border-radius:50%;background:${contactColor(n.contact_id)};display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0;">${esc((n.contact_name||'?').charAt(0).toUpperCase())}</span>` : ''}<span style="color:var(--text);">${esc(n.contact_name || '—')}</span></span></td>
         <td style="font-weight:700;font-size:13px;">${n.amount ? fmtMoney(n.amount, n.currency || 'USD') : '—'}</td>
         <td class="hide-mobile" style="font-size:13px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(n.message)}">${esc(n.message)}</td>
         <td style="font-size:12px;color:var(--muted);">${fmtRelative(n.created_at)}</td>

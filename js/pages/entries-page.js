@@ -152,7 +152,7 @@ export async function renderEntries(el, page, forceRefresh) {
         <td style="min-width:80px;">
           ${cId ? `<span style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;" onclick="openContactDetail('${cId}')">
             <span style="width:24px;height:24px;border-radius:50%;background:${col};display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;color:#fff;">${esc(cName.charAt(0).toUpperCase())}</span>
-            <span style="font-weight:600;color:${col};">${esc(cName)}</span>
+            <span style="font-weight:600;color:var(--text);">${esc(cName)}</span>
           </span>` : `<span style="color:var(--muted);">${esc(cName)}</span>`}
         </td>
         <td style="font-weight:700;cursor:pointer;" onclick="openEntryDetail('${e.id}')">${amtHtml}</td>
@@ -2145,7 +2145,7 @@ window.saveNewEntry = async function() {
         user_id: getCurrentUser().id, type: 'notification',
         message: `${txLabel} with ${contactName} — ${amtLabel}${combinedMsg ? '. ' + combinedMsg : ''}`,
         amount: parseFloat(amount), currency, contact_name: contactName,
-        entry_id: entryId, read: false
+        contact_id: contactId, entry_id: entryId, read: false
       });
       // Self-email copy
       if (getCurrentUser()?.email) {
@@ -2181,7 +2181,7 @@ window.saveNewEntry = async function() {
         user_id: linkedUserId, type: 'notification',
         message: `${fromName}: ${mirrorLabel} — ${amtLabel}${combinedMsg ? '. ' + combinedMsg : ''}`,
         amount: parseFloat(amount), currency, contact_name: fromName,
-        entry_id: entryId, read: false
+        contact_id: contactId, entry_id: entryId, read: false
       });
     }
 
