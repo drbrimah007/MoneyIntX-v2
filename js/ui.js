@@ -172,26 +172,26 @@ export const TX_CREATE_LABELS = {
 };
 
 export const TX_COLORS = {
-  // Receivable / owed to me → success green
-  owed_to_me:       '#63d69a',
-  invoice_sent:     '#63d69a',
-  bill_sent:        '#63d69a',
-  they_owe_you:     '#63d69a',
-  they_paid_you:    '#63d69a',
-  // Payable / I owe → indigo-blue
-  i_owe:            '#7C8CFF',
-  invoice_received: '#7C8CFF',
-  bill_received:    '#7C8CFF',
-  you_owe_them:     '#7C8CFF',
-  you_paid_them:    '#7C8CFF',
-  // Neutral invoice/bill → posted blue
-  invoice:          '#9db2db',
-  bill:             '#9db2db',
-  // Payment recorded → success green
-  payment_recorded: '#63d69a',
-  // Advances → partial gold
-  advance_paid:     '#d5bb7a',
-  advance_received: '#d5bb7a'
+  // Receivable / owed to me → calm green
+  owed_to_me:       '#5FD39A',
+  invoice_sent:     '#5FD39A',
+  bill_sent:        '#5FD39A',
+  they_owe_you:     '#5FD39A',
+  they_paid_you:    '#5FD39A',
+  // Payable / I owe → indigo-violet
+  i_owe:            '#8D8CFF',
+  invoice_received: '#8D8CFF',
+  bill_received:    '#8D8CFF',
+  you_owe_them:     '#8D8CFF',
+  you_paid_them:    '#8D8CFF',
+  // Neutral invoice/bill → slate blue-grey
+  invoice:          '#7B92B0',
+  bill:             '#7B92B0',
+  // Payment recorded → calm green
+  payment_recorded: '#5FD39A',
+  // Advances → muted gold
+  advance_paid:     '#D5BA78',
+  advance_received: '#D5BA78'
 };
 
 // Direction sign per category (canonical source of truth for new entries)

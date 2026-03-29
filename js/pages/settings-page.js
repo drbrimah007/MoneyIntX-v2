@@ -165,30 +165,28 @@ async function renderSettings(el) {
   // ── Theme picker ───────────────────────────────────────────────
   const currentTheme = (currentUser?.id && localStorage.getItem('mxi_theme_' + currentUser.id)) || localStorage.getItem('mxi_theme') || 'classic';
   const themes = [
-    { id: 'navy',    name: 'Money IntX',  color: '#080b53', dot: '#e020b0' },
-    { id: 'classic', name: 'Classic Dark', color: '#0f1117' },
-    { id: 'dark',    name: 'Dark Blue',   color: '#334155' },
-    { id: 'purple',  name: 'Purple',      color: '#6c63ff' },
-    { id: 'teal',    name: 'Teal',        color: '#0d9488' },
-    { id: 'ocean',   name: 'Ocean',       color: '#0284c7' },
-    { id: 'rose',    name: 'Rose',        color: '#e11d48' }
+    { id: 'navy',    name: 'MoneyIntX',     bg: '#020617', accent: '#3B82F6' },
+    { id: 'classic', name: 'Classic Dark',   bg: '#0A0B0E', accent: '#6366F1' },
+    { id: 'dark',    name: 'Deep Black',     bg: '#030303', accent: '#6366F1' },
+    { id: 'light',   name: 'Light',          bg: '#F5F7FB', accent: '#6366F1' }
   ];
   html += `<div class="card" style="margin-top:12px;">
     <h3 style="font-size:16px;font-weight:700;margin-bottom:12px;">Theme</h3>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       ${themes.map(t => {
         const isActive = currentTheme === t.id;
-        const bgColor  = ['navy','classic','dark'].includes(t.id) ? t.color : '#fff';
-        const dotColor = t.dot || t.color;
+        const isLight = t.id === 'light';
         return `<button onclick="setTheme('${t.id}')" title="${t.name}" style="
-          width:56px;height:56px;border-radius:14px;border:3px solid ${isActive ? dotColor : 'var(--border)'};
-          background:${bgColor};cursor:pointer;display:flex;align-items:center;justify-content:center;
-          transition:all .15s;box-shadow:${isActive ? '0 0 0 2px ' + dotColor + '40' : 'none'};">
-          <div style="width:28px;height:28px;border-radius:50%;background:${dotColor};"></div>
+          width:64px;height:64px;border-radius:14px;
+          border:${isActive ? '2px solid rgba(99,102,241,.45)' : '1px solid ' + (isLight ? 'rgba(24,32,51,.10)' : 'rgba(255,255,255,.05)')};
+          background:${t.bg};cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+          transition:border-color .15s;box-shadow:none;">
+          <div style="width:24px;height:24px;border-radius:50%;background:${t.accent};"></div>
+          <span style="font-size:9px;font-weight:600;color:${isLight ? '#73819A' : '#8791A2'};letter-spacing:.02em;">${t.name.split(' ')[0]}</span>
         </button>`;
       }).join('')}
     </div>
-    <p style="font-size:12px;color:var(--muted);margin-top:8px;">Current: ${themes.find(t => t.id === currentTheme)?.name || 'Purple'}</p>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px;">Current: ${themes.find(t => t.id === currentTheme)?.name || 'Classic Dark'}</p>
   </div>`;
 
   // ── Admin: Branding + Dashboard Tips ──────────────────────────

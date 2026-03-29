@@ -103,7 +103,7 @@ export async function renderDash(el) {
   const netAbs = Math.abs(net);
   const netLabel = net > 0 ? 'You are owed' : net < 0 ? 'You owe' : 'All settled up';
   const netIcon = net > 0 ? '📈' : net < 0 ? '📉' : '✅';
-  const heroGrad = net > 0 ? 'linear-gradient(135deg,#1d4ed8,#6c63ff)' : net < 0 ? 'linear-gradient(135deg,#b91c1c,#dc2626)' : 'linear-gradient(135deg,#065f46,#047857)';
+  const heroGrad = net > 0 ? 'linear-gradient(135deg,#1d4ed8,#3730a3)' : net < 0 ? 'linear-gradient(135deg,#4338ca,#3730a3)' : 'linear-gradient(135deg,#1e3a5f,#1e293b)';
 
   const CURRENCY_ICONS = { USD:'🇺🇸', EUR:'🇪🇺', GBP:'🇬🇧', NGN:'🇳🇬', CAD:'🇨🇦', AUD:'🇦🇺', JPY:'🇯🇵', KES:'🇰🇪', ZAR:'🇿🇦', GHS:'🇬🇭', INR:'🇮🇳', AED:'🇦🇪', SAR:'🇸🇦', BRL:'🇧🇷', EGP:'🇪🇬', MAD:'🇲🇦' };
   // Distinct hues for currency sub-boxes (not red/green — purely visual identity)
@@ -191,12 +191,12 @@ export async function renderDash(el) {
   html += `<div style="margin-bottom:14px;overflow-x:auto;padding-bottom:2px;">
     <div style="display:flex;gap:8px;min-width:max-content;">
       <button onclick="openNewEntryModal('owe-me')"
-        style="${_qaBtnBase}background:rgba(99,214,154,.10);border-color:rgba(99,214,154,.20);color:#63d69a;"
+        style="${_qaBtnBase}background:rgba(95,211,154,.10);border-color:rgba(95,211,154,.18);color:#5FD39A;"
         onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
         + They Owe Me
       </button>
       <button onclick="openNewEntryModal('i-owe')"
-        style="${_qaBtnBase}background:rgba(124,140,255,.10);border-color:rgba(124,140,255,.20);color:#7C8CFF;"
+        style="${_qaBtnBase}background:rgba(141,140,255,.10);border-color:rgba(141,140,255,.18);color:#8D8CFF;"
         onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
         + I Owe Them
       </button>
@@ -205,8 +205,8 @@ export async function renderDash(el) {
         onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
         + Advances
       </button>
-      <button onclick="openNewEntryModal('owe-me');setTimeout(()=>{document.querySelector('[onclick*=invoice_sent]')?.click()},80)"
-        style="${_qaBtnBase}background:rgba(157,178,219,.10);border-color:rgba(157,178,219,.20);color:#9db2db;"
+      <button onclick="openNewEntryModal('invoice')"
+        style="${_qaBtnBase}background:rgba(123,146,176,.10);border-color:rgba(123,146,176,.18);color:#7B92B0;"
         onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
         + New Invoice
       </button>

@@ -1,263 +1,272 @@
 /* ═══════════════════════════════════════════════════════════════════
-   MoneyIntX — Production Theme System
-   CORE RULE: MoneyIntx navy = reference standard. Everything adapts from it.
-   UI should feel like dimly lit glass layers, not flat paint.
+   MoneyIntX — Unified Theme System v3
+   4 themes, 1 system. Matte · Flat · Calm · Premium.
+   No shine, no glow, no glass. Flat surfaces with subtle layer separation.
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ── Classic Dark ─────────────────────────────────────────────────
-   Deep near-black with subtle blue undertone. NOT pure black.
-   "too black" fix: surfaces are lifted, never #000.                */
+/* ── Shared Semantic Colors (all themes) ──────────────────────────
+   These stay consistent across every theme.                         */
+
+/* ── Classic Dark — DEFAULT ──────────────────────────────────────
+   Charcoal editorial dark. Softest dark theme.
+   Not blue-black. Not true black. Slightly warmer, more neutral.    */
 :root, [data-theme="classic"] {
   --accent: #6366F1;
   --accent-hover: #4F46E5;
   --accent-light: rgba(99,102,241,0.12);
 
-  /* Backgrounds — 3 graduated layers */
-  --bg:       #05070F;   /* main body */
-  --bg2:      #0A0F1F;   /* elevated: cards, nav, topbar */
-  --bg3:      #0D1428;   /* inputs, nested panels */
-  --bg-soft:  #0A0F1F;
-  --panel:    #0A0F1F;
-  --panel-2:  #0D1428;
+  /* Backgrounds — charcoal, not blue */
+  --bg:       #0A0B0E;
+  --bg2:      #111318;
+  --bg3:      #161920;
+  --bg-soft:  #111318;
+  --panel:    #111318;
+  --panel-2:  #161920;
 
-  /* Text — 4 levels max */
-  --text:     #E6EDF7;
-  --text-2:   #9FB0CC;
-  --muted:    #6B7A96;
-  --muted-2:  #4A5568;
+  /* Text — 4-level hierarchy */
+  --text:     #E7EBF2;
+  --text-2:   #B4BDCB;
+  --muted:    #8791A2;
+  --muted-2:  #616978;
 
-  /* Borders — subtle, not visible lines */
-  --border:   rgba(255,255,255,.06);
-  --line:     rgba(255,255,255,.06);
-  --line-2:   rgba(255,255,255,.10);
+  /* Borders — soft, not visible lines */
+  --border:   rgba(255,255,255,.05);
+  --line:     rgba(255,255,255,.05);
+  --line-2:   rgba(255,255,255,.08);
 
   /* Contact name/avatar */
-  --contact:  #d88978;
+  --contact:  #D88978;
 
-  /* Status tokens */
-  --green:      #22C55E;
-  --green-bg:   rgba(34,197,94,.12);
-  --success:    #22C55E;
-  --success-bg: rgba(34,197,94,.12);
+  /* Semantic: Owed to Me — calm green */
+  --green:      #5FD39A;
+  --green-bg:   rgba(95,211,154,.12);
+  --success:    #5FD39A;
+  --success-bg: rgba(95,211,154,.12);
 
+  /* Semantic: I Owe — indigo-violet (not red) */
   --red:        #EF4444;
   --red-bg:     rgba(239,68,68,.10);
-  --owe-color:  #7C8CFF;
-  --owe-bg:     rgba(124,140,255,.10);
+  --owe-color:  #8D8CFF;
+  --owe-bg:     rgba(141,140,255,.12);
 
-  --amber:      #F59E0B;
-  --gold:       #F59E0B;
-  --partial:    #F59E0B;
-  --gold-bg:    rgba(245,158,11,.10);
-  --partial-bg: rgba(245,158,11,.10);
+  /* Semantic: Advance / Pending — muted gold */
+  --amber:      #D5BA78;
+  --gold:       #D5BA78;
+  --partial:    #D5BA78;
+  --gold-bg:    rgba(213,186,120,.12);
+  --partial-bg: rgba(213,186,120,.12);
 
-  --blue:       #3B82F6;
-  --posted:     #3B82F6;
-  --blue-bg:    rgba(59,130,246,.10);
-  --posted-bg:  rgba(59,130,246,.10);
+  /* Semantic: Posted / Neutral — slate blue-grey */
+  --blue:       #7B92B0;
+  --posted:     #7B92B0;
+  --blue-bg:    rgba(123,146,176,.10);
+  --posted-bg:  rgba(123,146,176,.10);
 
-  --card-border: 1px solid rgba(255,255,255,.06);
+  /* User name palette */
+  --user-coral:  #D88978;
+  --user-purple: #A98AE0;
+  --user-teal:   #63C5B7;
+  --user-blue:   #71A8DB;
+  --user-gold:   #D5BA78;
+  --user-rose:   #D98DA0;
+
+  --card-border: 1px solid rgba(255,255,255,.05);
 
   --radius: 14px;
-  --shadow:    0 2px 12px rgba(0,0,0,.55);
-  --shadow-lg: 0 8px 28px rgba(0,0,0,.55);
+  --shadow:    none;
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.10);
 }
 
-/* ── Teal Light ───────────────────────────────────────────────── */
-[data-theme="teal"] {
-  --accent: #0d9488; --accent-hover: #0f766e;
-  --accent-light: rgba(13,148,136,0.08);
-  --green: #16a34a; --red: #dc2626; --amber: #d97706; --blue: #3b82f6;
-  --bg: #f0fdfa; --bg2: #ffffff; --bg3: #f0fdfa;
-  --text: #0f172a; --text-2: #1e293b; --muted: #475569; --muted-2: #64748b;
-  --border: #99f6e4; --line: #b2f5ea; --line-2: #81e6d9;
-  --panel: #ffffff; --panel-2: #f0fdfa;
-  --shadow: 0 2px 8px rgba(0,0,0,.08); --shadow-lg: 0 8px 24px rgba(0,0,0,.12);
-  --contact: #0d9488;
-  --green-bg: rgba(22,163,74,.08); --red-bg: rgba(220,38,38,.08);
-  --gold-bg: rgba(217,119,6,.08); --blue-bg: rgba(59,130,246,.08);
-  --posted-bg: rgba(59,130,246,.08); --partial-bg: rgba(217,119,6,.08);
-  --success: #16a34a; --success-bg: rgba(22,163,74,.08);
-  --radius: 14px;
-}
-/* ── Ocean Light ──────────────────────────────────────────────── */
-[data-theme="ocean"] {
-  --accent: #0284c7; --accent-hover: #0369a1;
-  --accent-light: rgba(2,132,199,0.08);
-  --green: #16a34a; --red: #dc2626; --amber: #d97706; --blue: #3b82f6;
-  --bg: #f0f9ff; --bg2: #ffffff; --bg3: #f0f9ff;
-  --text: #0f172a; --text-2: #1e293b; --muted: #475569; --muted-2: #64748b;
-  --border: #bae6fd; --line: #bae6fd; --line-2: #93c5fd;
-  --panel: #ffffff; --panel-2: #f0f9ff;
-  --shadow: 0 2px 8px rgba(0,0,0,.08); --shadow-lg: 0 8px 24px rgba(0,0,0,.12);
-  --contact: #0284c7;
-  --green-bg: rgba(22,163,74,.08); --red-bg: rgba(220,38,38,.08);
-  --gold-bg: rgba(217,119,6,.08); --blue-bg: rgba(59,130,246,.08);
-  --posted-bg: rgba(59,130,246,.08); --partial-bg: rgba(217,119,6,.08);
-  --success: #16a34a; --success-bg: rgba(22,163,74,.08);
-  --radius: 14px;
-}
-/* ── Rose Light ───────────────────────────────────────────────── */
-[data-theme="rose"] {
-  --accent: #e11d48; --accent-hover: #be123c;
-  --accent-light: rgba(225,29,72,0.08);
-  --green: #16a34a; --red: #dc2626; --amber: #d97706; --blue: #3b82f6;
-  --bg: #fff1f2; --bg2: #ffffff; --bg3: #fff1f2;
-  --text: #0f172a; --text-2: #1e293b; --muted: #475569; --muted-2: #64748b;
-  --border: #fecdd3; --line: #fecdd3; --line-2: #fda4af;
-  --panel: #ffffff; --panel-2: #fff1f2;
-  --shadow: 0 2px 8px rgba(0,0,0,.08); --shadow-lg: 0 8px 24px rgba(0,0,0,.12);
-  --contact: #e11d48;
-  --green-bg: rgba(22,163,74,.08); --red-bg: rgba(220,38,38,.08);
-  --gold-bg: rgba(217,119,6,.08); --blue-bg: rgba(59,130,246,.08);
-  --posted-bg: rgba(59,130,246,.08); --partial-bg: rgba(217,119,6,.08);
-  --success: #16a34a; --success-bg: rgba(22,163,74,.08);
-  --radius: 14px;
-}
-/* ── Purple Light ─────────────────────────────────────────────── */
-[data-theme="purple"] {
-  --accent: #6c63ff; --accent-hover: #5a52e0;
-  --accent-light: rgba(108,99,255,0.08);
-  --green: #16a34a; --red: #dc2626; --amber: #d97706; --blue: #3b82f6;
-  --bg: #f5f3ff; --bg2: #ffffff; --bg3: #f5f3ff;
-  --text: #0f172a; --text-2: #1e293b; --muted: #475569; --muted-2: #64748b;
-  --border: #ddd6fe; --line: #ddd6fe; --line-2: #c4b5fd;
-  --panel: #ffffff; --panel-2: #f5f3ff;
-  --shadow: 0 2px 8px rgba(0,0,0,.08); --shadow-lg: 0 8px 24px rgba(0,0,0,.12);
-  --contact: #6c63ff;
-  --green-bg: rgba(22,163,74,.08); --red-bg: rgba(220,38,38,.08);
-  --gold-bg: rgba(217,119,6,.08); --blue-bg: rgba(59,130,246,.08);
-  --posted-bg: rgba(59,130,246,.08); --partial-bg: rgba(217,119,6,.08);
-  --success: #16a34a; --success-bg: rgba(22,163,74,.08);
-  --radius: 14px;
-}
-/* Light theme form input override — must come after dark base */
-[data-theme="teal"] .form-input,
-[data-theme="ocean"] .form-input,
-[data-theme="rose"] .form-input,
-[data-theme="purple"] .form-input,
-[data-theme="teal"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-[data-theme="ocean"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-[data-theme="rose"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-[data-theme="purple"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-[data-theme="teal"] textarea,
-[data-theme="ocean"] textarea,
-[data-theme="rose"] textarea,
-[data-theme="purple"] textarea,
-[data-theme="teal"] select,
-[data-theme="ocean"] select,
-[data-theme="rose"] select,
-[data-theme="purple"] select {
-  background: #ffffff !important;
-  color: #0f172a !important;
-  border-color: var(--border) !important;
-}
-[data-theme="teal"] .form-input:focus,
-[data-theme="ocean"] .form-input:focus,
-[data-theme="rose"] .form-input:focus,
-[data-theme="purple"] .form-input:focus {
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 0 2px var(--accent-light) !important;
-}
-
-/* ── Deep Black (true dark, but usable) ──────────────────────────
-   Pure black body but NEVER pure-black surfaces.                  */
+/* ── Deep Black — Minimal, serious, almost monochrome ────────────
+   Most minimal dark theme. Clean black with layer separation.
+   No glow. No blue. Just clean.                                    */
 [data-theme="dark"] {
   --accent: #6366F1;
   --accent-hover: #4F46E5;
   --accent-light: rgba(99,102,241,0.12);
 
-  --bg:      #000000;   /* true black body */
-  --bg2:     #0A0A0F;   /* NEVER pure black surfaces */
-  --bg3:     #12121A;   /* inputs, nested */
-  --bg-soft: #0A0A0F;
-  --panel:   #0A0A0F;
-  --panel-2: #12121A;
+  --bg:      #030303;
+  --bg2:     #090A0D;
+  --bg3:     #101216;
+  --bg-soft: #090A0D;
+  --panel:   #090A0D;
+  --panel-2: #101216;
 
-  --text:    #E6EDF7;
-  --text-2:  #9FB0CC;
-  --muted:   #6B7A96;
-  --muted-2: #4A5568;
+  --text:    #F1F4F8;
+  --text-2:  #C7CED9;
+  --muted:   #8C95A5;
+  --muted-2: #626A78;
 
-  --border:  rgba(255,255,255,.06);
-  --line:    rgba(255,255,255,.06);
-  --line-2:  rgba(255,255,255,.10);
+  --border:  rgba(255,255,255,.04);
+  --line:    rgba(255,255,255,.04);
+  --line-2:  rgba(255,255,255,.07);
 
-  --contact:    #d88978;
-  --green:      #22C55E;
-  --green-bg:   rgba(34,197,94,.12);
-  --success:    #22C55E;
-  --success-bg: rgba(34,197,94,.12);
+  --contact:    #D88978;
+  --green:      #5FD39A;
+  --green-bg:   rgba(95,211,154,.12);
+  --success:    #5FD39A;
+  --success-bg: rgba(95,211,154,.12);
   --red:        #EF4444;
   --red-bg:     rgba(239,68,68,.10);
-  --owe-color:  #7C8CFF;
-  --owe-bg:     rgba(124,140,255,.10);
-  --amber:      #F59E0B;
-  --gold:       #F59E0B;
-  --partial:    #F59E0B;
-  --gold-bg:    rgba(245,158,11,.10);
-  --partial-bg: rgba(245,158,11,.10);
-  --blue:       #3B82F6;
-  --posted:     #3B82F6;
-  --blue-bg:    rgba(59,130,246,.10);
-  --posted-bg:  rgba(59,130,246,.10);
+  --owe-color:  #8D8CFF;
+  --owe-bg:     rgba(141,140,255,.12);
+  --amber:      #D5BA78;
+  --gold:       #D5BA78;
+  --partial:    #D5BA78;
+  --gold-bg:    rgba(213,186,120,.12);
+  --partial-bg: rgba(213,186,120,.12);
+  --blue:       #7B92B0;
+  --posted:     #7B92B0;
+  --blue-bg:    rgba(123,146,176,.10);
+  --posted-bg:  rgba(123,146,176,.10);
 
-  --card-border: 1px solid rgba(255,255,255,.06);
+  --user-coral:  #D88978;
+  --user-purple: #A98AE0;
+  --user-teal:   #63C5B7;
+  --user-blue:   #71A8DB;
+  --user-gold:   #D5BA78;
+  --user-rose:   #D98DA0;
 
-  --sidebar-bg:     #000000;
-  --sidebar-active: #0A0A0F;
+  --card-border: 1px solid rgba(255,255,255,.04);
+
+  --sidebar-bg:     #030303;
+  --sidebar-active: #090A0D;
   --radius: 14px;
-  --shadow:    0 2px 12px rgba(0,0,0,.55);
-  --shadow-lg: 0 8px 28px rgba(0,0,0,.55);
+  --shadow:    none;
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.10);
 }
 
-/* ── MoneyIntX Navy — THE reference standard ─────────────────────
-   DO NOT TOUCH bg-elevated (#06122b). Everything else adapts.    */
+/* ── MoneyIntX Navy — THE branded reference ──────────────────────
+   Deep navy background. Core blue shade preserved.
+   Matte: no glow, no shiny gradients, reduced border brightness.   */
 [data-theme="navy"] {
   --accent: #3B82F6;
   --accent-hover: #2563EB;
   --accent-light: rgba(59,130,246,0.12);
 
-  --bg:      #020617;   /* main body */
-  --bg2:     #06122b;   /* THE MoneyIntx blue — DO NOT TOUCH */
-  --bg3:     #0A162F;   /* surface-input */
+  --bg:      #020617;
+  --bg2:     #06122b;   /* THE MoneyIntx blue — preserved */
+  --bg3:     #0A1733;
   --bg-soft: #06122b;
   --panel:   #06122b;
-  --panel-2: #0A162F;
+  --panel-2: #0A1733;
 
   --text:    #E6EDF7;
-  --text-2:  #9FB0CC;
-  --muted:   #6B7A96;
-  --muted-2: #4A5568;
+  --text-2:  #A4B3CC;
+  --muted:   #72819B;
+  --muted-2: #55627A;
 
-  --border:  rgba(255,255,255,.06);
-  --line:    rgba(255,255,255,.06);
-  --line-2:  rgba(255,255,255,.10);
+  --border:  rgba(255,255,255,.05);
+  --line:    rgba(255,255,255,.05);
+  --line-2:  rgba(255,255,255,.08);
 
-  --contact:    #d88978;
-  --green:      #22C55E;
-  --green-bg:   rgba(34,197,94,.12);
-  --success:    #22C55E;
-  --success-bg: rgba(34,197,94,.12);
+  --contact:    #D88978;
+  --green:      #5FD39A;
+  --green-bg:   rgba(95,211,154,.12);
+  --success:    #5FD39A;
+  --success-bg: rgba(95,211,154,.12);
   --red:        #EF4444;
   --red-bg:     rgba(239,68,68,.10);
-  --owe-color:  #7C8CFF;
-  --owe-bg:     rgba(124,140,255,.10);
-  --amber:      #F59E0B;
-  --gold:       #F59E0B;
-  --partial:    #F59E0B;
-  --gold-bg:    rgba(245,158,11,.10);
-  --partial-bg: rgba(245,158,11,.10);
-  --blue:       #3B82F6;
-  --posted:     #3B82F6;
-  --blue-bg:    rgba(59,130,246,.10);
-  --posted-bg:  rgba(59,130,246,.10);
+  --owe-color:  #8D8CFF;
+  --owe-bg:     rgba(141,140,255,.12);
+  --amber:      #D5BA78;
+  --gold:       #D5BA78;
+  --partial:    #D5BA78;
+  --gold-bg:    rgba(213,186,120,.12);
+  --partial-bg: rgba(213,186,120,.12);
+  --blue:       #7B92B0;
+  --posted:     #7B92B0;
+  --blue-bg:    rgba(123,146,176,.10);
+  --posted-bg:  rgba(123,146,176,.10);
 
-  --card-border: 1px solid rgba(255,255,255,.06);
+  --user-coral:  #D88978;
+  --user-purple: #A98AE0;
+  --user-teal:   #63C5B7;
+  --user-blue:   #71A8DB;
+  --user-gold:   #D5BA78;
+  --user-rose:   #D98DA0;
+
+  --card-border: 1px solid rgba(255,255,255,.05);
 
   --sidebar-bg:     #020617;
   --sidebar-active: #06122b;
   --radius: 14px;
-  --shadow:    0 2px 12px rgba(0,0,0,.55);
-  --shadow-lg: 0 8px 28px rgba(0,0,0,.55);
+  --shadow:    none;
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.10);
+}
+
+/* ── Light — Soft, clear, modern ─────────────────────────────────
+   One reference light theme. Lightly tinted off-white, not sterile.
+   Soft grey-blue borders, no harsh colors.                          */
+[data-theme="light"] {
+  --accent: #6366F1;
+  --accent-hover: #4F46E5;
+  --accent-light: rgba(99,102,241,0.08);
+
+  --bg:      #F5F7FB;
+  --bg2:     #FFFFFF;
+  --bg3:     #EEF3FA;
+  --bg-soft: #EEF3FA;
+  --panel:   #FFFFFF;
+  --panel-2: #EEF3FA;
+
+  --text:    #182033;
+  --text-2:  #4D5A72;
+  --muted:   #73819A;
+  --muted-2: #98A3B6;
+
+  --border:  rgba(24,32,51,.08);
+  --line:    rgba(24,32,51,.08);
+  --line-2:  rgba(24,32,51,.12);
+
+  --contact:    #6366F1;
+
+  /* Semantic — slightly saturated for light bg */
+  --green:      #16a34a;
+  --green-bg:   rgba(22,163,74,.08);
+  --success:    #16a34a;
+  --success-bg: rgba(22,163,74,.08);
+  --red:        #dc2626;
+  --red-bg:     rgba(220,38,38,.08);
+  --owe-color:  #6366F1;
+  --owe-bg:     rgba(99,102,241,.08);
+  --amber:      #d97706;
+  --gold:       #d97706;
+  --partial:    #d97706;
+  --gold-bg:    rgba(217,119,6,.08);
+  --partial-bg: rgba(217,119,6,.08);
+  --blue:       #3b82f6;
+  --posted:     #3b82f6;
+  --blue-bg:    rgba(59,130,246,.08);
+  --posted-bg:  rgba(59,130,246,.08);
+
+  --user-coral:  #C47060;
+  --user-purple: #7C5EC4;
+  --user-teal:   #0d9488;
+  --user-blue:   #3B82F6;
+  --user-gold:   #b45309;
+  --user-rose:   #be123c;
+
+  --card-border: 1px solid rgba(24,32,51,.08);
+
+  --radius: 14px;
+  --shadow:    none;
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.06);
+}
+
+/* ── Light theme form input override ────────────────────────────── */
+[data-theme="light"] .form-input,
+[data-theme="light"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="light"] textarea,
+[data-theme="light"] select {
+  background: #FFFFFF !important;
+  color: #182033 !important;
+  border-color: rgba(24,32,51,.10) !important;
+}
+[data-theme="light"] .form-input:focus,
+[data-theme="light"] input:focus:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="light"] textarea:focus,
+[data-theme="light"] select:focus {
+  border-color: rgba(99,102,241,.35) !important;
+  box-shadow: 0 0 0 2px rgba(99,102,241,.10) !important;
 }

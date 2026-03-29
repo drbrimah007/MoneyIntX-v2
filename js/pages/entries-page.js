@@ -1594,8 +1594,8 @@ const NE_TABS = [
     ]
   },
   {
-    id: 'i-owe', emoji: '+', label: 'I Owe Them', color: 'var(--owe-color, var(--red))',
-    borderActive: 'rgba(124,140,255,.3)', bgActive: 'rgba(124,140,255,.1)',
+    id: 'i-owe', emoji: '+', label: 'I Owe Them', color: 'var(--owe-color, #8D8CFF)',
+    borderActive: 'rgba(141,140,255,.3)', bgActive: 'rgba(141,140,255,.1)',
     actions: [
       { category: 'i_owe',             label: 'I owe them',         icon: '💸', extra: [] },
       { category: 'bill_received',     label: 'Receive a bill',     icon: '📬', extra: ['due_date','ref_number'] },
@@ -1621,11 +1621,13 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
   window._neSelectedContactId = preselectedContactId || (contacts.length === 1 ? contacts[0].id : '');
 
   // Determine initial tab from legacy defaultDirection arg
+  const isInvoice = defaultDirection === 'invoice';
   const initTabId = (defaultDirection === 'you_owe_them' || defaultDirection === 'i-owe') ? 'i-owe'
                   : defaultDirection === 'advance'      ? 'advance'
                   : 'owe-me';
   window._neTab      = initTabId;
-  window._neCategory = NE_TABS.find(t => t.id === initTabId).actions[0].category;
+  // If invoice shortcut, pre-select invoice_sent; otherwise first action in tab
+  window._neCategory = isInvoice ? 'invoice_sent' : NE_TABS.find(t => t.id === initTabId).actions[0].category;
 
   const selectedContact = window._neSelectedContactId ? contacts.find(c => c.id === window._neSelectedContactId) : null;
   const contactDisplayVal = selectedContact ? selectedContact.name : '';
@@ -1641,7 +1643,7 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
     </button>`).join('');
 
   const initTab = NE_TABS.find(t => t.id === initTabId);
-  const actionRowHtml = _neActionRow(initTab, initTab.actions[0].category);
+  const actionRowHtml = _neActionRow(initTab, window._neCategory);
 
   openModal(`
     <div class="modal-title">New Entry</div>
