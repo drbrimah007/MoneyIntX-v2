@@ -44,6 +44,7 @@ DECLARE
   v_contact_id  uuid;
   v_new_entry_id uuid;
   v_flipped_type text;
+  v_entry_number bigint;
 
   -- tx_type flip map (recipient perspective is mirror of sender's)
   v_flip        jsonb := '{
@@ -116,10 +117,15 @@ BEGIN
     LIMIT 1;
   END IF;
 
-  -- 7. Insert mirrored entry in recipient's ledger
+  -- 7a. Increment recipient's entry counter to get next entry_number
+  UPDATE users SET entry_counter = COALESCE(entry_counter, 0) + 1
+  WHERE id = p_recipient_id
+  RETURNING entry_counter INTO v_entry_number;
+
+  -- 7b. Insert mirrored entry in recipient's ledger
   INSERT INTO entries (
     user_id, contact_id, tx_type, sender_tx_type,
-    amount, currency, date, note, invoice_number,
+    amount, currency, date, note, invoice_number, entry_number,
     is_shared, share_token, from_name, from_email,
     status, settled_amount
   ) VALUES (
@@ -132,6 +138,7 @@ BEGIN
     v_entry.date,
     COALESCE(v_entry.note, ''),
     COALESCE(v_entry.invoice_number, ''),
+    v_entry_number,
     true,
     v_token.token,
     v_from_name,

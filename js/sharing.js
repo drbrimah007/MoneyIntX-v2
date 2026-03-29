@@ -141,6 +141,13 @@ export async function confirmShare(tokenId, recipientId) {
     }
   }
 
+  // Get next entry_number for recipient
+  let entryNumber = null;
+  try {
+    const { data: counterData } = await supabase.rpc('increment_entry_counter', { p_user_id: recipientId });
+    if (counterData) entryNumber = counterData;
+  } catch (_) { /* RPC not deployed yet — entry_number stays null */ }
+
   // Create entry in recipient's records
   const { data: newEntry, error } = await supabase
     .from('entries')
@@ -154,6 +161,7 @@ export async function confirmShare(tokenId, recipientId) {
       date:           token.entry.date,
       note:           token.entry.note || '',
       invoice_number: token.entry.invoice_number || '',
+      entry_number:   entryNumber,
       is_shared:      true,
       share_token:    token.token,
       from_name:      fromName,
