@@ -891,13 +891,13 @@ async function enterApp(user) {
         </div>
       `);
     }, 600);
-  } else if (!isNewUser) {
-    // returning user — restore page from URL hash first, then fall back to localStorage
-    const hashPage = (window.location.hash || '').replace('#', '').split('?')[0] || '';
-    const validPages = ['dash','entries','contacts','settings','groups','investments','business','templates','recurring','notifications','nok','trash','admin','view-all','user-entries'];
-    const pageToRestore = validPages.includes(hashPage) ? hashPage : (localStorage.getItem('mxi_last_page') || 'dash');
-    navTo(pageToRestore);
   }
+
+  // Restore page from URL hash (returning user), or default to dash
+  const hashPage = (window.location.hash || '').replace('#', '').split('?')[0] || '';
+  const validPages = ['dash','entries','contacts','settings','groups','investments','business','templates','recurring','notifications','nok','trash','admin','view-all','user-entries'];
+  const pageToRestore = (!isNewUser && validPages.includes(hashPage)) ? hashPage : (localStorage.getItem('mxi_last_page') || 'dash');
+  navTo(pageToRestore);
   // Process scheduled reminders + recurring rules every 60s
   setInterval(() => { processDueReminders(user.id, { emailFn: sendNotificationEmail }); processDueRecurring(user.id); }, 60000);
   processDueReminders(user.id, { emailFn: sendNotificationEmail });
