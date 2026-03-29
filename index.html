@@ -2098,7 +2098,7 @@ window.openEntryDetail = async function(id) {
       <button class="bs sm" onclick="openEditEntryModal('${entry.id}')">Edit</button>
       <button class="bs sm" onclick="closeModal();openShareModal('${entry.id}')">Share</button>
       ${!isTerminal ? `<button class="bs sm" onclick="closeModal();openSendReminderModal('${entry.id}')">Remind</button>` : ''}
-      ${['invoice_sent','bill_sent','invoice','bill'].includes(_ecat) && !isTerminal ? `<button class="bs sm" onclick="closeModal();openNotifyInvoiceModal('${entry.id}')" style="color:#60a5fa;">🔔 Notify</button>` : ''}
+      ${['invoice_sent','bill_sent','invoice','bill'].includes(_ecat) && !isTerminal ? `<button class="bs sm" onclick="closeModal();openNotifyInvoiceModal('${entry.id}')" style="color:#60a5fa;">✉️ Email</button>` : ''}
       <button class="bs sm" onclick="printInvoice('${entry.id}')">Print</button>
       <button class="bs sm" onclick="duplicateEntry('${entry.id}');closeModal();">Duplicate</button>
       <button class="bs sm" onclick="toggleNoLedger('${entry.id}',${!entry.no_ledger});closeModal();">${entry.no_ledger ? 'Restore Ledger' : 'Rm Ledger'}</button>
@@ -2622,7 +2622,7 @@ window.openNotifyInvoiceModal = async function(id) {
 
   const contactEmail = entry.contact?.email || '';
   openModal(`
-    <h3 style="margin-bottom:4px;">🔔 Notify Contact</h3>
+    <h3 style="margin-bottom:4px;">✉️ Email Contact</h3>
     <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">${esc(cName)}${invLabel} — ${amtLabel}</p>
     <div class="form-group">
       <label>Message to contact</label>
@@ -2638,15 +2638,15 @@ window.openNotifyInvoiceModal = async function(id) {
     </div>
     ${contactEmail ? `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:14px;">
       <input type="checkbox" id="notif-send-email" checked style="accent-color:var(--accent);width:15px;height:15px;">
-      Also send email to <strong>${esc(contactEmail)}</strong>
-    </label>` : `<p style="font-size:12px;color:var(--muted);margin-bottom:14px;">💡 Add an email to this contact to also send email notifications.</p>`}
+      Send email to <strong>${esc(contactEmail)}</strong>
+    </label>` : `<p style="font-size:12px;color:var(--muted);margin-bottom:14px;">💡 Add an email to this contact to send emails.</p>`}
     <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
       <button class="bs sm" onclick="copyNotifLink('${id}')" title="Copy share link to clipboard">🔗 Copy Link</button>
       <button class="bs sm" onclick="copyNotifMessage('${id}')" title="Copy message + link to clipboard">📋 Copy Message + Link</button>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="sendInvoiceNotification('${id}')">Send Notification</button>
+      <button class="btn btn-primary btn-sm" onclick="sendInvoiceNotification('${id}')">Send Email</button>
     </div>
   `, { maxWidth: '440px' });
 };
@@ -2742,7 +2742,7 @@ window.sendInvoiceNotification = async function(entryId) {
           fromEmail: currentProfile?.company_email || currentUser?.email,
           siteUrl: 'https://moneyinteractions.com'
         });
-        if (!result?.ok) toast('Notification sent (email failed: ' + (result?.error || 'check Settings → Email Diagnostics') + ')', 'info');
+        if (!result?.ok) toast('Email failed: ' + (result?.error || 'check Settings → Email Diagnostics'), 'info');
       } catch(e) { console.warn('Email send failed:', e); toast('Email failed: ' + e.message, 'error'); }
     }
   }
@@ -2778,7 +2778,7 @@ window.sendInvoiceNotification = async function(entryId) {
   }
 
   closeModal();
-  toast('Notification sent.' + (sendEmail && cEmail ? ' Email queued.' : ''), 'success');
+  toast('Email sent.' + (sendEmail && cEmail ? ' Queued for delivery.' : ''), 'success');
   _invalidateEntries(); navTo('entries');
 };
 
@@ -3076,7 +3076,7 @@ window.openSendReminderModal = async function(id) {
     </div>
     <div class="form-group"><label>Message</label><textarea id="rem-msg" rows="3" placeholder="Add a message (optional)..."></textarea></div>
     <div class="form-group">
-      <label>Notify</label>
+      <label>Email</label>
       <div style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
         <button type="button" id="rem-nwho-them" onclick="setReminderNwho('them')" style="padding:8px 18px;font-size:13px;font-weight:600;background:var(--accent);color:#fff;border:none;cursor:pointer;">Contact</button>
         <button type="button" id="rem-nwho-you" onclick="setReminderNwho('you')" style="padding:8px 18px;font-size:13px;background:var(--bg3);color:var(--text);border:none;border-left:1px solid var(--border);cursor:pointer;">You</button>
@@ -3407,10 +3407,10 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
     </div>
     <div id="ne-extra-fields"></div>
     <div class="form-group"><label>Issue Date</label><input type="date" id="ne-date" value="${new Date().toISOString().slice(0,10)}"></div>
-    <!-- NOTIFY section with ON/OFF toggle -->
+    <!-- EMAIL section with ON/OFF toggle -->
     <div style="margin-bottom:12px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg3);cursor:pointer;" onclick="toggleNeNotify()">
-        <div style="font-size:13px;font-weight:600;">🔔 Notify</div>
+        <div style="font-size:13px;font-weight:600;">✉️ Email</div>
         <div style="display:flex;align-items:center;gap:7px;">
           <span id="ne-notify-label" style="font-size:12px;color:var(--muted);">Off</span>
           <div style="width:38px;height:21px;border-radius:11px;background:var(--border);position:relative;transition:background .2s;" id="ne-notify-track">
@@ -3423,14 +3423,14 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
           <div style="font-size:12px;color:var(--muted);margin-bottom:5px;">Message <span style="font-weight:400;">(sent to recipient)</span></div>
           <textarea id="ne-message" rows="2" placeholder="Add a note for the recipient..." style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;resize:vertical;box-sizing:border-box;"></textarea>
         </div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Notify who</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Email who</div>
         <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--border);margin-bottom:10px;">
           <button id="ne-nw-contact" onclick="setNeNotifyWho('contact')" style="flex:1;padding:7px 4px;font-size:12px;font-weight:600;border:none;background:var(--accent);color:#fff;cursor:pointer;">Contact</button>
           <button id="ne-nw-you" onclick="setNeNotifyWho('you')" style="flex:1;padding:7px 4px;font-size:12px;font-weight:600;border:none;border-left:1px solid var(--border);border-right:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer;">You</button>
           <button id="ne-nw-both" onclick="setNeNotifyWho('both')" style="flex:1;padding:7px 4px;font-size:12px;font-weight:600;border:none;background:var(--bg3);color:var(--text);cursor:pointer;">Both</button>
         </div>
         <div id="ne-notify-email-row" style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:8px;padding:10px 12px;display:none;">
-          <div style="font-size:12px;color:#b45309;margin-bottom:6px;">⚠️ Contact has no email — enter one to send notification:</div>
+          <div style="font-size:12px;color:#b45309;margin-bottom:6px;">⚠️ Contact has no email — enter one to send:</div>
           <input type="email" id="ne-notify-email-override" placeholder="Enter email" style="width:100%;padding:7px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:13px;box-sizing:border-box;">
         </div>
       </div>
