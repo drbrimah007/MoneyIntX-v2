@@ -6,7 +6,8 @@ import { getCurrentUser, getCurrentProfile } from './state.js';
 import { contactColor, _fmtAmt } from './state.js';
 import { getDashboardTotals, recentEntries, getLedgerSummary, getCurrencyLedger, fmtMoney, toCents, invalidateEntryCache } from '../entries.js';
 import { listContacts } from '../contacts.js';
-import { getUnreadCount, listReceivedShares } from '../notifications.js';
+import { getUnreadCount } from '../notifications.js';
+import { listReceivedShares } from '../sharing.js';
 import { esc, statusBadge, TX_LABELS, TX_COLORS, fmtDate } from '../ui.js';
 
 export async function renderDash(el) {
