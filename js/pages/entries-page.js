@@ -1983,6 +1983,7 @@ window.setEntryDirection = function(dir) {
 };
 
 window.saveNewEntry = async function() {
+  try {
   const contactId  = (document.getElementById('ne-contact')?.value || '').trim();
   const category   = document.getElementById('ne-category')?.value || 'owed_to_me';
   const amount     = document.getElementById('ne-amount').value;
@@ -2024,6 +2025,12 @@ window.saveNewEntry = async function() {
     note: combinedNote,
     invoiceNumber: invNumber || refNumber || ''
   });
+
+  if (!entry || !entry.id) {
+    toast('Failed to save entry — please try again.', 'error');
+    console.error('[saveNewEntry] createEntry returned:', entry);
+    return;
+  }
 
   // Persist new fields onto the entry row
   const isAdvance = ['advance_paid', 'advance_received'].includes(category);
@@ -2203,6 +2210,10 @@ window.saveNewEntry = async function() {
   } catch (notifErr) {
     console.warn('Post-entry notify error:', notifErr);
     toast('Notification failed: ' + (notifErr?.message || notifErr), 'error');
+  }
+  } catch (saveErr) {
+    console.error('[saveNewEntry] FATAL:', saveErr);
+    toast('Save failed: ' + (saveErr?.message || saveErr), 'error');
   }
 };
 

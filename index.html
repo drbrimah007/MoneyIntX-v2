@@ -351,7 +351,6 @@
       <div id="search-results" style="display:none;position:absolute;left:50%;transform:translateX(-50%);width:400px;max-width:90vw;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);z-index:200;max-height:300px;overflow-y:auto;margin-top:4px;"></div>
     </div>
     <div id="topbar-right">
-      <button onclick="app.navigate('notifications')" style="position:relative;background:none;border:none;cursor:pointer;font-size:18px;padding:4px 8px;color:var(--text);" title="Notifications">🔔<span id="topbar-notif-badge" style="display:none;position:absolute;top:-2px;right:0;min-width:16px;height:16px;border-radius:8px;background:var(--accent,#6366F1);color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;padding:0 4px;">0</span></button>
       <span id="sidebar-user-name" style="font-size:13px;font-weight:600;"></span>
       <button class="bs sm" onclick="app.logOut()">Sign Out</button>
     </div>
@@ -388,7 +387,7 @@
       <button class="active" data-page="dash" onclick="app.navigate('dash')"><span class="tab-icon">📊</span>Dash</button>
       <button data-page="contacts" onclick="app.navigate('contacts')"><span class="tab-icon">👤</span>Contacts</button>
       <button data-page="entries" onclick="app.navigate('entries')"><span class="tab-icon">📋</span>Entries</button>
-      <button data-page="notifications" onclick="app.navigate('notifications')"><span class="tab-icon">🔔</span>Notifs</button>
+      <button data-page="notifications" onclick="app.navigate('notifications')" style="position:relative;"><span class="tab-icon">🔔</span>Notifs<span id="mobile-notif-badge" style="display:none;position:absolute;top:4px;right:calc(50% - 16px);min-width:16px;height:16px;border-radius:8px;background:var(--accent,#6366F1);color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;padding:0 3px;">0</span></button>
       <button onclick="openMobileMore()"><span class="tab-icon">☰</span>More</button>
     </div>
   </div>
@@ -890,11 +889,11 @@ async function updateNotifBadge() {
     badge.textContent = count;
     badge.style.display = count > 0 ? '' : 'none';
   }
-  // Update topbar bell badge
-  const topBadge = document.getElementById('topbar-notif-badge');
-  if (topBadge) {
-    topBadge.textContent = count;
-    topBadge.style.display = count > 0 ? '' : 'none';
+  // Update mobile tab bar badge
+  const mobileBadge = document.getElementById('mobile-notif-badge');
+  if (mobileBadge) {
+    mobileBadge.textContent = count;
+    mobileBadge.style.display = count > 0 ? '' : 'none';
   }
 }
 window.updateNotifBadge = updateNotifBadge;
