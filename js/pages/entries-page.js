@@ -1871,11 +1871,14 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
       <div id="ne-items-rows"></div>
       <button type="button" class="bs sm" onclick="addNeItemRow()" style="margin-top:4px;">+ Add Row</button>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label>Amount * <span id="ne-amount-hint" style="display:none;font-size:10px;font-weight:400;color:var(--accent);">(auto from items)</span></label><input type="number" id="ne-amount" min="0" step="0.01" placeholder="0.00"></div>
-      <div class="form-group"><label>Currency</label><select id="ne-currency">
-        ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'].map(c => `<option value="${c}" ${(getCurrentProfile()?.default_currency||'USD')===c?'selected':''}>${c}</option>`).join('')}
-      </select></div>
+    <div class="form-group">
+      <label>Amount * <span id="ne-amount-hint" style="display:none;font-size:10px;font-weight:400;color:var(--accent);">(auto from items)</span></label>
+      <div style="display:flex;gap:8px;">
+        <input type="number" id="ne-amount" min="0" step="0.01" placeholder="0.00" style="flex:1;min-width:0;">
+        <select id="ne-currency" style="flex:0 0 90px;">
+          ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'].map(c => `<option value="${c}" ${(getCurrentProfile()?.default_currency||'USD')===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
     </div>
     <div id="ne-extra-fields"></div>
     <div class="form-row">
