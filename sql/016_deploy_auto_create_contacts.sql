@@ -1,31 +1,13 @@
+-- ══════════════════════════════════════════════════════════════════
+-- 016_deploy_auto_create_contacts.sql
+-- DEPLOY SCRIPT: Run this in Supabase SQL Editor.
+-- Contains:
+--   1. Updated confirm_share_for_recipient RPC (with auto-create contact)
+--   2. Backfill for existing shared entries with null contact_id
+-- ══════════════════════════════════════════════════════════════════
+
 -- ──────────────────────────────────────────────────────────────────
--- 014_confirm_share_rpc.sql
--- SECURITY DEFINER RPC: confirm a shared record for a recipient.
---
--- WHY THIS EXISTS:
---   When a recipient clicks "Confirm" on a share token, the app needs to:
---     1. Read the original entry (blocked by entries RLS — recipient can't
---        read the sender's entries)
---     2. Create a mirrored entry in the recipient's ledger
---     3. Mark the share token as confirmed
---     4. Notify the sender
---
---   All four steps require cross-user data access that RLS prevents.
---   Running SECURITY DEFINER bypasses RLS so all steps succeed atomically.
---
--- WHAT IT DOES:
---   1. Validates the share token (must exist, not expired/dismissed, right recipient)
---   2. Reads the sender's entry (bypasses entries RLS)
---   3. Resolves from_name: entry_snapshot.from_name → users.display_name fallback
---   4. Resolves from_email: snapshot.from_email → share_tokens.recipient_email
---   5. Flips tx_type for recipient perspective
---   6. Finds contact_id in recipient's contacts (by linked_user_id or email)
---      6b. AUTO-CREATES contact if none found (linked to sender's user_id)
---   7. Inserts the mirrored entry into recipient's ledger
---   8. Updates share_tokens status → 'confirmed', confirmed_at = now()
---   9. Fires a notification to the sender
---
--- Returns jsonb: { entry_id: uuid } on success, { error: text } on failure
+-- PART 1: Updated RPC — now auto-creates contacts
 -- ──────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION confirm_share_for_recipient(
@@ -47,7 +29,6 @@ DECLARE
   v_flipped_type text;
   v_entry_number bigint;
 
-  -- tx_type flip map (recipient perspective is mirror of sender's)
   v_flip        jsonb := '{
     "they_owe_you":     "you_owe_them",
     "you_owe_them":     "they_owe_you",
@@ -84,7 +65,7 @@ BEGIN
     RETURN jsonb_build_object('error', 'Original entry not found');
   END IF;
 
-  -- 3. Resolve from_name (snapshot → sender's display_name → 'Someone')
+  -- 3. Resolve from_name
   v_from_name := COALESCE(
     NULLIF(v_token.entry_snapshot->>'from_name', ''),
     (SELECT display_name FROM users WHERE id = v_token.sender_id LIMIT 1),
@@ -102,14 +83,12 @@ BEGIN
   v_flipped_type := COALESCE(v_flip->>v_entry.tx_type, v_entry.tx_type);
 
   -- 6. Find or AUTO-CREATE contact in recipient's contacts
-  --    First try: contact whose linked_user_id = sender_id
   SELECT id INTO v_contact_id
   FROM contacts
   WHERE user_id = p_recipient_id
     AND linked_user_id = v_token.sender_id
   LIMIT 1;
 
-  --    Fallback: contact whose email = from_email
   IF v_contact_id IS NULL AND v_from_email <> '' THEN
     SELECT id INTO v_contact_id
     FROM contacts
@@ -131,12 +110,12 @@ BEGIN
     RETURNING id INTO v_contact_id;
   END IF;
 
-  -- 7a. Increment recipient's entry counter to get next entry_number
+  -- 7a. Increment recipient's entry counter
   UPDATE users SET entry_counter = COALESCE(entry_counter, 0) + 1
   WHERE id = p_recipient_id
   RETURNING entry_counter INTO v_entry_number;
 
-  -- 7b. Insert mirrored entry in recipient's ledger
+  -- 7b. Insert mirrored entry
   INSERT INTO entries (
     user_id, contact_id, tx_type, sender_tx_type,
     amount, currency, date, note, invoice_number, entry_number,
@@ -189,3 +168,73 @@ $$;
 
 REVOKE ALL ON FUNCTION confirm_share_for_recipient(uuid, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION confirm_share_for_recipient(uuid, uuid) TO authenticated;
+
+-- ──────────────────────────────────────────────────────────────────
+-- PART 2: Backfill existing shared entries with missing contact_id
+-- ──────────────────────────────────────────────────────────────────
+
+DO $$
+DECLARE
+  rec record;
+  v_contact_id uuid;
+  v_sender_id  uuid;
+  v_count      int := 0;
+BEGIN
+  FOR rec IN
+    SELECT e.id AS entry_id,
+           e.user_id AS recipient_id,
+           e.from_name,
+           e.from_email,
+           e.share_token,
+           st.sender_id
+    FROM entries e
+    JOIN share_tokens st ON st.token = e.share_token
+    WHERE e.is_shared = true
+      AND e.contact_id IS NULL
+      AND st.sender_id IS NOT NULL
+  LOOP
+    v_sender_id := rec.sender_id;
+    v_contact_id := NULL;
+
+    -- Check if contact already exists (by linked_user_id)
+    SELECT id INTO v_contact_id
+    FROM contacts
+    WHERE user_id = rec.recipient_id
+      AND linked_user_id = v_sender_id
+    LIMIT 1;
+
+    -- Check by email
+    IF v_contact_id IS NULL AND rec.from_email IS NOT NULL AND rec.from_email <> '' THEN
+      SELECT id INTO v_contact_id
+      FROM contacts
+      WHERE user_id = rec.recipient_id
+        AND lower(email) = lower(rec.from_email)
+      LIMIT 1;
+
+      -- Link existing contact if found by email
+      IF v_contact_id IS NOT NULL THEN
+        UPDATE contacts SET linked_user_id = v_sender_id WHERE id = v_contact_id;
+      END IF;
+    END IF;
+
+    -- Still no contact? Create one.
+    IF v_contact_id IS NULL THEN
+      INSERT INTO contacts (user_id, name, email, linked_user_id, tags)
+      VALUES (
+        rec.recipient_id,
+        COALESCE(NULLIF(rec.from_name, ''), 'Unknown'),
+        COALESCE(NULLIF(rec.from_email, ''), ''),
+        v_sender_id,
+        ARRAY['shared']::text[]
+      )
+      RETURNING id INTO v_contact_id;
+    END IF;
+
+    -- Update the entry
+    UPDATE entries SET contact_id = v_contact_id WHERE id = rec.entry_id;
+    v_count := v_count + 1;
+  END LOOP;
+
+  RAISE NOTICE 'Backfill complete: % entries updated', v_count;
+END;
+$$;

@@ -117,10 +117,10 @@ export async function confirmShare(tokenId, recipientId) {
   };
   const flippedType = FLIP[token.entry.tx_type] || token.entry.tx_type;
 
-  // Try to find the sender in recipient's contact list (by email or by linked_user_id)
+  // Find or AUTO-CREATE contact for sender in recipient's contact list
   let contactId = null;
   if (token.sender_id) {
-    // Look for a contact in recipient's list whose linked_user_id matches the sender
+    // First try: contact whose linked_user_id matches the sender
     const { data: linkedContact } = await supabase
       .from('contacts')
       .select('id')
@@ -138,6 +138,29 @@ export async function confirmShare(tokenId, recipientId) {
         .eq('email', fromEmail)
         .maybeSingle();
       if (emailContact) contactId = emailContact.id;
+    }
+
+    // AUTO-CREATE: if no contact found, create one linked to the sender
+    if (!contactId) {
+      const contactName = fromName || snap.from_name || 'Unknown';
+      const contactEmail = fromEmail || '';
+      const { data: newContact, error: cErr } = await supabase
+        .from('contacts')
+        .insert({
+          user_id:        recipientId,
+          name:           contactName,
+          email:          contactEmail,
+          linked_user_id: token.sender_id,
+          tags:           ['shared']
+        })
+        .select('id')
+        .single();
+      if (newContact) {
+        contactId = newContact.id;
+        console.log('[confirmShare] Auto-created contact:', contactName, contactId);
+      } else if (cErr) {
+        console.error('[confirmShare] Failed to auto-create contact:', cErr.message);
+      }
     }
   }
 
