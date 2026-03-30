@@ -1029,7 +1029,16 @@ function _modsKey() { return 'mxi_modules_' + (currentUser?.id || 'default'); }
 window._getModules = function _getModules() {
   try {
     const raw = localStorage.getItem(_modsKey());
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const mods = JSON.parse(raw);
+      // Backfill any new modules added since user last saved (default OFF)
+      let dirty = false;
+      OPTIONAL_MODULES.forEach(m => {
+        if (typeof mods[m.id] === 'undefined') { mods[m.id] = false; dirty = true; }
+      });
+      if (dirty) try { localStorage.setItem(_modsKey(), JSON.stringify(mods)); } catch(_) {}
+      return mods;
+    }
     // First visit for this user — default all modules OFF (user opts in via Settings)
     const defaults = {};
     OPTIONAL_MODULES.forEach(m => { defaults[m.id] = false; });

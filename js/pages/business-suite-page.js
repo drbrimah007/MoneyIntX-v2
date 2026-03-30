@@ -21,6 +21,20 @@ let _bsContacts = [];              // cached contacts
 let _bsEntries = [];               // cached business entries
 let _bsEl = null;                  // content element ref
 
+// ── Business ID ──────────────────────────────────────────────────
+function _getBizId() {
+  const uid = getCurrentUser()?.id;
+  if (!uid) return 'BIZ-000000';
+  const key = 'mxi_business_id_' + uid;
+  let id = localStorage.getItem(key);
+  if (id) return id;
+  // Generate a stable Business ID from user UUID
+  const hash = uid.replace(/-/g,'').slice(0,8).toUpperCase();
+  id = 'BIZ-' + hash;
+  localStorage.setItem(key, id);
+  return id;
+}
+
 // ── Business Suite Tool Registry ──────────────────────────────────
 const BS_TOOLS = [
   { id: 'bs-dash',       icon: '📊', label: 'Overview',         always: true },
@@ -33,6 +47,7 @@ const BS_TOOLS = [
   { id: 'bs-templates',  icon: '📑', label: 'Templates',        always: true },
   { id: 'bs-investments',icon: '📈', label: 'Investments',      always: true },
   { id: 'bs-panel-db',   icon: '🌐', label: 'Panel Public DB',  always: true },
+  { id: 'bs-branding',   icon: '🏷️', label: 'Branding',          always: true },
   { id: 'bs-operatives', icon: '🔑', label: 'Operatives',       always: true },
   { id: 'bs-settings',   icon: '⚙️', label: 'Suite Settings',   always: true },
 ];
@@ -94,8 +109,8 @@ export async function renderBusinessSuite(el) {
     <div class="bs-shell">
       <div class="bs-sidebar" id="bs-sidebar">
         <div class="bs-sidebar-header">
-          <div style="font-size:18px;font-weight:800;letter-spacing:-.02em;color:var(--text);">Business Suite</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Money IntX for Business</div>
+          <div style="font-size:18px;font-weight:800;letter-spacing:-.02em;color:var(--text);">${esc(getCurrentProfile()?.company_name || 'Business Suite')}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${_getBizId()}</div>
         </div>
         <div class="bs-sidebar-nav" id="bs-sidebar-nav">
           ${sidebarHtml}
@@ -168,6 +183,7 @@ async function _bsRenderSection(section) {
     case 'bs-templates':   await _bsRenderTemplates(el); break;
     case 'bs-investments': await _bsRenderInvestments(el); break;
     case 'bs-panel-db':    await _bsRenderPanelDB(el); break;
+    case 'bs-branding':    _bsRenderBranding(el); break;
     case 'bs-operatives':  await _bsRenderOperatives(el); break;
     case 'bs-settings':    _bsRenderSettings(el); break;
     default:               await _bsRenderDash(el); break;
@@ -204,34 +220,51 @@ async function _bsRenderDash(el) {
 
   const userName = profile?.display_name?.split(' ')[0] || 'there';
 
+  // Compute additional KPIs
+  const paidInvoices = invoicesSent.filter(e => e.status === 'settled');
+  const paidTotal = paidInvoices.filter(e => (e.currency||'USD') === cur).reduce((s,e) => s + (e.amount||0), 0);
+  const overdueInv = invoicesSent.filter(e => e.status !== 'settled' && e.status !== 'voided' && e.metadata?.due_date && new Date(e.metadata.due_date) < new Date());
+  const netPosition = totalOutstanding - totalBills;
+
   el.innerHTML = `
-    <div style="margin-bottom:24px;">
-      <h2 style="font-size:22px;font-weight:800;margin:0;">Business Overview</h2>
-      <p style="color:var(--muted);font-size:13px;margin-top:4px;">Welcome back, ${esc(userName)}</p>
+    <!-- Business header with branding -->
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+      ${profile?.logo_url ? `<img src="${esc(profile.logo_url)}" style="max-height:48px;max-width:120px;border-radius:8px;object-fit:contain;">` : ''}
+      <div style="flex:1;min-width:0;">
+        <h2 style="font-size:22px;font-weight:800;margin:0;">${esc(profile?.company_name || 'Business Overview')}</h2>
+        <p style="color:var(--muted);font-size:13px;margin-top:2px;">Welcome back, ${esc(userName)} · <span style="font-family:monospace;font-size:12px;">${_getBizId()}</span></p>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="window._bsNavigate('bs-branding')" style="white-space:nowrap;">Edit Branding</button>
     </div>
 
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:28px;">
-      <div class="card" style="padding:20px;border-left:3px solid var(--green,#7fe0d0);">
-        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Outstanding Invoices</div>
-        <div style="font-size:26px;font-weight:800;margin-top:6px;color:var(--green,#7fe0d0);">${fmtMoney(totalOutstanding, cur)}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:4px;">${invoicesSent.filter(e=>e.status!=='settled'&&e.status!=='voided').length} unpaid</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:24px;">
+      <div class="card" style="padding:18px;border-left:3px solid var(--green,#7fe0d0);">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Receivables</div>
+        <div style="font-size:24px;font-weight:800;margin-top:4px;color:var(--green,#7fe0d0);">${fmtMoney(totalOutstanding, cur)}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${invoicesSent.filter(e=>e.status!=='settled'&&e.status!=='voided').length} unpaid invoice${invoicesSent.filter(e=>e.status!=='settled'&&e.status!=='voided').length!==1?'s':''}</div>
       </div>
-      <div class="card" style="padding:20px;border-left:3px solid var(--blue,#8fa8d6);">
-        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Outstanding Bills</div>
-        <div style="font-size:26px;font-weight:800;margin-top:6px;color:var(--blue,#8fa8d6);">${fmtMoney(totalBills, cur)}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:4px;">${billsSent.filter(e=>e.status!=='settled'&&e.status!=='voided').length} pending</div>
+      <div class="card" style="padding:18px;border-left:3px solid var(--blue,#8fa8d6);">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Payables</div>
+        <div style="font-size:24px;font-weight:800;margin-top:4px;color:var(--blue,#8fa8d6);">${fmtMoney(totalBills, cur)}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${billsSent.filter(e=>e.status!=='settled'&&e.status!=='voided').length} pending bill${billsSent.filter(e=>e.status!=='settled'&&e.status!=='voided').length!==1?'s':''}</div>
       </div>
-      <div class="card" style="padding:20px;border-left:3px solid var(--gold,#d6b97a);">
-        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Total Activity</div>
-        <div style="font-size:26px;font-weight:800;margin-top:6px;color:var(--gold,#d6b97a);">${biz.length}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:4px;">business entries</div>
+      <div class="card" style="padding:18px;border-left:3px solid ${netPosition >= 0 ? 'var(--green,#7fe0d0)' : 'var(--red,#d07878)'};">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Net Position</div>
+        <div style="font-size:24px;font-weight:800;margin-top:4px;color:${netPosition >= 0 ? 'var(--green,#7fe0d0)' : 'var(--red,#d07878)'};">${fmtMoney(netPosition, cur)}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">receivables − payables</div>
+      </div>
+      <div class="card" style="padding:18px;border-left:3px solid var(--gold,#d6b97a);">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Collected</div>
+        <div style="font-size:24px;font-weight:800;margin-top:4px;color:var(--gold,#d6b97a);">${fmtMoney(paidTotal, cur)}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${paidInvoices.length} settled${overdueInv.length > 0 ? ` · <span style="color:var(--red,#d07878);">${overdueInv.length} overdue</span>` : ''}</div>
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:28px;">
-      <button class="btn btn-primary" onclick="window._bsQuickAction('invoice')" style="padding:14px;font-size:14px;font-weight:700;border-radius:10px;">+ New Invoice</button>
-      <button class="btn btn-secondary" onclick="window._bsQuickAction('bill')" style="padding:14px;font-size:14px;font-weight:700;border-radius:10px;">+ New Bill</button>
-      <button class="btn btn-secondary" onclick="window._bsNavigate('bs-clients')" style="padding:14px;font-size:14px;font-weight:700;border-radius:10px;">View Clients</button>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:28px;">
+      <button class="btn btn-primary" onclick="window._bsQuickAction('invoice')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">+ New Invoice</button>
+      <button class="btn btn-secondary" onclick="window._bsQuickAction('bill')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">+ New Bill</button>
+      <button class="btn btn-secondary" onclick="window._bsNavigate('bs-clients')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">Clients</button>
+      <button class="btn btn-secondary" onclick="window._bsNavigate('bs-panels')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">Panels</button>
     </div>
 
     <h3 style="font-size:16px;font-weight:700;margin-bottom:12px;">Recent Business Activity</h3>
@@ -289,26 +322,48 @@ async function _bsRenderInvoices(el) {
     .order('created_at', { ascending: false });
 
   const inv = data || [];
+  const unpaid = inv.filter(e => e.status !== 'settled' && e.status !== 'voided');
+  const overdue = unpaid.filter(e => e.metadata?.due_date && new Date(e.metadata.due_date) < new Date());
+  const totalUnpaid = unpaid.filter(e => (e.currency||'USD') === cur).reduce((s,e) => s+(e.amount||0), 0);
+
+  // Filter state
+  if (!window._bsInvFilter) window._bsInvFilter = 'all';
+  const f = window._bsInvFilter;
+  const filtered = f === 'all' ? inv
+    : f === 'unpaid' ? unpaid
+    : f === 'overdue' ? overdue
+    : f === 'settled' ? inv.filter(e => e.status === 'settled')
+    : inv;
 
   el.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <div>
         <h2 style="font-size:20px;font-weight:800;margin:0;">Invoices</h2>
-        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${inv.length} total invoice${inv.length!==1?'s':''}</p>
+        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${inv.length} total · ${unpaid.length} unpaid${overdue.length > 0 ? ` · <span style="color:var(--red,#d07878);">${overdue.length} overdue</span>` : ''} · ${fmtMoney(totalUnpaid, cur)} outstanding</p>
       </div>
       <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('invoice')">+ New Invoice</button>
     </div>
-    ${inv.length === 0
-      ? '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No invoices yet. Click "+ New Invoice" to create one.</p></div>'
+    <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;">
+      ${['all','unpaid','overdue','settled'].map(v => `
+        <button class="bs sm" onclick="window._bsInvFilter='${v}';window._bsNavigate('bs-invoices');"
+          style="font-weight:${f===v?'700':'500'};background:${f===v?'var(--accent)':'var(--bg3)'};color:${f===v?'#fff':'var(--text)'};border:1px solid ${f===v?'var(--accent)':'var(--border)'};border-radius:6px;padding:5px 12px;font-size:12px;">
+          ${v.charAt(0).toUpperCase()+v.slice(1)}${v==='all'?' ('+inv.length+')':v==='unpaid'?' ('+unpaid.length+')':v==='overdue'?' ('+overdue.length+')':' ('+inv.filter(e=>e.status==='settled').length+')'}
+        </button>`).join('')}
+    </div>
+    ${filtered.length === 0
+      ? '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No invoices match this filter.</p></div>'
       : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Client</th><th>Invoice #</th><th>Amount</th><th>Due</th><th>Status</th></tr></thead><tbody>
-          ${inv.map(e => `<tr style="cursor:pointer;" onclick="window._bsViewEntry('${e.id}')">
+          ${filtered.map(e => {
+            const isOverdue = e.status !== 'settled' && e.status !== 'voided' && e.metadata?.due_date && new Date(e.metadata.due_date) < new Date();
+            return `<tr style="cursor:pointer;${isOverdue?'background:rgba(208,120,120,.06);':''}" onclick="window._bsViewEntry('${e.id}')">
             <td style="color:var(--muted);font-size:13px;">${fmtDate(e.created_at)}</td>
             <td style="font-weight:600;">${esc(e.contact_name || '—')}</td>
-            <td style="color:var(--muted);font-size:13px;">${esc(e.metadata?.inv_number || '—')}</td>
+            <td style="color:var(--accent);font-size:13px;font-weight:600;">${esc(e.metadata?.inv_number || '—')}</td>
             <td style="font-weight:700;">${fmtMoney(e.amount, e.currency)}</td>
-            <td style="color:var(--muted);font-size:13px;">${fmtDate(e.metadata?.due_date)}</td>
+            <td style="color:${isOverdue?'var(--red,#d07878)':'var(--muted)'};font-size:13px;font-weight:${isOverdue?'600':'400'};">${fmtDate(e.metadata?.due_date)}${isOverdue?' ⚠':''}
+            </td>
             <td>${statusBadge(e.status || 'draft')}</td>
-          </tr>`).join('')}
+          </tr>`}).join('')}
         </tbody></table></div></div>`
     }
   `;
@@ -324,6 +379,7 @@ window._bsViewEntry = function(entryId) {
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderBills(el) {
   const user = getCurrentUser();
+  const cur = getCurrentProfile()?.default_currency || 'USD';
 
   const { data } = await supabase
     .from('entries')
@@ -334,26 +390,46 @@ async function _bsRenderBills(el) {
     .order('created_at', { ascending: false });
 
   const bills = data || [];
+  const unpaid = bills.filter(e => e.status !== 'settled' && e.status !== 'voided');
+  const overdue = unpaid.filter(e => e.metadata?.due_date && new Date(e.metadata.due_date) < new Date());
+  const totalUnpaid = unpaid.filter(e => (e.currency||'USD') === cur).reduce((s,e) => s+(e.amount||0), 0);
+
+  if (!window._bsBillFilter) window._bsBillFilter = 'all';
+  const f = window._bsBillFilter;
+  const filtered = f === 'all' ? bills
+    : f === 'unpaid' ? unpaid
+    : f === 'overdue' ? overdue
+    : f === 'settled' ? bills.filter(e => e.status === 'settled')
+    : bills;
 
   el.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <div>
         <h2 style="font-size:20px;font-weight:800;margin:0;">Bills</h2>
-        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${bills.length} total bill${bills.length!==1?'s':''}</p>
+        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${bills.length} total · ${unpaid.length} unpaid${overdue.length > 0 ? ` · <span style="color:var(--red,#d07878);">${overdue.length} overdue</span>` : ''} · ${fmtMoney(totalUnpaid, cur)} outstanding</p>
       </div>
       <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('bill')">+ New Bill</button>
     </div>
-    ${bills.length === 0
-      ? '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No bills yet. Click "+ New Bill" to create one.</p></div>'
-      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Contact</th><th>Ref #</th><th>Amount</th><th>Due</th><th>Status</th></tr></thead><tbody>
-          ${bills.map(e => `<tr style="cursor:pointer;" onclick="window._bsViewEntry('${e.id}')">
+    <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;">
+      ${['all','unpaid','overdue','settled'].map(v => `
+        <button class="bs sm" onclick="window._bsBillFilter='${v}';window._bsNavigate('bs-bills');"
+          style="font-weight:${f===v?'700':'500'};background:${f===v?'var(--accent)':'var(--bg3)'};color:${f===v?'#fff':'var(--text)'};border:1px solid ${f===v?'var(--accent)':'var(--border)'};border-radius:6px;padding:5px 12px;font-size:12px;">
+          ${v.charAt(0).toUpperCase()+v.slice(1)}${v==='all'?' ('+bills.length+')':v==='unpaid'?' ('+unpaid.length+')':v==='overdue'?' ('+overdue.length+')':' ('+bills.filter(e=>e.status==='settled').length+')'}
+        </button>`).join('')}
+    </div>
+    ${filtered.length === 0
+      ? '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No bills match this filter.</p></div>'
+      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Supplier</th><th>Ref #</th><th>Amount</th><th>Due</th><th>Status</th></tr></thead><tbody>
+          ${filtered.map(e => {
+            const isOverdue = e.status !== 'settled' && e.status !== 'voided' && e.metadata?.due_date && new Date(e.metadata.due_date) < new Date();
+            return `<tr style="cursor:pointer;${isOverdue?'background:rgba(208,120,120,.06);':''}" onclick="window._bsViewEntry('${e.id}')">
             <td style="color:var(--muted);font-size:13px;">${fmtDate(e.created_at)}</td>
             <td style="font-weight:600;">${esc(e.contact_name || '—')}</td>
             <td style="color:var(--muted);font-size:13px;">${esc(e.metadata?.ref_number || '—')}</td>
             <td style="font-weight:700;">${fmtMoney(e.amount, e.currency)}</td>
-            <td style="color:var(--muted);font-size:13px;">${fmtDate(e.metadata?.due_date)}</td>
+            <td style="color:${isOverdue?'var(--red,#d07878)':'var(--muted)'};font-size:13px;font-weight:${isOverdue?'600':'400'};">${fmtDate(e.metadata?.due_date)}${isOverdue?' ⚠':''}</td>
             <td>${statusBadge(e.status || 'draft')}</td>
-          </tr>`).join('')}
+          </tr>`}).join('')}
         </tbody></table></div></div>`
     }
   `;
@@ -364,25 +440,22 @@ async function _bsRenderBills(el) {
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderClients(el) {
   const user = getCurrentUser();
-
-  // Get contacts who have been invoiced (clients)
   const contacts = await listContacts(user.id);
   _bsContacts = contacts;
 
-  // Get all invoice_sent entries to identify clients
   const { data: invoices } = await supabase
     .from('entries')
-    .select('contact_id, contact_name, amount, currency, status')
+    .select('contact_id, contact_name, amount, currency, status, created_at')
     .eq('user_id', user.id)
     .eq('tx_type', 'invoice_sent')
-    .is('archived_at', null);
+    .is('archived_at', null)
+    .order('created_at', { ascending: false });
 
-  // Build client map: contact_id → { name, totalInvoiced, unpaid }
   const clientMap = {};
   (invoices || []).forEach(inv => {
     if (!inv.contact_id) return;
     if (!clientMap[inv.contact_id]) {
-      clientMap[inv.contact_id] = { name: inv.contact_name, total: 0, unpaid: 0, count: 0 };
+      clientMap[inv.contact_id] = { name: inv.contact_name, total: 0, unpaid: 0, count: 0, lastDate: inv.created_at };
     }
     clientMap[inv.contact_id].count++;
     clientMap[inv.contact_id].total += (inv.amount || 0);
@@ -391,27 +464,33 @@ async function _bsRenderClients(el) {
     }
   });
 
-  const clients = Object.entries(clientMap).map(([id, c]) => ({ id, ...c }));
+  // Enrich with contact details
+  const clients = Object.entries(clientMap).map(([id, c]) => {
+    const contact = contacts.find(ct => ct.id === id);
+    return { id, ...c, email: contact?.email || '', phone: contact?.phone || '' };
+  });
   clients.sort((a,b) => b.unpaid - a.unpaid);
-
   const cur = getCurrentProfile()?.default_currency || 'USD';
+  const totalReceivable = clients.reduce((s,c) => s + c.unpaid, 0);
 
   el.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <div>
         <h2 style="font-size:20px;font-weight:800;margin:0;">Clients</h2>
-        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${clients.length} client${clients.length!==1?'s':''} with invoices</p>
+        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${clients.length} client${clients.length!==1?'s':''} · ${fmtMoney(totalReceivable, cur)} total receivable</p>
       </div>
-      <button class="btn btn-secondary btn-sm" onclick="window._bsQuickAction('invoice')">+ Invoice Client</button>
+      <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('invoice')">+ Invoice Client</button>
     </div>
     ${clients.length === 0
       ? '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No clients yet. Clients appear here automatically when you send your first invoice.</p></div>'
-      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Client</th><th>Invoices</th><th>Total Invoiced</th><th>Unpaid</th></tr></thead><tbody>
+      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Client</th><th>Contact</th><th>Invoices</th><th>Total</th><th>Outstanding</th><th>Last Invoice</th></tr></thead><tbody>
           ${clients.map(c => `<tr>
             <td style="font-weight:600;">${contactAvatar(c.name, c.id, 28)} ${esc(c.name)}</td>
-            <td style="color:var(--muted);">${c.count}</td>
+            <td style="font-size:12px;color:var(--muted);">${esc(c.email || c.phone || '—')}</td>
+            <td style="text-align:center;">${c.count}</td>
             <td>${fmtMoney(c.total, cur)}</td>
             <td style="font-weight:700;color:${c.unpaid > 0 ? 'var(--green,#7fe0d0)' : 'var(--muted)'};">${fmtMoney(c.unpaid, cur)}</td>
+            <td style="color:var(--muted);font-size:12px;">${fmtRelative(c.lastDate)}</td>
           </tr>`).join('')}
         </tbody></table></div></div>`
     }
@@ -423,20 +502,21 @@ async function _bsRenderClients(el) {
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderSuppliers(el) {
   const user = getCurrentUser();
+  const contacts = _bsContacts.length ? _bsContacts : await listContacts(user.id);
 
-  // Get contacts you've sent bills to or recorded purchases against
   const { data: bills } = await supabase
     .from('entries')
-    .select('contact_id, contact_name, amount, currency, status')
+    .select('contact_id, contact_name, amount, currency, status, created_at')
     .eq('user_id', user.id)
     .in('tx_type', ['bill_sent','i_owe'])
-    .is('archived_at', null);
+    .is('archived_at', null)
+    .order('created_at', { ascending: false });
 
   const supplierMap = {};
   (bills || []).forEach(b => {
     if (!b.contact_id) return;
     if (!supplierMap[b.contact_id]) {
-      supplierMap[b.contact_id] = { name: b.contact_name, total: 0, unpaid: 0, count: 0 };
+      supplierMap[b.contact_id] = { name: b.contact_name, total: 0, unpaid: 0, count: 0, lastDate: b.created_at };
     }
     supplierMap[b.contact_id].count++;
     supplierMap[b.contact_id].total += (b.amount || 0);
@@ -445,27 +525,32 @@ async function _bsRenderSuppliers(el) {
     }
   });
 
-  const suppliers = Object.entries(supplierMap).map(([id, c]) => ({ id, ...c }));
+  const suppliers = Object.entries(supplierMap).map(([id, c]) => {
+    const contact = contacts.find(ct => ct.id === id);
+    return { id, ...c, email: contact?.email || '', phone: contact?.phone || '' };
+  });
   suppliers.sort((a,b) => b.unpaid - a.unpaid);
-
   const cur = getCurrentProfile()?.default_currency || 'USD';
+  const totalPayable = suppliers.reduce((s,c) => s + c.unpaid, 0);
 
   el.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <div>
         <h2 style="font-size:20px;font-weight:800;margin:0;">Suppliers</h2>
-        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${suppliers.length} supplier${suppliers.length!==1?'s':''}</p>
+        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${suppliers.length} supplier${suppliers.length!==1?'s':''} · ${fmtMoney(totalPayable, cur)} total payable</p>
       </div>
-      <button class="btn btn-secondary btn-sm" onclick="window._bsQuickAction('bill')">+ New Bill</button>
+      <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('bill')">+ New Bill</button>
     </div>
     ${suppliers.length === 0
       ? '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No suppliers yet. Suppliers appear here automatically when you create a bill or record a payable.</p></div>'
-      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Supplier</th><th>Bills</th><th>Total Billed</th><th>Unpaid</th></tr></thead><tbody>
+      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Supplier</th><th>Contact</th><th>Bills</th><th>Total</th><th>Outstanding</th><th>Last Bill</th></tr></thead><tbody>
           ${suppliers.map(c => `<tr>
             <td style="font-weight:600;">${contactAvatar(c.name, c.id, 28)} ${esc(c.name)}</td>
-            <td style="color:var(--muted);">${c.count}</td>
+            <td style="font-size:12px;color:var(--muted);">${esc(c.email || c.phone || '—')}</td>
+            <td style="text-align:center;">${c.count}</td>
             <td>${fmtMoney(c.total, cur)}</td>
             <td style="font-weight:700;color:${c.unpaid > 0 ? 'var(--red,#d07878)' : 'var(--muted)'};">${fmtMoney(c.unpaid, cur)}</td>
+            <td style="color:var(--muted);font-size:12px;">${fmtRelative(c.lastDate)}</td>
           </tr>`).join('')}
         </tbody></table></div></div>`
     }
@@ -518,21 +603,28 @@ async function _bsRenderPanels(el) {
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
       <div>
         <h2 style="font-size:20px;font-weight:800;margin:0;">Business Panels</h2>
-        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${panels.length} panel${panels.length!==1?'s':''}</p>
+        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${panels.length} panel${panels.length!==1?'s':''} · ${panels.filter(p=>p.is_public).length} published</p>
       </div>
       <div style="display:flex;gap:8px;">
-        <button class="btn btn-primary btn-sm" onclick="if(window.bpCreatePanel)window.bpCreatePanel();else window._bsNavigate('bs-panels');">+ New Panel</button>
-        <button class="btn btn-secondary btn-sm" onclick="window._bsNavigate('bs-panel-db')">Panel Public DB</button>
+        <button class="btn btn-primary btn-sm" onclick="if(window._bpEngine?.openCreateModal)window._bpEngine.openCreateModal();else toast('Panel engine not loaded','error');">+ New Panel</button>
+        <button class="btn btn-secondary btn-sm" onclick="window._bsNavigate('bs-panel-db')">Browse Public DB</button>
       </div>
     </div>
     ${panels.length === 0
-      ? '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No business panels yet. Create a custom panel to track structured business data.</p></div>'
+      ? '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No business panels yet. Create a custom panel to track structured business data, or import one from the Public DB.</p></div>'
       : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
           ${panels.map(p => `
-            <div class="card" style="padding:18px;cursor:pointer;" onclick="if(window.bpOpenPanel)window.bpOpenPanel('${p.id}')">
-              <div style="font-size:16px;font-weight:700;">${esc(p.title)}</div>
+            <div class="card" style="padding:18px;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                <div style="font-size:16px;font-weight:700;cursor:pointer;flex:1;" onclick="if(window._bpEngine?.openPanel)window._bpEngine.openPanel('${p.id}');else toast('Panel engine not loaded','error');">${esc(p.title)}</div>
+                ${p.is_public ? '<span class="badge badge-blue" style="font-size:10px;flex-shrink:0;">Public</span>' : ''}
+              </div>
               <div style="font-size:12px;color:var(--muted);margin-top:4px;">${esc(p.session_type || 'Standard')} · ${esc(p.currency || 'USD')}</div>
               <div style="font-size:11px;color:var(--muted);margin-top:6px;">${(p.fields||[]).length} field${(p.fields||[]).length!==1?'s':''} · Updated ${fmtRelative(p.updated_at || p.created_at)}</div>
+              <div style="display:flex;gap:6px;margin-top:10px;">
+                <button class="bs sm" onclick="if(window._bpEngine?.openPanel)window._bpEngine.openPanel('${p.id}');" style="font-size:12px;">Open</button>
+                <button class="bs sm" onclick="if(window._bpEngine?.togglePublicPanel)window._bpEngine.togglePublicPanel('${p.id}',${!p.is_public});" style="font-size:12px;">${p.is_public ? '🔒 Unpublish' : '🌐 Publish'}</button>
+              </div>
             </div>
           `).join('')}
         </div>`
@@ -626,6 +718,7 @@ async function _bsRenderInvestments(el) {
 // SECTION: Panel Public DB
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderPanelDB(el) {
+  const userId = getCurrentUser()?.id;
   // Fetch public business panels (is_public column may not exist yet — graceful fallback)
   let panels = [];
   try {
@@ -639,26 +732,79 @@ async function _bsRenderPanelDB(el) {
   } catch(_) { /* is_public column may not exist yet */ }
 
   el.innerHTML = `
-    <div style="margin-bottom:20px;">
-      <h2 style="font-size:20px;font-weight:800;margin:0;">Panel Public DB</h2>
-      <p style="color:var(--muted);font-size:13px;margin-top:2px;">Browse publicly shared business panels</p>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h2 style="font-size:20px;font-weight:800;margin:0;">Panel Public DB</h2>
+        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${panels.length} published panel${panels.length!==1?'s':''} available</p>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="window._bsNavigate('bs-panels')">My Panels</button>
     </div>
     ${panels.length === 0
-      ? '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No public business panels available yet. Publish your panels to share them here.</p></div>'
-      : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
-          ${panels.map(p => `
+      ? `<div class="card" style="text-align:center;padding:40px;">
+          <div style="font-size:32px;margin-bottom:12px;">📋</div>
+          <p style="color:var(--muted);margin-bottom:12px;">No public panels available yet.</p>
+          <p style="color:var(--muted);font-size:12px;">Publish one of your panels from the Business Panels section to share it here.</p>
+          <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="window._bsNavigate('bs-panels')">Go to My Panels</button>
+        </div>`
+      : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;">
+          ${panels.map(p => {
+            const fields = p.fields || [];
+            const isOwn = p.user_id === userId;
+            return `
             <div class="card" style="padding:18px;">
-              <div style="font-size:16px;font-weight:700;">${esc(p.title)}</div>
-              <div style="font-size:12px;color:var(--muted);margin-top:4px;">${esc(p.session_type || 'Standard')} · ${esc(p.currency || 'USD')} · ${(p.fields||[]).length} fields</div>
-              <div style="margin-top:12px;">
-                <button class="btn btn-secondary btn-sm" onclick="window._bsCopyPanel('${p.id}')">+ Copy to My Panels</button>
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                <div style="font-size:16px;font-weight:700;">${esc(p.title)}</div>
+                ${isOwn ? '<span class="badge badge-purple" style="font-size:10px;">Yours</span>' : ''}
               </div>
-            </div>
-          `).join('')}
+              <div style="font-size:12px;color:var(--muted);margin-top:4px;">${esc(p.session_type || 'Standard')} · ${esc(p.currency || 'USD')}</div>
+              <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;">
+                ${fields.slice(0,5).map(f => `<span class="badge badge-gray" style="font-size:10px;">${esc(f.name||f.label||'Field')}</span>`).join('')}
+                ${fields.length > 5 ? `<span class="badge badge-gray" style="font-size:10px;">+${fields.length-5} more</span>` : ''}
+              </div>
+              <div style="font-size:11px;color:var(--muted);margin-top:6px;">Published ${fmtRelative(p.created_at)}</div>
+              <div style="margin-top:10px;display:flex;gap:6px;">
+                ${!isOwn ? `<button class="btn btn-primary btn-sm" onclick="window._bsCopyPanel('${p.id}')">+ Import to My Panels</button>` : `<button class="btn btn-secondary btn-sm" onclick="if(window._bpEngine?.openPanel)window._bpEngine.openPanel('${p.id}');">Open</button>`}
+                <button class="bs sm" onclick="window._bsPreviewPanel('${p.id}')" style="font-size:12px;">Preview Fields</button>
+              </div>
+            </div>`;
+          }).join('')}
         </div>`
     }
   `;
 }
+
+// Preview panel fields in a modal
+window._bsPreviewPanel = async function(panelId) {
+  const { data: panel } = await supabase
+    .from('business_panels')
+    .select('*')
+    .eq('id', panelId)
+    .single();
+  if (!panel) { toast('Panel not found', 'error'); return; }
+
+  const fields = panel.fields || [];
+  openModal(`
+    <div class="modal-title">${esc(panel.title)} — Fields Preview</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">${esc(panel.session_type || 'Standard')} · ${esc(panel.currency || 'USD')} · ${fields.length} field${fields.length!==1?'s':''}</div>
+    ${fields.length === 0 ? '<p style="color:var(--muted);">This panel has no fields defined yet.</p>' : `
+      <div style="max-height:300px;overflow-y:auto;">
+        ${fields.map((f, i) => `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:11px;color:var(--muted);width:20px;text-align:right;">${i+1}.</span>
+            <div style="flex:1;">
+              <div style="font-weight:600;font-size:13px;">${esc(f.name || f.label || 'Unnamed')}</div>
+              <div style="font-size:11px;color:var(--muted);">${esc(f.type || 'text')}${f.unitType ? ' · ' + esc(f.unitType + (f.unitValue ? ':'+f.unitValue : '')) : ''}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `}
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="bs sm" onclick="closeModal()">Close</button>
+      ${panel.user_id !== getCurrentUser()?.id ? `<button class="btn btn-primary sm" onclick="closeModal();window._bsCopyPanel('${panelId}')">+ Import</button>` : ''}
+    </div>
+  `, { maxWidth: '500px' });
+};
 
 window._bsCopyPanel = async function(panelId) {
   const user = getCurrentUser();
@@ -685,6 +831,153 @@ window._bsCopyPanel = async function(panelId) {
   if (error) { toast('Failed to copy: ' + error.message, 'error'); return; }
   toast('Panel copied to your Business Panels', 'success');
   window._bsNavigate('bs-panels');
+};
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION: Branding — Invoice customization & business identity
+// ══════════════════════════════════════════════════════════════════
+function _bsRenderBranding(el) {
+  const p = getCurrentProfile() || {};
+  const bizId = _getBizId();
+
+  el.innerHTML = `
+    <div style="margin-bottom:24px;">
+      <h2 style="font-size:20px;font-weight:800;margin:0;">Business Branding</h2>
+      <p style="color:var(--muted);font-size:13px;margin-top:2px;">Customize how your business appears on invoices, bills, and shared documents</p>
+    </div>
+
+    <!-- Business Identity Card -->
+    <div class="card" style="padding:20px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap;">
+        <div style="width:64px;height:64px;border-radius:12px;border:2px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--bg3);flex-shrink:0;">
+          ${p.logo_url
+            ? `<img src="${esc(p.logo_url)}" style="width:100%;height:100%;object-fit:contain;">`
+            : `<span style="font-size:28px;font-weight:800;color:var(--accent);">${(p.company_name||p.display_name||'B').charAt(0).toUpperCase()}</span>`}
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:18px;font-weight:700;">${esc(p.company_name || 'Your Business Name')}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;font-family:monospace;">${bizId}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;color:var(--muted);">
+        <div>Email: <span style="color:var(--text);font-weight:500;">${esc(p.company_email || '—')}</span></div>
+        <div>Phone: <span style="color:var(--text);font-weight:500;">${esc(p.company_phone || '—')}</span></div>
+        <div style="grid-column:span 2;">Address: <span style="color:var(--text);font-weight:500;">${esc(p.company_address || '—')}</span></div>
+      </div>
+    </div>
+
+    <!-- Edit Branding Form -->
+    <div class="card" style="padding:20px;margin-bottom:16px;">
+      <h3 style="font-size:15px;font-weight:700;margin:0 0 14px;">Edit Business Info</h3>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+        <div id="bs-brand-logo-box" style="width:72px;height:72px;border-radius:10px;border:2px dashed var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--bg3);flex-shrink:0;">
+          ${p.logo_url
+            ? `<img id="bs-brand-logo-img" src="${esc(p.logo_url)}" style="width:100%;height:100%;object-fit:contain;">`
+            : `<span style="font-size:12px;color:var(--muted);">Logo</span>`}
+        </div>
+        <div>
+          <label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;">
+            Upload Logo
+            <input type="file" accept="image/*" style="display:none;" onchange="window._bsUploadLogo(this)">
+          </label>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Max 5 MB · JPG, PNG, WebP, SVG</div>
+          <div id="bs-brand-logo-status" style="font-size:11px;margin-top:2px;"></div>
+        </div>
+      </div>
+      <input type="hidden" id="bs-brand-logo-url" value="${esc(p.logo_url || '')}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Business Name</label><input type="text" id="bs-brand-name" value="${esc(p.company_name || '')}" placeholder="Your Company Ltd."></div>
+        <div class="form-group"><label>Business Email</label><input type="email" id="bs-brand-email" value="${esc(p.company_email || '')}" placeholder="billing@company.com"></div>
+        <div class="form-group"><label>Business Phone</label><input type="text" id="bs-brand-phone" value="${esc(p.company_phone || '')}" placeholder="+1 234 567 8900"></div>
+        <div class="form-group"><label>Business Address</label><input type="text" id="bs-brand-addr" value="${esc(p.company_address || '')}" placeholder="123 Main St, City"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-primary btn-sm" onclick="window._bsSaveBranding()">Save Branding</button>
+      </div>
+    </div>
+
+    <!-- Invoice Preview -->
+    <div class="card" style="padding:20px;">
+      <h3 style="font-size:15px;font-weight:700;margin:0 0 14px;">Invoice Preview</h3>
+      <div style="background:var(--bg3);border-radius:10px;padding:20px;border:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+          <div>
+            ${p.logo_url ? `<img src="${esc(p.logo_url)}" style="max-height:40px;max-width:100px;margin-bottom:6px;object-fit:contain;">` : ''}
+            <div style="font-size:16px;font-weight:800;">${esc(p.company_name || 'Your Business')}</div>
+            <div style="font-size:11px;color:var(--muted);">${esc(p.company_address || 'Business Address')}</div>
+            <div style="font-size:11px;color:var(--muted);">${esc(p.company_email || 'email@business.com')} · ${esc(p.company_phone || 'Phone')}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:20px;font-weight:800;color:var(--accent);">INVOICE</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">#INV-0001</div>
+            <div style="font-size:11px;color:var(--muted);">Date: ${new Date().toLocaleDateString()}</div>
+          </div>
+        </div>
+        <div style="border-top:2px solid var(--border);padding-top:12px;margin-top:8px;">
+          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);">
+            <span style="font-weight:600;">Item</span><span style="font-weight:600;">Amount</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;border-bottom:1px solid var(--border);">
+            <span>Sample line item</span><span style="font-weight:600;">${p.default_currency||'USD'} 100.00</span>
+          </div>
+          <div style="display:flex;justify-content:flex-end;padding:10px 0;font-size:14px;font-weight:800;">
+            Total: ${p.default_currency||'USD'} 100.00
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center;font-family:monospace;">${bizId} · Powered by Money IntX</div>
+      </div>
+    </div>
+  `;
+}
+
+window._bsUploadLogo = async function(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('bs-brand-logo-status');
+  if (file.size > 5 * 1024 * 1024) { statusEl.textContent = 'File too large — max 5 MB'; statusEl.style.color = 'var(--red)'; return; }
+  statusEl.textContent = 'Uploading…'; statusEl.style.color = 'var(--muted)';
+  const uid = getCurrentUser().id;
+  const ext = file.name.split('.').pop();
+  const path = `${uid}/logo.${ext}`;
+  const { error } = await supabase.storage.from('user-logos').upload(path, file, { upsert: true });
+  if (error) { statusEl.textContent = 'Upload failed: ' + error.message; statusEl.style.color = 'var(--red)'; return; }
+  const { data } = supabase.storage.from('user-logos').getPublicUrl(path);
+  const url = data.publicUrl + '?t=' + Date.now();
+  document.getElementById('bs-brand-logo-url').value = url;
+  const box = document.getElementById('bs-brand-logo-box');
+  if (box) box.innerHTML = `<img id="bs-brand-logo-img" src="${url}" style="width:100%;height:100%;object-fit:contain;">`;
+  statusEl.textContent = 'Uploaded!'; statusEl.style.color = 'var(--green)';
+};
+
+window._bsSaveBranding = async function() {
+  const uid = getCurrentUser().id;
+  const updates = {
+    logo_url:        (document.getElementById('bs-brand-logo-url')?.value || '').trim(),
+    company_name:    (document.getElementById('bs-brand-name')?.value || '').trim(),
+    company_email:   (document.getElementById('bs-brand-email')?.value || '').trim(),
+    company_phone:   (document.getElementById('bs-brand-phone')?.value || '').trim(),
+    company_address: (document.getElementById('bs-brand-addr')?.value || '').trim(),
+    updated_at:      new Date().toISOString()
+  };
+  const { error } = await supabase.from('users').update(updates).eq('id', uid);
+  if (error) { toast('Failed to save: ' + error.message, 'error'); return; }
+  // Refresh profile in state
+  const { data: fresh } = await supabase.from('users').select('*').eq('id', uid).single();
+  if (fresh) {
+    const { setCurrentProfile } = await import('./state.js');
+    setCurrentProfile(fresh);
+  }
+  toast('Branding saved', 'success');
+  // Re-render to show updated preview
+  _bsRenderBranding(document.getElementById('bs-content'));
+  // Update sidebar header
+  const hdr = document.querySelector('.bs-sidebar-header');
+  if (hdr) {
+    hdr.innerHTML = `
+      <div style="font-size:18px;font-weight:800;letter-spacing:-.02em;color:var(--text);">${esc(updates.company_name || 'Business Suite')}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px;">${_getBizId()}</div>
+    `;
+  }
 };
 
 // ══════════════════════════════════════════════════════════════════
@@ -818,13 +1111,25 @@ async function _bsRenderOperatives(el) {
 window._bsAddOperative = function() {
   openModal(`
     <div class="modal-title">Add Operative</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Search for an existing Money IntX member by name or email. They must already have an account on the platform.</p>
     <div class="form-group">
-      <label>Name *</label>
-      <input type="text" id="bs-op-name" placeholder="Full name" style="width:100%;">
-    </div>
-    <div class="form-group">
-      <label>Email</label>
-      <input type="email" id="bs-op-email" placeholder="email@example.com" style="width:100%;">
+      <label>Search Member *</label>
+      <input type="text" id="bs-op-search" placeholder="Search by name or email…" autocomplete="off" style="width:100%;"
+        oninput="window._bsSearchMembers(this.value)">
+      <div id="bs-op-search-results" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:4px;display:none;"></div>
+      <input type="hidden" id="bs-op-user-id" value="">
+      <input type="hidden" id="bs-op-name" value="">
+      <input type="hidden" id="bs-op-email" value="">
+      <div id="bs-op-selected" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div id="bs-op-sel-avatar" style="width:32px;height:32px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;"></div>
+          <div>
+            <div id="bs-op-sel-name" style="font-weight:600;font-size:13px;"></div>
+            <div id="bs-op-sel-email" style="font-size:11px;color:var(--muted);"></div>
+          </div>
+          <button class="bs sm" onclick="window._bsClearOpSelection()" style="margin-left:auto;font-size:11px;color:var(--red);">✕</button>
+        </div>
+      </div>
     </div>
     <div class="form-group">
       <label>Role *</label>
@@ -834,28 +1139,121 @@ window._bsAddOperative = function() {
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="bs sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary sm" onclick="window._bsSaveNewOperative()">Add Operative</button>
+      <button class="btn btn-primary sm" onclick="window._bsSaveNewOperative()">Invite Operative</button>
     </div>
-  `, { maxWidth: '440px' });
+  `, { maxWidth: '480px' });
 };
 
-window._bsSaveNewOperative = function() {
+window._bsSearchMembers = async function(query) {
+  const resultsEl = document.getElementById('bs-op-search-results');
+  if (!resultsEl) return;
+  if (!query || query.length < 2) { resultsEl.style.display = 'none'; return; }
+
+  // Search users by display_name or email
+  const { data } = await supabase
+    .from('users')
+    .select('id, display_name, email, avatar_url')
+    .or(`display_name.ilike.%${query}%,email.ilike.%${query}%`)
+    .neq('id', getCurrentUser().id)
+    .limit(10);
+
+  const users = data || [];
+  const ops = _getOperatives();
+  const existingIds = new Set(ops.filter(o => o.user_id).map(o => o.user_id));
+
+  if (users.length === 0) {
+    resultsEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--muted);font-size:12px;">No members found. They must have a Money IntX account first.</div>';
+    resultsEl.style.display = 'block';
+    return;
+  }
+
+  resultsEl.innerHTML = users.map(u => {
+    const already = existingIds.has(u.id);
+    return `<div onclick="${already ? '' : `window._bsSelectOpMember('${u.id}','${esc(u.display_name||'')}','${esc(u.email||'')}')`}"
+      style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:${already?'default':'pointer'};border-bottom:1px solid var(--border);opacity:${already?'0.5':'1'};"
+      ${already ? '' : 'onmouseenter="this.style.background=\'var(--bg3)\'" onmouseleave="this.style.background=\'\'"'}>
+      <div style="width:28px;height:28px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;">
+        ${(u.display_name||u.email||'?').charAt(0).toUpperCase()}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:13px;">${esc(u.display_name || 'Unnamed')}</div>
+        <div style="font-size:11px;color:var(--muted);">${esc(u.email || '')}</div>
+      </div>
+      ${already ? '<span class="badge badge-gray" style="font-size:10px;">Already added</span>' : ''}
+    </div>`;
+  }).join('');
+  resultsEl.style.display = 'block';
+};
+
+window._bsSelectOpMember = function(userId, name, email) {
+  document.getElementById('bs-op-user-id').value = userId;
+  document.getElementById('bs-op-name').value = name;
+  document.getElementById('bs-op-email').value = email;
+  document.getElementById('bs-op-search-results').style.display = 'none';
+  document.getElementById('bs-op-search').style.display = 'none';
+
+  const sel = document.getElementById('bs-op-selected');
+  sel.style.display = 'block';
+  document.getElementById('bs-op-sel-avatar').textContent = (name||email||'?').charAt(0).toUpperCase();
+  document.getElementById('bs-op-sel-name').textContent = name || 'Unnamed';
+  document.getElementById('bs-op-sel-email').textContent = email || '';
+};
+
+window._bsClearOpSelection = function() {
+  document.getElementById('bs-op-user-id').value = '';
+  document.getElementById('bs-op-name').value = '';
+  document.getElementById('bs-op-email').value = '';
+  document.getElementById('bs-op-selected').style.display = 'none';
+  const searchEl = document.getElementById('bs-op-search');
+  searchEl.style.display = '';
+  searchEl.value = '';
+  searchEl.focus();
+};
+
+window._bsSaveNewOperative = async function() {
+  const userId = (document.getElementById('bs-op-user-id')?.value || '').trim();
   const name = (document.getElementById('bs-op-name')?.value || '').trim();
   const email = (document.getElementById('bs-op-email')?.value || '').trim();
   const role = document.getElementById('bs-op-role')?.value || 'viewer';
-  if (!name) { toast('Name is required', 'error'); return; }
+  if (!userId || !name) { toast('Please search and select a member first', 'error'); return; }
 
   const ops = _getOperatives();
+  if (ops.some(o => o.user_id === userId)) { toast('This member is already an operative', 'error'); return; }
+
   ops.push({
     id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36),
+    user_id: userId,
     name, email, role,
-    status: 'active',
+    status: 'invited',
     added_at: new Date().toISOString(),
     is_self: false
   });
   _saveOperatives(ops);
   closeModal();
-  toast('Operative added', 'success');
+
+  // Send invitation email
+  const profile = getCurrentProfile();
+  const bizName = profile?.company_name || profile?.display_name || 'A business';
+  const roleLabel = BS_ROLES.find(r => r.id === role)?.label || role;
+  try {
+    await fetch('/api/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: email,
+        subject: `${bizName} has invited you as a Business ${roleLabel}`,
+        type: 'notification',
+        data: {
+          heading: `You've been invited!`,
+          body: `${bizName} has invited you to join their business as a <strong>${roleLabel}</strong> on Money IntX. Log in to your account to view and manage business operations.`,
+          cta_text: 'Go to Money IntX',
+          cta_url: 'https://moneyinteractions.com'
+        }
+      })
+    });
+  } catch(_) { /* email send is best-effort */ }
+
+  toast(`${name} invited as ${roleLabel}`, 'success');
   _bsRenderOperatives(document.getElementById('bs-content'));
 };
 
