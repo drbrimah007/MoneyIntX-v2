@@ -396,8 +396,26 @@ window.confirmSettlement = async function(settlementId, entryId, reviewMode) {
     }
     toast('Settlement confirmed.', 'success');
     invalidateEntryCache(getCurrentUser().id);
+
+    // Notify the recorder that their payment was confirmed
+    try {
+      const entry = await getEntry(entryId);
+      if (entry?.linked_entry_id) {
+        const { data: linkedEntry } = await supabase
+          .from('entries').select('user_id').eq('id', entry.linked_entry_id).maybeSingle();
+        if (linkedEntry?.user_id && linkedEntry.user_id !== getCurrentUser().id) {
+          const myName = getCurrentProfile()?.display_name || 'Someone';
+          await supabase.from('notifications').insert({
+            user_id: linkedEntry.user_id, type: 'settlement_confirmed',
+            message: `${myName} confirmed your payment of ${fmtMoney(result.amount, entry.currency || 'USD')}`,
+            amount: result.amount, currency: entry.currency || 'USD',
+            contact_name: myName, entry_id: entry.linked_entry_id, read: false
+          });
+        }
+      }
+    } catch (_) { /* notification is non-critical */ }
+
     closeModal();
-    // Re-open the entry detail, staying in review mode if applicable
     await window.openEntryDetail(entryId, { reviewMode: reviewMode || false });
   } catch (err) {
     console.error('[confirmSettlement]', err);
@@ -408,6 +426,9 @@ window.confirmSettlement = async function(settlementId, entryId, reviewMode) {
 window.rejectSettlement = async function(settlementId, entryId, reviewMode) {
   if (!confirm('Reject this settlement? It will be removed.')) return;
   try {
+    // Get settlement details before deleting (for notification)
+    const { data: settlement } = await supabase.from('settlements').select('*').eq('id', settlementId).maybeSingle();
+
     const ok = await deleteSettlement(settlementId);
     if (!ok) {
       toast('Failed to reject settlement.', 'error');
@@ -415,6 +436,33 @@ window.rejectSettlement = async function(settlementId, entryId, reviewMode) {
     }
     toast('Settlement rejected and removed.', 'success');
     invalidateEntryCache(getCurrentUser().id);
+
+    // Notify the recorder that their payment was rejected
+    try {
+      const entry = await getEntry(entryId);
+      if (entry?.linked_entry_id) {
+        const { data: linkedEntry } = await supabase
+          .from('entries').select('user_id').eq('id', entry.linked_entry_id).maybeSingle();
+        if (linkedEntry?.user_id && linkedEntry.user_id !== getCurrentUser().id) {
+          const myName = getCurrentProfile()?.display_name || 'Someone';
+          const amt = settlement?.amount || 0;
+          await supabase.from('notifications').insert({
+            user_id: linkedEntry.user_id, type: 'settlement_rejected',
+            message: `${myName} rejected your payment of ${fmtMoney(amt, entry.currency || 'USD')}`,
+            amount: amt, currency: entry.currency || 'USD',
+            contact_name: myName, entry_id: entry.linked_entry_id, read: false
+          });
+          // Also delete the mirror settlement on the recorder's side
+          if (settlement?.mirror_of) {
+            await supabase.from('settlements').delete().eq('id', settlement.mirror_of).catch(() => {});
+          } else {
+            // This settlement might be the original — find and delete its mirror
+            await supabase.from('settlements').delete().eq('mirror_of', settlementId).catch(() => {});
+          }
+        }
+      }
+    } catch (_) { /* notification is non-critical */ }
+
     closeModal();
     await window.openEntryDetail(entryId, { reviewMode: reviewMode || false });
   } catch (err) {
@@ -927,21 +975,27 @@ window.saveMarkPaid = async function(entryId, currency) {
         .maybeSingle();
       if (mirrorEntry?.id) {
         mirrorEntryId = mirrorEntry.id;
-        await supabase.from('settlements').insert({
+        const { data: mirrorSettlement } = await supabase.from('settlements').insert({
           entry_id:    mirrorEntry.id,
           amount:      amountCents,
           method:      method,
           note:        note,
           proof_url:   proofUrl,
           recorded_by: getCurrentUser().id,
-          status:      iOwe ? 'pending' : 'confirmed'
-        });
+          status:      'pending',   // ALWAYS pending — other party must confirm (double-confirm)
+          mirror_of:   settlement.id  // link back to original settlement
+        }).select('id').single();
+        // Cross-link: point original settlement to mirror
+        if (mirrorSettlement?.id && settlement?.id) {
+          await supabase.from('settlements').update({ mirror_of: mirrorSettlement.id })
+            .eq('id', settlement.id).catch(() => {});
+        }
       }
     }
 
     // 6. In-app notification to linked contact — use THEIR mirror entry ID so they can open it
     if (linkedUserId) {
-      const contactType = iOwe ? 'settlement_pending' : 'payment_received';
+      const contactType = 'settlement_pending';  // always pending for double-confirm
       await supabase.from('notifications').insert({
         user_id: linkedUserId, type: contactType,
         message: `${fromName} recorded a payment of ${fmtAmt}${note ? ' — ' + note : ''}`,
