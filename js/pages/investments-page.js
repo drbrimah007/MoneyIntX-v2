@@ -239,6 +239,13 @@ window.doCreateInvestment = async function() {
   }
   closeModal();
   toast(`Investment "${name}" created${partners.length > 0 ? ` with ${partners.length} partner${partners.length!==1?'s':''}` : ''}.`, 'success');
+
+  // Business Suite after-save hook
+  if (window._bsCreatingInvestment && inv?.id) {
+    if (typeof window._invAfterSave === 'function') window._invAfterSave(inv.id);
+    window._bsCreatingInvestment = false;
+    if (window._bsNavigate) { window._bsNavigate('bs-investments'); return; }
+  }
   window.navTo('investments');
 };
 

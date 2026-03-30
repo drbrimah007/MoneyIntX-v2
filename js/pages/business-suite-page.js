@@ -10,7 +10,7 @@ import { getCurrentUser, getCurrentProfile, contactColor, contactAvatar, renderP
 import { esc, toast, openModal, closeModal, fmtDate, fmtRelative, statusBadge, TX_LABELS, TX_COLORS } from '../ui.js';
 import { supabase } from '../supabase.js';
 import { listContacts } from '../contacts.js';
-import { fmtMoney } from '../entries.js';
+import { fmtMoney, createEntry } from '../entries.js';
 import { listTemplates, listPublicTemplates, copyPublicTemplate } from '../templates.js';
 import { listRecurring, FREQUENCIES } from '../recurring.js';
 import { listPanels } from '../business-panels.js';
@@ -67,7 +67,7 @@ function _getBsItems() {
     const raw = localStorage.getItem(_bsItemsKey());
     if (raw) return JSON.parse(raw);
   } catch(_) {}
-  return { templates: [], panels: [], recurring: [] };
+  return { templates: [], panels: [], recurring: [], investments: [] };
 }
 
 function _saveBsItems(items) {
@@ -190,6 +190,13 @@ export async function renderBusinessSuite(el) {
 // ── Section Navigation ────────────────────────────────────────────
 window._bsNavigate = function(section) {
   if (section === 'bs-back') {
+    // Clear any lingering BS context flags to prevent personal items getting tagged
+    window._bsActiveContext = false;
+    window._bsActiveBizId = '';
+    window._bsCreatingPanel = false;
+    window._bsCreatingTemplate = false;
+    window._bsCreatingRecurring = false;
+    window._bsCreatingInvestment = false;
     // Close sidebar on mobile
     document.getElementById('bs-sidebar')?.classList.remove('bs-sidebar-open');
     if (window.app?.navigate) window.app.navigate('dash');
@@ -1066,18 +1073,22 @@ window._bsSaveReceivedBill = async function() {
   if (refNum) metadata.ref_number = refNum;
   if (notes) metadata.notes = notes;
 
-  const { error } = await supabase.from('entries').insert({
-    user_id: user.id,
-    contact_id: finalContactId,
-    contact_name: supplierName,
-    tx_type: 'bill_sent',
-    amount, currency,
+  // Use createEntry for proper entry_number counter tracking
+  const entry = await createEntry(user.id, {
+    contactId: finalContactId,
+    txType: 'bill_sent',
+    amount,
+    currency,
+    date: billDate,
+    note: description || '',
+    invoiceNumber: refNum || '',
     status: 'pending',
-    metadata,
-    created_at: new Date(billDate + 'T12:00:00').toISOString()
+    metadata
   });
 
-  if (error) { toast('Failed to log bill: ' + error.message, 'error'); return; }
+  if (!entry) { toast('Failed to log bill', 'error'); return; }
+  // Update contact_name on the entry (createEntry doesn't set it)
+  await supabase.from('entries').update({ contact_name: supplierName }).eq('id', entry.id);
   closeModal();
   toast('Bill logged from ' + supplierName, 'success');
   window._bsNavigate('bs-suppliers');
@@ -1414,6 +1425,12 @@ window._bsCreateRecurring = function() {
   else toast('Recurring module not loaded', 'error');
 };
 
+window._bsCreateInvestment = function() {
+  window._bsCreatingInvestment = true;
+  if (window.openNewInvestmentModal) window.openNewInvestmentModal();
+  else toast('Investment module not loaded', 'error');
+};
+
 // After panel save, check flag and track
 const _origBpAfterSave = window._bpAfterSave;
 window._bpAfterSave = function(panelId) {
@@ -1446,6 +1463,17 @@ window._recAfterSave = function(ruleId) {
     setTimeout(() => window._bsNavigate('bs-recurring'), 100);
   }
   if (typeof _origRecAfterSave === 'function') _origRecAfterSave(ruleId);
+};
+
+// After investment save, check flag and track
+const _origInvAfterSave = window._invAfterSave;
+window._invAfterSave = function(investmentId) {
+  if (window._bsCreatingInvestment && investmentId) {
+    _addBsItem('investments', investmentId);
+    window._bsCreatingInvestment = false;
+    setTimeout(() => window._bsNavigate('bs-investments'), 100);
+  }
+  if (typeof _origInvAfterSave === 'function') _origInvAfterSave(investmentId);
 };
 
 // Copy/install a public template
@@ -1503,7 +1531,9 @@ async function _bsRenderInvestments(el) {
     .is('archived_at', null)
     .order('created_at', { ascending: false });
 
-  const inv = investments || [];
+  // Only show investments tracked in the business context
+  const bsInvIds = new Set(_getBsItems().investments || []);
+  const inv = (investments || []).filter(i => bsInvIds.has(i.id));
   const totalMembers = inv.reduce((s,i) => s + (i.members||[]).length, 0);
   const totalTx = inv.reduce((s,i) => s + (i.transactions||[]).length, 0);
 
@@ -1513,7 +1543,7 @@ async function _bsRenderInvestments(el) {
         <h2 style="font-size:20px;font-weight:800;margin:0;">Investments</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${inv.length} investment${inv.length!==1?'s':''} · ${totalMembers} member${totalMembers!==1?'s':''} · ${totalTx} transaction${totalTx!==1?'s':''}</p>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="if(window.openNewInvestmentModal)window.openNewInvestmentModal()">+ New Investment</button>
+      <button class="btn btn-primary btn-sm" onclick="window._bsCreateInvestment()">+ New Investment</button>
     </div>
 
     ${inv.length > 0 ? `
@@ -1536,14 +1566,14 @@ async function _bsRenderInvestments(el) {
       ? `<div class="card" style="text-align:center;padding:40px;">
           <div style="font-size:36px;margin-bottom:10px;">📈</div>
           <p style="font-weight:700;font-size:15px;margin-bottom:6px;">No investments yet</p>
-          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Track investment pools, member contributions, and returns all in one place.</p>
-          <button class="btn btn-primary btn-sm" onclick="if(window.openNewInvestmentModal)window.openNewInvestmentModal()">Create First Investment</button>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Your business starts fresh. Create a new investment pool or manage existing ones here.</p>
+          <button class="btn btn-primary btn-sm" onclick="window._bsCreateInvestment()">Create First Investment</button>
         </div>`
       : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
           ${inv.map(i => {
             const memberCount = (i.members||[]).length;
             const txCount = (i.transactions||[]).length;
-            return `<div class="card" style="padding:18px;cursor:pointer;transition:border-color .15s;" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor=''" onclick="if(window.openInvestmentDetail)window.openInvestmentDetail('${i.id}')">
+            return `<div class="card" style="padding:18px;cursor:pointer;transition:border-color .15s;" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor=''" onclick="if(window.openInvestmentDetail)window.openInvestmentDetail('${i.id}');">
               <div style="font-size:16px;font-weight:700;">${esc(i.name)}</div>
               <div style="font-size:12px;color:var(--muted);margin-top:4px;">${esc(i.type || 'Standard')}</div>
               <div style="display:flex;gap:8px;margin-top:8px;">
@@ -2253,7 +2283,7 @@ function _bsRenderSettings(el) {
         <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:rgba(208,120,120,.06);border-radius:8px;border:1px solid rgba(208,120,120,.2);">
           <div>
             <div style="font-weight:600;font-size:13px;">Clear Business Tracker</div>
-            <div style="font-size:11px;color:var(--muted);">Remove all business panel/template/recurring associations (data remains, just unlinked from BS)</div>
+            <div style="font-size:11px;color:var(--muted);">Remove all business panel/template/recurring/investment associations (data remains, just unlinked from BS)</div>
           </div>
           <button class="btn btn-sm" style="background:var(--red,#d07878);color:#fff;border:none;" onclick="window._bsClearTracker()">Clear</button>
         </div>
@@ -2310,8 +2340,8 @@ window._bsExportData = async function() {
 };
 
 window._bsClearTracker = function() {
-  if (!confirm('Clear all business panel, template, and recurring associations? Your data remains — items are just unlinked from the Business Suite.')) return;
-  _saveBsItems({ templates: [], panels: [], recurring: [] });
+  if (!confirm('Clear all business panel, template, recurring, and investment associations? Your data remains — items are just unlinked from the Business Suite.')) return;
+  _saveBsItems({ templates: [], panels: [], recurring: [], investments: [] });
   toast('Business tracker cleared', 'success');
   window._bsNavigate('bs-settings');
 };
@@ -2339,7 +2369,7 @@ const BS_CSS = `
 /* Business Suite Shell */
 .bs-shell {
   display: flex;
-  min-height: calc(100vh - 120px);
+  min-height: 100vh;
   background: var(--bg);
 }
 
@@ -2353,7 +2383,7 @@ const BS_CSS = `
   flex-direction: column;
   position: sticky;
   top: 0;
-  height: calc(100vh - 120px);
+  height: 100vh;
   overflow-y: auto;
 }
 

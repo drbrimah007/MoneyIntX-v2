@@ -977,12 +977,19 @@ function navTo(page) {
   if (_navBar) _navBar.style.display = _isBs ? 'none' : '';
   if (_mobileTab) _mobileTab.style.display = _isBs ? 'none' : '';
 
-  // Reset Business Suite layout override when leaving
+  // Reset Business Suite layout override and context flags when leaving
   if (!_isBs) {
     const _c = document.getElementById('content');
     if (_c) { _c.style.maxWidth = ''; _c.style.margin = ''; }
     const _m = document.getElementById('main');
     if (_m) { _m.style.padding = ''; }
+    // Clear any lingering BS creation flags to prevent cross-contamination
+    window._bsActiveContext = false;
+    window._bsActiveBizId = '';
+    window._bsCreatingPanel = false;
+    window._bsCreatingTemplate = false;
+    window._bsCreatingRecurring = false;
+    window._bsCreatingInvestment = false;
   }
 
   // Update sidebar active state
