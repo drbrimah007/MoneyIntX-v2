@@ -52,6 +52,10 @@ const BS_TOOLS = [
   { id: 'bs-settings',   icon: '⚙️', label: 'Suite Settings',   always: true },
 ];
 
+// ── Constants ────────────────────────────────────────────────────
+const BS_CURRENCIES = ['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF','CHF'];
+const BS_EXPENSE_CATEGORIES = ['Stock/Inventory','Transport/Logistics','Utilities','Rent/Lease','Salaries/Wages','Marketing/Ads','Insurance','Professional Services','Office Supplies','Equipment','Maintenance','Travel','Telecommunications','Taxes/Fees','Miscellaneous'];
+
 // ── Helpers ───────────────────────────────────────────────────────
 function _bsModKey() { return 'mxi_bs_tools_' + (getCurrentUser()?.id || 'def'); }
 
@@ -275,7 +279,7 @@ async function _bsRenderDash(el) {
     <!-- Quick Actions -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:28px;">
       <button class="btn btn-primary" onclick="window._bsQuickAction('invoice')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">+ New Invoice</button>
-      <button class="btn btn-secondary" onclick="window._bsQuickAction('bill')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">+ New Bill</button>
+      <button class="btn btn-secondary" onclick="window._bsReceiveBill?window._bsReceiveBill():window._bsQuickAction('bill')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">+ Receive Bill</button>
       <button class="btn btn-secondary" onclick="window._bsNavigate('bs-clients')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">Clients</button>
       <button class="btn btn-secondary" onclick="window._bsNavigate('bs-panels')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">Panels</button>
     </div>
@@ -470,7 +474,7 @@ async function _bsRenderBills(el) {
         <h2 style="font-size:20px;font-weight:800;margin:0;">Bills</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${bills.length} total · ${unpaid.length} unpaid${overdue.length > 0 ? ` · <span style="color:var(--red,#d07878);">${overdue.length} overdue</span>` : ''} · ${fmtMoney(totalUnpaid, cur)} outstanding</p>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('bill')">+ New Bill</button>
+      <button class="btn btn-primary btn-sm" onclick="window._bsReceiveBill?window._bsReceiveBill():window._bsQuickAction('bill')">+ Receive Bill</button>
     </div>
     <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
       <input type="text" placeholder="Search bills…" value="${esc(window._bsBillSearch||'')}"
@@ -603,18 +607,28 @@ async function _bsRenderClients(el) {
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderSuppliers(el) {
   const user = getCurrentUser();
+  const cur = getCurrentProfile()?.default_currency || 'USD';
   const contacts = _bsContacts.length ? _bsContacts : await listContacts(user.id);
+  _bsContacts = contacts;
 
+  // Fetch ALL supplier bills (received bills, bills you owe)
   const { data: bills } = await supabase
     .from('entries')
-    .select('contact_id, contact_name, amount, currency, status, created_at')
+    .select('*')
     .eq('user_id', user.id)
     .in('tx_type', ['bill_sent','i_owe'])
     .is('archived_at', null)
     .order('created_at', { ascending: false });
 
+  const allBills = bills || [];
+  const unpaidBills = allBills.filter(e => e.status !== 'settled' && e.status !== 'voided');
+  const paidBills = allBills.filter(e => e.status === 'settled');
+  const totalPayable = unpaidBills.filter(e => (e.currency||'USD') === cur).reduce((s,e) => s + (e.amount||0), 0);
+  const totalPaid = paidBills.filter(e => (e.currency||'USD') === cur).reduce((s,e) => s + (e.amount||0), 0);
+
+  // Build supplier map
   const supplierMap = {};
-  (bills || []).forEach(b => {
+  allBills.forEach(b => {
     if (!b.contact_id) return;
     if (!supplierMap[b.contact_id]) {
       supplierMap[b.contact_id] = { name: b.contact_name, total: 0, unpaid: 0, count: 0, lastDate: b.created_at };
@@ -625,67 +639,325 @@ async function _bsRenderSuppliers(el) {
       supplierMap[b.contact_id].unpaid += (b.amount || 0);
     }
   });
-
   const suppliers = Object.entries(supplierMap).map(([id, c]) => {
     const contact = contacts.find(ct => ct.id === id);
     return { id, ...c, email: contact?.email || '', phone: contact?.phone || '' };
   });
   suppliers.sort((a,b) => b.unpaid - a.unpaid);
-  const cur = getCurrentProfile()?.default_currency || 'USD';
-  const totalPayable = suppliers.reduce((s,c) => s + c.unpaid, 0);
 
-  if (!window._bsSupplierSearch) window._bsSupplierSearch = '';
-  const sq = window._bsSupplierSearch.toLowerCase();
+  // Tab/filter state
+  if (!window._bsSupTab) window._bsSupTab = 'bills';   // bills | suppliers
+  if (!window._bsSupFilter) window._bsSupFilter = 'all';
+  if (!window._bsSupSearch) window._bsSupSearch = '';
+  const tab = window._bsSupTab;
+  const sf = window._bsSupFilter;
+  const sq = window._bsSupSearch.toLowerCase();
+
+  // Filter bills
+  let displayBills = sf === 'all' ? allBills
+    : sf === 'unpaid' ? unpaidBills
+    : sf === 'paid' ? paidBills
+    : allBills;
+  if (sq) displayBills = displayBills.filter(e =>
+    (e.contact_name||'').toLowerCase().includes(sq) ||
+    (e.metadata?.ref_number||'').toLowerCase().includes(sq) ||
+    (e.metadata?.expense_category||'').toLowerCase().includes(sq) ||
+    String(e.amount||'').includes(sq)
+  );
+
+  // Filter suppliers for supplier tab
   const displaySuppliers = sq ? suppliers.filter(c => (c.name||'').toLowerCase().includes(sq) || (c.email||'').toLowerCase().includes(sq)) : suppliers;
-  const topSuppliers = suppliers.slice(0, 3);
 
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <div>
-        <h2 style="font-size:20px;font-weight:800;margin:0;">Suppliers</h2>
-        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${suppliers.length} supplier${suppliers.length!==1?'s':''} · ${fmtMoney(totalPayable, cur)} total payable</p>
+        <h2 style="font-size:20px;font-weight:800;margin:0;">Suppliers & Bills</h2>
+        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${suppliers.length} supplier${suppliers.length!==1?'s':''} · ${allBills.length} bill${allBills.length!==1?'s':''} · ${fmtMoney(totalPayable, cur)} outstanding</p>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('bill')">+ New Bill</button>
+      <button class="btn btn-primary btn-sm" onclick="window._bsReceiveBill()">+ Receive Bill</button>
     </div>
 
-    <!-- Top Suppliers summary -->
-    ${topSuppliers.length > 0 ? `
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:16px;">
-      ${topSuppliers.map(c => `
-        <div class="card" style="padding:14px;">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-            ${contactAvatar(c.name, c.id, 28)}
-            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(c.name)}</div>
-          </div>
-          <div style="font-size:18px;font-weight:800;color:${c.unpaid > 0 ? 'var(--red,#d07878)' : 'var(--muted)'};">${fmtMoney(c.unpaid, cur)}</div>
-          <div style="font-size:11px;color:var(--muted);">${c.count} bill${c.count!==1?'s':''} · owed to them</div>
-        </div>
-      `).join('')}
-    </div>` : ''}
+    <!-- KPI Cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px;">
+      <div class="card" style="padding:14px;border-left:3px solid var(--red,#d07878);">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600;">Outstanding</div>
+        <div style="font-size:22px;font-weight:800;color:var(--red,#d07878);margin-top:4px;">${fmtMoney(totalPayable, cur)}</div>
+        <div style="font-size:11px;color:var(--muted);">${unpaidBills.length} unpaid bill${unpaidBills.length!==1?'s':''}</div>
+      </div>
+      <div class="card" style="padding:14px;border-left:3px solid var(--green,#7fe0d0);">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600;">Paid</div>
+        <div style="font-size:22px;font-weight:800;color:var(--green,#7fe0d0);margin-top:4px;">${fmtMoney(totalPaid, cur)}</div>
+        <div style="font-size:11px;color:var(--muted);">${paidBills.length} settled</div>
+      </div>
+      <div class="card" style="padding:14px;border-left:3px solid var(--accent,#6366F1);">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600;">Suppliers</div>
+        <div style="font-size:22px;font-weight:800;margin-top:4px;">${suppliers.length}</div>
+        <div style="font-size:11px;color:var(--muted);">active vendors</div>
+      </div>
+    </div>
 
-    <input type="text" placeholder="Search suppliers…" value="${esc(window._bsSupplierSearch||'')}"
-      oninput="window._bsSupplierSearch=this.value;window._bsNavigate('bs-suppliers');"
-      style="width:100%;max-width:320px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;margin-bottom:14px;">
+    <!-- Tabs: Bills Log vs Supplier Directory -->
+    <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
+      <button onclick="window._bsSupTab='bills';window._bsNavigate('bs-suppliers');"
+        style="padding:10px 20px;font-size:13px;font-weight:${tab==='bills'?'700':'500'};color:${tab==='bills'?'var(--accent)':'var(--muted)'};background:none;border:none;border-bottom:2px solid ${tab==='bills'?'var(--accent)':'transparent'};margin-bottom:-2px;cursor:pointer;">
+        Bills Log
+      </button>
+      <button onclick="window._bsSupTab='suppliers';window._bsNavigate('bs-suppliers');"
+        style="padding:10px 20px;font-size:13px;font-weight:${tab==='suppliers'?'700':'500'};color:${tab==='suppliers'?'var(--accent)':'var(--muted)'};background:none;border:none;border-bottom:2px solid ${tab==='suppliers'?'var(--accent)':'transparent'};margin-bottom:-2px;cursor:pointer;">
+        Supplier Directory
+      </button>
+    </div>
 
-    ${displaySuppliers.length === 0
-      ? `<div class="card" style="text-align:center;padding:40px;">
-          <div style="font-size:36px;margin-bottom:10px;">🏪</div>
-          <p style="color:var(--muted);margin-bottom:12px;">${sq ? 'No suppliers match your search.' : 'No suppliers yet. Suppliers appear here automatically when you create a bill or record a payable.'}</p>
-          ${!sq ? '<button class="btn btn-primary btn-sm" onclick="window._bsQuickAction(\'bill\')">Create First Bill</button>' : ''}
-        </div>`
-      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Supplier</th><th>Contact</th><th>Bills</th><th>Total Billed</th><th>Outstanding</th><th>Last Bill</th></tr></thead><tbody>
-          ${displaySuppliers.map(c => `<tr>
-            <td style="font-weight:600;">${contactAvatar(c.name, c.id, 28)} ${esc(c.name)}</td>
-            <td style="font-size:12px;color:var(--muted);">${esc(c.email || c.phone || '—')}</td>
-            <td style="text-align:center;">${c.count}</td>
-            <td>${fmtMoney(c.total, cur)}</td>
-            <td style="font-weight:700;color:${c.unpaid > 0 ? 'var(--red,#d07878)' : 'var(--muted)'};">${fmtMoney(c.unpaid, cur)}</td>
-            <td style="color:var(--muted);font-size:12px;">${fmtRelative(c.lastDate)}</td>
-          </tr>`).join('')}
-        </tbody></table></div></div>`
-    }
+    <!-- Search + Filters -->
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+      <input type="text" placeholder="Search…" value="${esc(window._bsSupSearch||'')}"
+        oninput="window._bsSupSearch=this.value;window._bsNavigate('bs-suppliers');"
+        style="flex:1;min-width:180px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;">
+      ${tab === 'bills' ? `<div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${['all','unpaid','paid'].map(v => `
+          <button class="bs sm" onclick="window._bsSupFilter='${v}';window._bsNavigate('bs-suppliers');"
+            style="font-weight:${sf===v?'700':'500'};background:${sf===v?'var(--accent)':'var(--bg3)'};color:${sf===v?'#fff':'var(--text)'};border:1px solid ${sf===v?'var(--accent)':'var(--border)'};border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">
+            ${v.charAt(0).toUpperCase()+v.slice(1)} (${v==='all'?allBills.length:v==='unpaid'?unpaidBills.length:paidBills.length})
+          </button>`).join('')}
+      </div>` : ''}
+    </div>
+
+    ${tab === 'bills' ? `
+      <!-- Bills Log Tab -->
+      ${displayBills.length === 0
+        ? `<div class="card" style="text-align:center;padding:40px;">
+            <div style="font-size:36px;margin-bottom:10px;">📄</div>
+            <p style="color:var(--muted);margin-bottom:12px;">${sq ? 'No bills match your search.' : 'No bills received yet. Log your first supplier bill.'}</p>
+            ${!sq ? '<button class="btn btn-primary btn-sm" onclick="window._bsReceiveBill()">Receive First Bill</button>' : ''}
+          </div>`
+        : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Supplier</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
+            ${displayBills.map(e => {
+              const isPaid = e.status === 'settled';
+              return `<tr style="cursor:pointer;" onclick="window._bsViewEntry('${e.id}')">
+              <td style="color:var(--muted);font-size:13px;">${fmtDate(e.created_at)}</td>
+              <td style="font-weight:600;">${esc(e.contact_name || '—')}</td>
+              <td style="font-size:12px;color:var(--muted);max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(e.metadata?.description || e.metadata?.ref_number || '—')}</td>
+              <td>${e.metadata?.expense_category ? `<span class="badge badge-gray" style="font-size:10px;">${esc(e.metadata.expense_category)}</span>` : '<span style="color:var(--muted);font-size:12px;">—</span>'}</td>
+              <td style="font-weight:700;">${fmtMoney(e.amount, e.currency)}</td>
+              <td>${statusBadge(e.status || 'draft')}</td>
+              <td style="white-space:nowrap;">
+                ${!isPaid ? `<button class="bs sm" onclick="event.stopPropagation();window._bsRecordPayment('${e.id}')" style="font-size:11px;color:var(--green,#5fd39a);" title="Record payment">💰 Pay</button>` : ''}
+              </td>
+            </tr>`}).join('')}
+          </tbody></table></div></div>`
+      }
+    ` : `
+      <!-- Supplier Directory Tab -->
+      ${displaySuppliers.length === 0
+        ? `<div class="card" style="text-align:center;padding:40px;">
+            <div style="font-size:36px;margin-bottom:10px;">🏪</div>
+            <p style="color:var(--muted);margin-bottom:12px;">${sq ? 'No suppliers match your search.' : 'No suppliers yet. Suppliers appear automatically when you log a bill.'}</p>
+          </div>`
+        : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Supplier</th><th>Contact</th><th>Bills</th><th>Total Billed</th><th>Outstanding</th><th>Last Bill</th></tr></thead><tbody>
+            ${displaySuppliers.map(c => `<tr>
+              <td style="font-weight:600;">${contactAvatar(c.name, c.id, 28)} ${esc(c.name)}</td>
+              <td style="font-size:12px;color:var(--muted);">${esc(c.email || c.phone || '—')}</td>
+              <td style="text-align:center;">${c.count}</td>
+              <td>${fmtMoney(c.total, cur)}</td>
+              <td style="font-weight:700;color:${c.unpaid > 0 ? 'var(--red,#d07878)' : 'var(--muted)'};">${fmtMoney(c.unpaid, cur)}</td>
+              <td style="color:var(--muted);font-size:12px;">${fmtRelative(c.lastDate)}</td>
+            </tr>`).join('')}
+          </tbody></table></div></div>`
+      }
+    `}
   `;
 }
+
+// ── Receive Bill modal — Log an incoming supplier bill ─────────
+window._bsReceiveBill = function() {
+  const cur = getCurrentProfile()?.default_currency || 'USD';
+  openModal(`
+    <div class="modal-title">Receive Bill</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Log an incoming bill from a supplier. Record what it's for, the amount, and tag the expense category.</p>
+
+    <div class="form-group">
+      <label>Supplier *</label>
+      <input type="text" id="bs-rb-supplier" placeholder="Search or enter supplier name…" autocomplete="off"
+        oninput="window._bsRbSearchContact(this.value)" style="width:100%;">
+      <div id="bs-rb-contact-results" style="max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:4px;display:none;"></div>
+      <input type="hidden" id="bs-rb-contact-id" value="">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-group">
+        <label>Amount *</label>
+        <div style="display:flex;gap:6px;">
+          <select id="bs-rb-currency" style="flex:0 0 80px;">
+            ${BS_CURRENCIES.map(c => `<option value="${c}" ${c===cur?'selected':''}>${c}</option>`).join('')}
+          </select>
+          <input type="number" id="bs-rb-amount" placeholder="0.00" step="0.01" min="0" style="flex:1;">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Bill Date</label>
+        <input type="date" id="bs-rb-date" value="${new Date().toISOString().slice(0,10)}">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Due Date</label>
+      <input type="date" id="bs-rb-due">
+    </div>
+
+    <div class="form-group">
+      <label>What's it for? (Description)</label>
+      <input type="text" id="bs-rb-desc" placeholder="e.g. Office supplies, Q1 inventory shipment…" style="width:100%;">
+    </div>
+
+    <div class="form-group">
+      <label>Expense Category</label>
+      <select id="bs-rb-category" style="width:100%;">
+        <option value="">— Select category —</option>
+        ${BS_EXPENSE_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Reference / Invoice # (optional)</label>
+      <input type="text" id="bs-rb-ref" placeholder="e.g. INV-12345" style="width:100%;">
+    </div>
+
+    <div class="form-group">
+      <label>Notes (optional)</label>
+      <textarea id="bs-rb-notes" rows="2" placeholder="Any extra notes…" style="width:100%;resize:vertical;"></textarea>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="bs sm" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary sm" onclick="window._bsSaveReceivedBill()">Log Bill</button>
+    </div>
+  `, { maxWidth: '520px' });
+};
+
+// Contact search for Receive Bill
+window._bsRbSearchContact = async function(query) {
+  const el = document.getElementById('bs-rb-contact-results');
+  if (!el) return;
+  if (!query || query.length < 2) { el.style.display = 'none'; return; }
+  const contacts = _bsContacts.length ? _bsContacts : await listContacts(getCurrentUser().id);
+  const matches = contacts.filter(c =>
+    (c.name||'').toLowerCase().includes(query.toLowerCase()) ||
+    (c.email||'').toLowerCase().includes(query.toLowerCase())
+  ).slice(0, 8);
+  if (matches.length === 0) { el.style.display = 'none'; return; }
+  el.innerHTML = matches.map(c => `
+    <div onclick="document.getElementById('bs-rb-supplier').value='${esc(c.name)}';document.getElementById('bs-rb-contact-id').value='${c.id}';document.getElementById('bs-rb-contact-results').style.display='none';"
+      style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);"
+      onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background=''">
+      ${contactAvatar(c.name, c.id, 24)}
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:13px;">${esc(c.name)}</div>
+        ${c.email ? `<div style="font-size:11px;color:var(--muted);">${esc(c.email)}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+  el.style.display = 'block';
+};
+
+// Save received bill as a bill_sent entry
+window._bsSaveReceivedBill = async function() {
+  const supplierName = (document.getElementById('bs-rb-supplier')?.value || '').trim();
+  const contactId = (document.getElementById('bs-rb-contact-id')?.value || '').trim();
+  const amount = parseFloat(document.getElementById('bs-rb-amount')?.value) || 0;
+  const currency = document.getElementById('bs-rb-currency')?.value || 'USD';
+  const billDate = document.getElementById('bs-rb-date')?.value || new Date().toISOString().slice(0,10);
+  const dueDate = document.getElementById('bs-rb-due')?.value || '';
+  const description = (document.getElementById('bs-rb-desc')?.value || '').trim();
+  const category = document.getElementById('bs-rb-category')?.value || '';
+  const refNum = (document.getElementById('bs-rb-ref')?.value || '').trim();
+  const notes = (document.getElementById('bs-rb-notes')?.value || '').trim();
+
+  if (!supplierName) { toast('Supplier is required', 'error'); return; }
+  if (amount <= 0) { toast('Amount must be greater than 0', 'error'); return; }
+
+  const user = getCurrentUser();
+
+  // If no existing contact, create one
+  let finalContactId = contactId;
+  if (!finalContactId) {
+    const { data: newContact, error: cErr } = await supabase
+      .from('contacts')
+      .insert({ user_id: user.id, name: supplierName, tags: ['supplier'] })
+      .select().single();
+    if (cErr) { toast('Failed to create supplier contact', 'error'); return; }
+    finalContactId = newContact.id;
+    _bsContacts = []; // clear cache
+  }
+
+  const metadata = {};
+  if (dueDate) metadata.due_date = dueDate;
+  if (description) metadata.description = description;
+  if (category) metadata.expense_category = category;
+  if (refNum) metadata.ref_number = refNum;
+  if (notes) metadata.notes = notes;
+
+  const { error } = await supabase.from('entries').insert({
+    user_id: user.id,
+    contact_id: finalContactId,
+    contact_name: supplierName,
+    tx_type: 'bill_sent',
+    amount, currency,
+    status: 'pending',
+    metadata,
+    created_at: new Date(billDate + 'T12:00:00').toISOString()
+  });
+
+  if (error) { toast('Failed to log bill: ' + error.message, 'error'); return; }
+  closeModal();
+  toast('Bill logged from ' + supplierName, 'success');
+  window._bsNavigate('bs-suppliers');
+};
+
+// Record payment against a bill
+window._bsRecordPayment = async function(entryId) {
+  const { data: entry } = await supabase.from('entries').select('*').eq('id', entryId).single();
+  if (!entry) { toast('Bill not found', 'error'); return; }
+
+  openModal(`
+    <div class="modal-title">Record Payment</div>
+    <div style="padding:12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);margin-bottom:14px;">
+      <div style="font-weight:700;font-size:14px;">${esc(entry.contact_name || 'Supplier')}</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:2px;">${entry.metadata?.description || entry.metadata?.ref_number || 'Bill'} · ${fmtMoney(entry.amount, entry.currency)}</div>
+      ${entry.metadata?.expense_category ? `<span class="badge badge-gray" style="font-size:10px;margin-top:4px;">${esc(entry.metadata.expense_category)}</span>` : ''}
+    </div>
+    <div class="form-group">
+      <label>Payment Date</label>
+      <input type="date" id="bs-pay-date" value="${new Date().toISOString().slice(0,10)}">
+    </div>
+    <div class="form-group">
+      <label>Payment Note (optional)</label>
+      <input type="text" id="bs-pay-note" placeholder="e.g. Bank transfer ref #1234" style="width:100%;">
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="bs sm" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary sm" onclick="window._bsConfirmPayment('${entryId}')">Mark as Paid</button>
+    </div>
+  `, { maxWidth: '440px' });
+};
+
+window._bsConfirmPayment = async function(entryId) {
+  const payDate = document.getElementById('bs-pay-date')?.value || new Date().toISOString().slice(0,10);
+  const payNote = (document.getElementById('bs-pay-note')?.value || '').trim();
+
+  const { data: entry } = await supabase.from('entries').select('metadata').eq('id', entryId).single();
+  const meta = entry?.metadata || {};
+  meta.paid_date = payDate;
+  if (payNote) meta.payment_note = payNote;
+
+  const { error } = await supabase.from('entries')
+    .update({ status: 'settled', metadata: meta })
+    .eq('id', entryId);
+
+  if (error) { toast('Failed: ' + error.message, 'error'); return; }
+  closeModal();
+  toast('Bill marked as paid', 'success');
+  window._bsNavigate('bs-suppliers');
+};
 
 // ══════════════════════════════════════════════════════════════════
 // SECTION: Recurring Billing
@@ -1099,41 +1371,50 @@ function _bsRenderBranding(el) {
         <div class="form-group"><label>Business Email</label><input type="email" id="bs-brand-email" value="${esc(p.company_email || '')}" placeholder="billing@company.com"></div>
         <div class="form-group"><label>Business Phone</label><input type="text" id="bs-brand-phone" value="${esc(p.company_phone || '')}" placeholder="+1 234 567 8900"></div>
         <div class="form-group"><label>Business Address</label><input type="text" id="bs-brand-addr" value="${esc(p.company_address || '')}" placeholder="123 Main St, City"></div>
+        <div class="form-group">
+          <label>Default Currency</label>
+          <select id="bs-brand-currency" style="width:100%;">
+            ${BS_CURRENCIES.map(c => `<option value="${c}" ${(p.default_currency||'USD')===c?'selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:12px;">
         <button class="btn btn-primary btn-sm" onclick="window._bsSaveBranding()">Save Branding</button>
       </div>
     </div>
 
-    <!-- Invoice Preview -->
+    <!-- Invoice Preview — always white like a real printed invoice -->
     <div class="card" style="padding:20px;">
       <h3 style="font-size:15px;font-weight:700;margin:0 0 14px;">Invoice Preview</h3>
-      <div style="background:var(--bg3);border-radius:10px;padding:20px;border:1px solid var(--border);">
+      <div style="background:#ffffff;border-radius:10px;padding:24px;border:1px solid #e0e0e0;color:#1a1a1a;box-shadow:0 2px 8px rgba(0,0,0,.06);">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
           <div>
             ${p.logo_url ? `<img src="${esc(p.logo_url)}" style="max-height:40px;max-width:100px;margin-bottom:6px;object-fit:contain;">` : ''}
-            <div style="font-size:16px;font-weight:800;">${esc(p.company_name || 'Your Business')}</div>
-            <div style="font-size:11px;color:var(--muted);">${esc(p.company_address || 'Business Address')}</div>
-            <div style="font-size:11px;color:var(--muted);">${esc(p.company_email || 'email@business.com')} · ${esc(p.company_phone || 'Phone')}</div>
+            <div style="font-size:16px;font-weight:800;color:#1a1a1a;">${esc(p.company_name || 'Your Business')}</div>
+            <div style="font-size:11px;color:#666;">${esc(p.company_address || 'Business Address')}</div>
+            <div style="font-size:11px;color:#666;">${esc(p.company_email || 'email@business.com')} · ${esc(p.company_phone || 'Phone')}</div>
           </div>
           <div style="text-align:right;">
-            <div style="font-size:20px;font-weight:800;color:var(--accent);">INVOICE</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:4px;">#INV-0001</div>
-            <div style="font-size:11px;color:var(--muted);">Date: ${new Date().toLocaleDateString()}</div>
+            <div style="font-size:20px;font-weight:800;color:#4338ca;">INVOICE</div>
+            <div style="font-size:11px;color:#888;margin-top:4px;">#INV-0001</div>
+            <div style="font-size:11px;color:#888;">Date: ${new Date().toLocaleDateString()}</div>
           </div>
         </div>
-        <div style="border-top:2px solid var(--border);padding-top:12px;margin-top:8px;">
-          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);">
+        <div style="border-top:2px solid #e5e7eb;padding-top:12px;margin-top:8px;">
+          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;color:#888;border-bottom:1px solid #e5e7eb;">
             <span style="font-weight:600;">Item</span><span style="font-weight:600;">Amount</span>
           </div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;border-bottom:1px solid var(--border);">
+          <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;color:#1a1a1a;border-bottom:1px solid #e5e7eb;">
             <span>Sample line item</span><span style="font-weight:600;">${p.default_currency||'USD'} 100.00</span>
           </div>
-          <div style="display:flex;justify-content:flex-end;padding:10px 0;font-size:14px;font-weight:800;">
-            Total: ${p.default_currency||'USD'} 100.00
+          <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;color:#1a1a1a;border-bottom:1px solid #e5e7eb;">
+            <span>Consulting service</span><span style="font-weight:600;">${p.default_currency||'USD'} 250.00</span>
+          </div>
+          <div style="display:flex;justify-content:flex-end;padding:12px 0;font-size:15px;font-weight:800;color:#1a1a1a;">
+            Total: ${p.default_currency||'USD'} 350.00
           </div>
         </div>
-        <div style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center;font-family:monospace;">${bizId} · Powered by Money IntX</div>
+        <div style="font-size:10px;color:#aaa;margin-top:8px;text-align:center;font-family:monospace;">${bizId} · Powered by Money IntX</div>
       </div>
     </div>
   `;
@@ -1161,12 +1442,13 @@ window._bsUploadLogo = async function(input) {
 window._bsSaveBranding = async function() {
   const uid = getCurrentUser().id;
   const updates = {
-    logo_url:        (document.getElementById('bs-brand-logo-url')?.value || '').trim(),
-    company_name:    (document.getElementById('bs-brand-name')?.value || '').trim(),
-    company_email:   (document.getElementById('bs-brand-email')?.value || '').trim(),
-    company_phone:   (document.getElementById('bs-brand-phone')?.value || '').trim(),
-    company_address: (document.getElementById('bs-brand-addr')?.value || '').trim(),
-    updated_at:      new Date().toISOString()
+    logo_url:         (document.getElementById('bs-brand-logo-url')?.value || '').trim(),
+    company_name:     (document.getElementById('bs-brand-name')?.value || '').trim(),
+    company_email:    (document.getElementById('bs-brand-email')?.value || '').trim(),
+    company_phone:    (document.getElementById('bs-brand-phone')?.value || '').trim(),
+    company_address:  (document.getElementById('bs-brand-addr')?.value || '').trim(),
+    default_currency: (document.getElementById('bs-brand-currency')?.value || 'USD'),
+    updated_at:       new Date().toISOString()
   };
   const { error } = await supabase.from('users').update(updates).eq('id', uid);
   if (error) { toast('Failed to save: ' + error.message, 'error'); return; }

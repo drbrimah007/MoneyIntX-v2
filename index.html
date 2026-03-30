@@ -980,7 +980,12 @@ function navTo(page) {
     case 'groups':      if (!_modEnabled('groups'))      { navTo('dash'); return; } renderGroups(content); break;
     case 'investments': if (!_modEnabled('investments')) { navTo('dash'); return; } renderInvestments(content); break;
     case 'business':    if (!_modEnabled('business'))    { navTo('dash'); return; } renderBusinessPage(content); break;
-    case 'business-suite': if (!_modEnabled('business-suite')) { navTo('dash'); return; } renderBusinessSuite(content); break;
+    case 'business-suite':
+      if (!_modEnabled('business-suite')) {
+        // Auto-enable if user explicitly navigated here (hash or last_page)
+        const _m = _getModules(); _m['business-suite'] = true; _saveModules(_m);
+      }
+      renderBusinessSuite(content); break;
     case 'templates': renderTemplatesPage(content); break;
     case 'recurring': renderRecurringPage(content); break;
     case 'notifications': renderNotifications(content); break;
