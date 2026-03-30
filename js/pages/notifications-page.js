@@ -78,14 +78,16 @@ export async function renderNotifications(el) {
         displayMessage = displayMessage.replace(myName + "'s shared record", "Your shared record");
       }
 
-      // Action button: any notification with an entry_id gets a "View" that opens the entry detail
+      // Action button based on notification type
       let actionBtn = '';
-      if (n.entry_id && (n.type === 'settlement_pending' || n.type === 'payment_received')) {
+      if (n.type === 'shared_record') {
+        // Always go to entries page where pending shares are shown — not openEntryDetail
+        // (the entry_id here is the SENDER's entry which the recipient can't access via RLS)
+        actionBtn = `<button onclick="navTo('entries')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View</button>`;
+      } else if (n.entry_id && (n.type === 'settlement_pending' || n.type === 'payment_received')) {
         actionBtn = `<button onclick="openEntryDetail('${n.entry_id}', { reviewMode: true })" style="background:var(--amber,#D5BA78);color:#000;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:700;margin-right:4px;">Review</button>`;
       } else if (n.entry_id) {
         actionBtn = `<button onclick="openEntryDetail('${n.entry_id}')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View</button>`;
-      } else if (n.type === 'shared_record') {
-        actionBtn = `<button onclick="navTo('entries')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View</button>`;
       }
       html += `<tr>
         <td style="font-weight:600;font-size:13px;"><span style="display:inline-flex;align-items:center;gap:6px;">${nColor ? `<span style="width:22px;height:22px;border-radius:50%;background:${nColor};display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0;">${esc(displayName.charAt(0).toUpperCase())}</span>` : ''}<span style="color:${nColor || 'var(--text)'};">${esc(displayName)}</span></span></td>

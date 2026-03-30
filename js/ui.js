@@ -59,14 +59,14 @@ export function openModal(html, { maxWidth = '520px', id = 'modal' } = {}) {
   const wrap = document.createElement('div');
   wrap.id = id;
   wrap.style.cssText = `
-    position:fixed;inset:0;z-index:200;
+    position:fixed;inset:0;z-index:1100;
     background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);
     display:flex;align-items:center;justify-content:center;
     padding:20px;animation:fadeIn 0.2s ease;
   `;
   wrap.innerHTML = `
-    <div style="background:var(--bg);border-radius:16px;padding:28px;
-      max-width:${maxWidth};width:100%;max-height:90vh;overflow-y:auto;
+    <div style="background:var(--bg);border-radius:16px;padding:28px;padding-bottom:max(28px, env(safe-area-inset-bottom, 28px));
+      max-width:${maxWidth};width:100%;max-height:88vh;overflow-y:auto;
       box-shadow:0 20px 40px rgba(0,0,0,0.15);animation:slideUp 0.25s ease;"
       onclick="event.stopPropagation()">
       ${html}

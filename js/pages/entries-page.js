@@ -1302,11 +1302,14 @@ window.doShareEntry = async function(entryId) {
 
   const entry = await getEntry(entryId);
   if (!entry) return;
+  // Use business sender name when sharing from BS context
+  const _shareSenderName = window._getBsSenderName?.() || getCurrentProfile()?.display_name || '';
+  const _shareSenderEmail = window._getBsSenderEmail?.() || getCurrentUser().email;
   const snapshot = {
     amount: entry.amount, currency: entry.currency, tx_type: entry.tx_type,
     date: entry.date, note: entry.note, invoice_number: entry.invoice_number,
-    status: entry.status, from_name: getCurrentProfile()?.display_name || '',
-    from_email: getCurrentUser().email
+    status: entry.status, from_name: _shareSenderName,
+    from_email: _shareSenderEmail
   };
   const token = await createShareToken(getCurrentUser().id, entryId, {
     recipientEmail: email, entrySnapshot: snapshot
@@ -1324,9 +1327,9 @@ window.doShareEntry = async function(entryId) {
       await supabase.from('notifications').insert({
         user_id: recipientId,
         type: 'shared_record',
-        message: `${getCurrentProfile()?.display_name || 'Someone'} shared a record with you: ${fmtMoney(entry.amount, entry.currency)}`,
+        message: `${_shareSenderName || 'Someone'} shared a record with you: ${fmtMoney(entry.amount, entry.currency)}`,
         entry_id: entryId,
-        contact_name: getCurrentProfile()?.display_name || '',
+        contact_name: _shareSenderName || '',
         amount: entry.amount, currency: entry.currency,
         read: false
       });
@@ -2267,9 +2270,9 @@ window.saveNewEntry = async function() {
 
   // Combine main note + advance note
   const combinedNote = [note, advNote].filter(Boolean).join(' · ');
-  // If creating from Business Suite, include business_id in metadata at creation time
+  // If creating from Business Suite, include business_id + sender identity in metadata
   const _bsMeta = window._bsActiveContext && window._bsActiveBizId
-    ? { business_id: window._bsActiveBizId } : null;
+    ? { business_id: window._bsActiveBizId, business_name: window._getBsSenderName?.() || '' } : null;
   let entry;
   try {
     entry = await createEntry(getCurrentUser().id, {
@@ -2297,6 +2300,10 @@ window.saveNewEntry = async function() {
     const updates = { category, direction_sign: dirSign, outstanding_amount: Math.round(parseFloat(amount) * 100) };
     if (contactName) updates.contact_name = contactName;
     if (dueDate) updates.due_date = dueDate;
+    // Store business sender name on the entry when created from BS
+    if (window._bsActiveContext) {
+      updates.from_name = window._getBsSenderName?.() || '';
+    }
     // Save repayment date as due_date for advances
     if (isAdvance && advEndDate) updates.due_date = advEndDate;
     await supabase.from('entries').update(updates).eq('id', entry.id);
@@ -2359,12 +2366,13 @@ window.saveNewEntry = async function() {
         .select('email').eq('id', contactId).single();
       const recipientEmail = cRow?.email?.trim() || '';
       if (recipientEmail) {
-        const fromName = getCurrentProfile()?.display_name || getCurrentProfile()?.company_name || 'Someone';
+        const fromName = window._getBsSenderName?.() || getCurrentProfile()?.display_name || 'Someone';
+        const fromEmail = window._getBsSenderEmail?.() || getCurrentUser().email;
         const autoSnap = {
           amount: Math.round(parseFloat(amount) * 100), // cents — consistent with entries table & fmtMoney
           currency, tx_type: category,
           date, note, invoice_number: invNumber || '',
-          from_name: fromName, from_email: getCurrentUser().email,
+          from_name: fromName, from_email: fromEmail,
           formatted_amount: fmtMoney(toCents(parseFloat(amount)), currency)
         };
         const { data: shareResult, error: shareErr } = await supabase.rpc('auto_share_entry', {
@@ -2389,7 +2397,7 @@ window.saveNewEntry = async function() {
   if (!notifyOn) return;
   try {
     const contactName = window._neContacts?.find(c => c.id === contactId)?.name || 'Contact';
-    const fromName    = getCurrentProfile()?.display_name || getCurrentProfile()?.company_name || 'Someone';
+    const fromName    = window._getBsSenderName?.() || getCurrentProfile()?.display_name || 'Someone';
     const txLabel     = TX_LABELS[category] || category;
     const amtLabel    = `${currency} ${parseFloat(amount).toLocaleString()}`;
     const entryId     = entry?.id;
@@ -2480,7 +2488,7 @@ window.saveNewEntry = async function() {
         console.warn('[email]', errDetail);
       }
     } else if (notifyContact && !contactEmail) {
-      toast('Notified (no email on contact — add one in the form or contact record)', 'info');
+      toast('⚠️ Contact has no email — add an email to send notifications', 'warning');
     }
   } catch (notifErr) {
     console.warn('Post-entry notify error:', notifErr);

@@ -127,6 +127,25 @@ window._addBsItem = _addBsItem;
 window._removeBsItem = _removeBsItem;
 window._isBsItem = _isBsItem;
 window._getBsItems = _getBsItems;
+window._getBizId = _getBizId;
+
+// ── Business sender identity ──────────────────────────────────────
+// Returns the business name when BS context is active, otherwise personal name.
+// Used by entries-page, sharing, and notifications to set the correct sender.
+window._getBsSenderName = function() {
+  const profile = getCurrentProfile() || {};
+  if (window._bsActiveContext && window._bsActiveBizId) {
+    return profile.company_name || profile.display_name || 'Business';
+  }
+  return profile.display_name || profile.company_name || 'Someone';
+};
+window._getBsSenderEmail = function() {
+  const profile = getCurrentProfile() || {};
+  if (window._bsActiveContext && window._bsActiveBizId) {
+    return profile.company_email || getCurrentUser()?.email || '';
+  }
+  return getCurrentUser()?.email || '';
+};
 
 // ── Main Render ───────────────────────────────────────────────────
 export async function renderBusinessSuite(el) {
@@ -732,7 +751,7 @@ async function _bsRenderClients(el) {
           ${!cq ? '<button class="btn btn-primary btn-sm" onclick="window._bsQuickAction(\'invoice\')">Send First Invoice</button>' : ''}
         </div>`
       : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Client</th><th>Contact</th><th>Invoices</th><th>Total Billed</th><th>Outstanding</th><th>Last Invoice</th></tr></thead><tbody>
-          ${displayClients.map(c => `<tr>
+          ${displayClients.map(c => `<tr style="cursor:pointer;" onclick="window._bsEditContact('${c.id}')">
             <td style="font-weight:600;">${contactAvatar(c.name, c.id, 28)} ${esc(c.name)}</td>
             <td style="font-size:12px;color:var(--muted);">${esc(c.email || c.phone || '—')}</td>
             <td style="text-align:center;">${c.count}</td>
@@ -929,7 +948,7 @@ async function _bsRenderSuppliers(el) {
             <p style="color:var(--muted);margin-bottom:12px;">${sq ? 'No suppliers match your search.' : 'No suppliers yet. Suppliers appear automatically when you log a bill.'}</p>
           </div>`
         : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Supplier</th><th>Contact</th><th>Bills</th><th>Total Billed</th><th>Outstanding</th><th>Last Bill</th></tr></thead><tbody>
-            ${displaySuppliers.map(c => `<tr>
+            ${displaySuppliers.map(c => `<tr style="cursor:pointer;" onclick="window._bsEditContact('${c.id}')">
               <td style="font-weight:600;">${contactAvatar(c.name, c.id, 28)} ${esc(c.name)}</td>
               <td style="font-size:12px;color:var(--muted);">${esc(c.email || c.phone || '—')}</td>
               <td style="text-align:center;">${c.count}</td>
@@ -989,6 +1008,48 @@ window._bsDoAddNewContact = async function() {
     window._bsNewContactCallback(newContact);
   }
   window._bsNewContactCallback = null;
+};
+
+// ── Edit Contact / Business Partner Detail ──────────────────────
+window._bsEditContact = async function(contactId) {
+  const { data: c, error } = await supabase.from('contacts').select('*').eq('id', contactId).single();
+  if (error || !c) { toast('Contact not found', 'error'); return; }
+  openModal(`
+    <h3 style="margin-bottom:4px;">Edit Contact</h3>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:16px;">Update business details for this contact</p>
+    <div class="form-group"><label>Name *</label><input type="text" id="bsc-name" value="${esc(c.name)}" placeholder="Full name or business name"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-group"><label>Email</label><input type="email" id="bsc-email" value="${esc(c.email || '')}" placeholder="email@example.com"></div>
+      <div class="form-group"><label>Phone</label><input type="tel" id="bsc-phone" value="${esc(c.phone || '')}" placeholder="+1 234 567 8900"></div>
+    </div>
+    <div class="form-group"><label>Business Address</label><input type="text" id="bsc-address" value="${esc(c.address || '')}" placeholder="123 Main St, City, State"></div>
+    <div class="form-group"><label>Notes</label><textarea id="bsc-notes" rows="2" placeholder="Any extra notes about this contact…" style="width:100%;resize:vertical;">${esc(c.notes || '')}</textarea></div>
+    <div class="form-group"><label>Tags</label><input type="text" id="bsc-tags" value="${esc((c.tags || []).join(', '))}" placeholder="e.g. supplier, client, vendor"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="bs sm" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary sm" onclick="window._bsSaveContact('${contactId}')">Save Changes</button>
+    </div>
+  `, { maxWidth: '520px' });
+};
+
+window._bsSaveContact = async function(contactId) {
+  const name = (document.getElementById('bsc-name')?.value || '').trim();
+  if (!name) { toast('Name is required', 'error'); return; }
+  const updates = {
+    name,
+    email: (document.getElementById('bsc-email')?.value || '').trim(),
+    phone: (document.getElementById('bsc-phone')?.value || '').trim(),
+    address: (document.getElementById('bsc-address')?.value || '').trim(),
+    notes: (document.getElementById('bsc-notes')?.value || '').trim(),
+    tags: (document.getElementById('bsc-tags')?.value || '').split(',').map(t => t.trim()).filter(Boolean)
+  };
+  const { error } = await supabase.from('contacts').update(updates).eq('id', contactId);
+  if (error) { toast('Save failed: ' + error.message, 'error'); return; }
+  closeModal();
+  toast('Contact updated', 'success');
+  _bsContacts = []; // clear cache
+  // Refresh current section
+  if (_bsEl && _bsSection) _bsNavigate(_bsSection);
 };
 
 // ── Receive Bill modal — Log an incoming supplier bill ─────────
