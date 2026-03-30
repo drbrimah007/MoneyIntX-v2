@@ -851,4 +851,4 @@ const BS_CSS = `
 }
 `;
 
-export { renderBusinessSuite };
+// renderBusinessSuite is already exported at function definition
