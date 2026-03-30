@@ -201,7 +201,7 @@ function computeRowFields(fields, rowValues) {
         val = fields.filter(ff => ff.direction !== 'row' && !ff.excludeFromAggregate && ff.id !== f.id)
                     .reduce((s, ff) => s + _resolveOperand('field', ff.id, 0, colValues), 0);
       } else if (op === 'select_aggregate') {
-        val = (calc.targetFieldIds || [])
+        val = (calc.targetFieldIds || []).filter(fid => fid !== f.id)
           .reduce((s, fid) => s + _resolveOperand('field', fid, 0, colValues), 0);
       }
       if (calc.resultVisible !== false) colValues[f.id] = val;
@@ -226,7 +226,7 @@ function computeColFields(fields, rawValues) {
         val = fields.filter(ff => ff.id !== f.id && !ff.excludeFromAggregate && ff.direction !== 'row')
                     .reduce((s, ff) => s + _resolveOperand('field', ff.id, 0, vals), 0);
       } else if (op === 'select_aggregate') {
-        val = (calc.targetFieldIds || []).reduce((s, fid) => s + _resolveOperand('field', fid, 0, vals), 0);
+        val = (calc.targetFieldIds || []).filter(fid => fid !== f.id).reduce((s, fid) => s + _resolveOperand('field', fid, 0, vals), 0);
       }
       if (calc.resultVisible !== false) vals[f.id] = val;
     });
@@ -1152,6 +1152,7 @@ function _previewRow(precomputedColVals) {
 async function _doAddRow(sessionKey) {
   const p = _curPanel;
   if (!p) return;
+  if (_curMembership && !_curMembership.can_add) { toast('You do not have permission to add rows', 'error'); return; }
   const rowDate   = document.getElementById('bpr-date')?.value || todayStr();
   const colFields = (p.fields || []).filter(f => f.direction !== 'row');
 
@@ -1258,6 +1259,7 @@ async function _doSaveRow(rowId) {
   const row = _curRows.find(r => r.id === rowId);
   const p   = _curPanel;
   if (!row || !p) return;
+  if (_curMembership && !_curMembership.can_edit) { toast('You do not have permission to edit rows', 'error'); return; }
   const colFields = (p.fields || []).filter(f => f.direction !== 'row');
 
   // Read only manual (non-auto) fields from the DOM
@@ -1277,7 +1279,8 @@ async function _doSaveRow(rowId) {
   const values  = computeColFields(p.fields, rawValues);
   const newDate = document.getElementById('bped-date')?.value || row.row_date;
   document.getElementById('bpEditRowBg')?.remove();
-  await updateRow(rowId, values);
+  const updated = await updateRow(rowId, values);
+  if (!updated) { toast('Failed to save row changes', 'error'); return; }
   const idx = _curRows.findIndex(r => r.id === rowId);
   if (idx >= 0) { _curRows[idx].values = values; _curRows[idx].row_date = newDate; }
   toast('Row updated');
@@ -1285,6 +1288,7 @@ async function _doSaveRow(rowId) {
 }
 
 async function _doDeleteRow(rowId) {
+  if (_curMembership && !_curMembership.can_edit) { toast('You do not have permission to delete rows', 'error'); return; }
   if (!confirm('Delete this row?')) return;
   document.getElementById('bpEditRowBg')?.remove();
   await deleteRow(rowId);
