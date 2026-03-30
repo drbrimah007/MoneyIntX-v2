@@ -401,6 +401,10 @@ window.doSaveRecurring = async function() {
         if (window._bsNavigate) { window._bsNavigate('bs-recurring'); return; }
       }
     }
+    // Stay in BS if inside Business Suite
+    if (document.getElementById('bs-content') && window._bsNavigate) {
+      window._bsNavigate('bs-recurring'); return;
+    }
     navTo('recurring');
   } catch (err) {
     console.error('Error saving recurring rule:', err);
@@ -410,7 +414,11 @@ window.doSaveRecurring = async function() {
 
 window.doToggleRecurring = async function(id, active) {
   await toggleRecurring(id, active);
-  toast(active ? 'Resumed.' : 'Paused.', 'success'); navTo('recurring');
+  toast(active ? 'Resumed.' : 'Paused.', 'success');
+  if (document.getElementById('bs-content') && window._bsNavigate) {
+    window._bsNavigate('bs-recurring'); return;
+  }
+  navTo('recurring');
 };
 
 window.confirmDeleteRecurring = async function(id) {

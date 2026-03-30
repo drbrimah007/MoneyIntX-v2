@@ -42,13 +42,12 @@ const BS_TOOLS = [
   { id: 'bs-bills',      icon: '📄', label: 'Bills',            always: true },
   { id: 'bs-clients',    icon: '👥', label: 'Clients',          always: true },
   { id: 'bs-suppliers',  icon: '🏪', label: 'Suppliers',        always: true },
-  { id: 'bs-recurring',  icon: '🔁', label: 'Recurring',        always: true },
+  { id: 'bs-recurring',  icon: '🔁', label: 'Recurring',        always: false },
   { id: 'bs-panels',     icon: '📋', label: 'Business Panels',  always: true },
-  { id: 'bs-templates',  icon: '📑', label: 'Templates',        always: true },
-  { id: 'bs-investments',icon: '📈', label: 'Investments',      always: true },
-  { id: 'bs-panel-db',   icon: '🌐', label: 'Panel Public DB',  always: true },
-  { id: 'bs-branding',   icon: '🏷️', label: 'Branding',          always: true },
-  { id: 'bs-operatives', icon: '🔑', label: 'Operatives',       always: true },
+  { id: 'bs-templates',  icon: '📑', label: 'Templates',        always: false },
+  { id: 'bs-investments',icon: '📈', label: 'Investments',      always: false },
+  { id: 'bs-branding',   icon: '🏷️', label: 'Branding',          always: false },
+  { id: 'bs-operatives', icon: '🔑', label: 'Operatives',       always: false },
   { id: 'bs-settings',   icon: '⚙️', label: 'Suite Settings',   always: true },
 ];
 
@@ -427,7 +426,7 @@ async function _bsRenderDash(el) {
           <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Create your first invoice or bill to start tracking your business finances.</p>
           <div style="display:flex;gap:8px;justify-content:center;">
             <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('invoice')">Create Invoice</button>
-            <button class="btn btn-secondary btn-sm" onclick="window._bsQuickAction('bill')">Create Bill</button>
+            <button class="btn btn-secondary btn-sm" onclick="window._bsReceiveBill?window._bsReceiveBill():window._bsQuickAction('bill')">Receive Bill</button>
           </div>
         </div>`
       : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Contact</th><th>Amount</th><th>Status</th></tr></thead><tbody>
@@ -620,7 +619,7 @@ async function _bsRenderBills(el) {
       ? `<div class="card" style="text-align:center;padding:40px;">
           <div style="font-size:36px;margin-bottom:10px;">📄</div>
           <p style="color:var(--muted);margin-bottom:12px;">${q ? 'No bills match your search.' : 'No bills match this filter.'}</p>
-          ${!q ? '<button class="btn btn-primary btn-sm" onclick="window._bsQuickAction(\'bill\')">Create First Bill</button>' : ''}
+          ${!q ? '<button class="btn btn-primary btn-sm" onclick="window._bsReceiveBill?window._bsReceiveBill():window._bsQuickAction(\'bill\')">Receive First Bill</button>' : ''}
         </div>`
       : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Supplier</th><th>Ref #</th><th>Amount</th><th>Due</th><th>Status</th></tr></thead><tbody>
           ${filtered.map(e => {
@@ -1155,11 +1154,10 @@ async function _bsRenderRecurring(el) {
   const cur = getCurrentProfile()?.default_currency || 'USD';
   const rules = await listRecurring(user.id);
 
-  // Filter to business-relevant types AND only those tracked in business context
-  const bizTypes = new Set(BS_ALL_BIZ_TYPES);
+  // Filter to only those tracked in business context (by ID)
   const bsItems = _getBsItems();
   const bsRecurringIds = new Set(bsItems.recurring || []);
-  const bizRules = rules.filter(r => bizTypes.has(r.tx_type) && bsRecurringIds.has(r.id));
+  const bizRules = rules.filter(r => bsRecurringIds.has(r.id));
   const activeRules = bizRules.filter(r => r.active);
   const pausedRules = bizRules.filter(r => !r.active);
   const totalRecurring = activeRules.reduce((s,r) => s + (r.amount||0), 0);
@@ -1227,8 +1225,78 @@ async function _bsRenderRecurring(el) {
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderPanels(el) {
   const user = getCurrentUser();
+  const userId = user.id;
+  if (!window._bsPanelTab) window._bsPanelTab = 'mine';
+  const tab = window._bsPanelTab;
+
+  if (tab === 'public') {
+    // ── Public Panel DB (moved here from separate sidebar item) ──
+    let panels = [];
+    try {
+      const { data, error } = await supabase
+        .from('business_panels')
+        .select('id, title, currency, session_type, fields, user_id, created_at, updated_at')
+        .eq('is_public', true)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (!error) panels = data || [];
+    } catch(_) {}
+
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+        <div>
+          <h2 style="font-size:20px;font-weight:800;margin:0;">Business Panels</h2>
+          <p style="color:var(--muted);font-size:13px;margin-top:2px;">${panels.length} public panel${panels.length!==1?'s':''} available</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="window._bsCreatePanel()">+ New Panel</button>
+      </div>
+      <!-- Tabs -->
+      <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
+        <button onclick="window._bsPanelTab='mine';window._bsNavigate('bs-panels');"
+          style="padding:10px 20px;font-size:13px;font-weight:500;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;">
+          My Panels
+        </button>
+        <button onclick="window._bsPanelTab='public';window._bsNavigate('bs-panels');"
+          style="padding:10px 20px;font-size:13px;font-weight:700;color:var(--accent);background:none;border:none;border-bottom:2px solid var(--accent);margin-bottom:-2px;cursor:pointer;">
+          Public DB
+        </button>
+      </div>
+      ${panels.length === 0
+        ? `<div class="card" style="text-align:center;padding:40px;">
+            <div style="font-size:32px;margin-bottom:12px;">📋</div>
+            <p style="color:var(--muted);margin-bottom:12px;">No public panels available yet.</p>
+            <p style="color:var(--muted);font-size:12px;">Publish one of your panels to share it here.</p>
+          </div>`
+        : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;">
+            ${panels.map(p => {
+              const fields = p.fields || [];
+              const isOwn = p.user_id === userId;
+              return `
+              <div class="card" style="padding:18px;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                  <div style="font-size:16px;font-weight:700;">${esc(p.title)}</div>
+                  ${isOwn ? '<span class="badge badge-purple" style="font-size:10px;">Yours</span>' : ''}
+                </div>
+                <div style="font-size:12px;color:var(--muted);margin-top:4px;">${esc(p.session_type || 'Standard')} · ${esc(p.currency || 'USD')}</div>
+                <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;">
+                  ${fields.slice(0,5).map(f => `<span class="badge badge-gray" style="font-size:10px;">${esc(f.name||f.label||'Field')}</span>`).join('')}
+                  ${fields.length > 5 ? `<span class="badge badge-gray" style="font-size:10px;">+${fields.length-5} more</span>` : ''}
+                </div>
+                <div style="font-size:11px;color:var(--muted);margin-top:6px;">Published ${fmtRelative(p.created_at)}</div>
+                <div style="margin-top:10px;display:flex;gap:6px;">
+                  ${!isOwn ? `<button class="btn btn-primary btn-sm" onclick="window._bsCopyPanel('${p.id}')">+ Import to My Panels</button>` : `<button class="btn btn-secondary btn-sm" onclick="if(window._bpEngine?.openPanel)window._bpEngine.openPanel('${p.id}');">Open</button>`}
+                  <button class="bs sm" onclick="window._bsPreviewPanel('${p.id}')" style="font-size:12px;">Preview</button>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>`
+      }
+    `;
+    return;
+  }
+
+  // ── My Panels tab ──
   const allPanels = await listPanels(user.id);
-  // Only show panels tracked in the business context
   const bsPanelIds = new Set(_getBsItems().panels || []);
   const panels = allPanels.filter(p => bsPanelIds.has(p.id));
 
@@ -1238,10 +1306,18 @@ async function _bsRenderPanels(el) {
         <h2 style="font-size:20px;font-weight:800;margin:0;">Business Panels</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${panels.length} panel${panels.length!==1?'s':''} · ${panels.filter(p=>p.is_public).length} published</p>
       </div>
-      <div style="display:flex;gap:8px;">
-        <button class="btn btn-primary btn-sm" onclick="window._bsCreatePanel()">+ New Panel</button>
-        <button class="btn btn-secondary btn-sm" onclick="window._bsNavigate('bs-panel-db')">Browse Public DB</button>
-      </div>
+      <button class="btn btn-primary btn-sm" onclick="window._bsCreatePanel()">+ New Panel</button>
+    </div>
+    <!-- Tabs -->
+    <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
+      <button onclick="window._bsPanelTab='mine';window._bsNavigate('bs-panels');"
+        style="padding:10px 20px;font-size:13px;font-weight:700;color:var(--accent);background:none;border:none;border-bottom:2px solid var(--accent);margin-bottom:-2px;cursor:pointer;">
+        My Panels
+      </button>
+      <button onclick="window._bsPanelTab='public';window._bsNavigate('bs-panels');"
+        style="padding:10px 20px;font-size:13px;font-weight:500;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;">
+        Public DB
+      </button>
     </div>
     ${panels.length === 0
       ? `<div class="card" style="text-align:center;padding:40px;">
@@ -1250,7 +1326,7 @@ async function _bsRenderPanels(el) {
           <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Your business starts fresh. Create a new panel or import one from the Public DB.</p>
           <div style="display:flex;gap:8px;justify-content:center;">
             <button class="btn btn-primary btn-sm" onclick="window._bsCreatePanel()">Create Panel</button>
-            <button class="btn btn-secondary btn-sm" onclick="window._bsNavigate('bs-panel-db')">Browse Public DB</button>
+            <button class="btn btn-secondary btn-sm" onclick="window._bsPanelTab='public';window._bsNavigate('bs-panels');">Browse Public DB</button>
           </div>
         </div>`
       : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">

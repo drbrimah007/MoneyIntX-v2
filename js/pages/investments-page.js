@@ -334,6 +334,10 @@ window.doAddInvPartner = async function(invId) {
   await addInvestmentMember(invId, { contactId: cId, name: cName, role });
   closeModal();
   toast('Partner added.', 'success');
+  // Stay in BS if inside Business Suite
+  if (document.getElementById('bs-content') && window._bsNavigate) {
+    window._bsNavigate('bs-investments'); return;
+  }
   window.navTo('investments');
 };
 
@@ -372,6 +376,9 @@ window.doAddInvTx = async function(invId) {
   if (!result) return toast('Failed to add transaction.', 'error');
   closeModal();
   toast('Transaction added.', 'success');
+  if (document.getElementById('bs-content') && window._bsNavigate) {
+    window._bsNavigate('bs-investments'); return;
+  }
   window.navTo('investments');
 };
 
@@ -379,5 +386,8 @@ window.confirmDeleteInvestment = async function(id) {
   if (!confirm('Delete this investment? This cannot be undone.')) return;
   await deleteInvestment(id);
   toast('Investment deleted.', 'success');
+  if (document.getElementById('bs-content') && window._bsNavigate) {
+    window._bsNavigate('bs-investments'); return;
+  }
   window.navTo('investments');
 };

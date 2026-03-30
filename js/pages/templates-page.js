@@ -424,7 +424,9 @@ window.doSaveTemplate = async function(id) {
     currency: document.getElementById('et-currency')?.value || 'USD',
     is_public: document.getElementById('et-public')?.checked || false
   });
-  closeModal(); toast('Template saved!', 'success'); navTo('templates');
+  closeModal(); toast('Template saved!', 'success');
+  if (document.getElementById('bs-content') && window._bsNavigate) { window._bsNavigate('bs-templates'); return; }
+  navTo('templates');
 };
 
 // ── Use Template for Entry ────────────────────────────────────────
@@ -843,15 +845,21 @@ window.previewPublicTemplate = function(id) {
 window.doCopyTemplate = async function(id) {
   const currentUser = getCurrentUser();
   await copyPublicTemplate(currentUser.id, id);
-  toast('Template copied!', 'success'); navTo('templates');
+  toast('Template copied!', 'success');
+  if (document.getElementById('bs-content') && window._bsNavigate) { window._bsNavigate('bs-templates'); return; }
+  navTo('templates');
 };
 window.toggleTemplatePublic = async function(id, pub) {
   await togglePublic(id, pub);
-  toast(pub ? 'Template is now public.' : 'Template is now private.', 'success'); navTo('templates');
+  toast(pub ? 'Template is now public.' : 'Template is now private.', 'success');
+  if (document.getElementById('bs-content') && window._bsNavigate) { window._bsNavigate('bs-templates'); return; }
+  navTo('templates');
 };
 window.confirmDeleteTemplate = async function(id) {
   if (!confirm('Delete this template?')) return;
-  await deleteTemplate(id); toast('Deleted.', 'success'); navTo('templates');
+  await deleteTemplate(id); toast('Deleted.', 'success');
+  if (document.getElementById('bs-content') && window._bsNavigate) { window._bsNavigate('bs-templates'); return; }
+  navTo('templates');
 };
 
 
