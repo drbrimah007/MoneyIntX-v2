@@ -1,6 +1,7 @@
 // Money IntX v2 — Sharing Module
 import { supabase } from './supabase.js';
 import { toCents } from './entries.js';
+import { getCurrentProfile } from './pages/state.js';
 
 // ── Create share token ────────────────────────────────────────────
 export async function createShareToken(senderId, entryId, { recipientEmail = '', entrySnapshot = {} } = {}) {
@@ -205,19 +206,27 @@ export async function confirmShare(tokenId, recipientId) {
 
   // Notify the sender that the share was confirmed
   if (newEntry && token.sender_id) {
-    // Get recipient name for the notification
-    let recipientName = 'Recipient';
+    // Get recipient name — use current profile (the recipient IS the logged-in user)
+    // Fallback: query users table (may fail due to RLS), then use 'Someone'
+    let recipientName = '';
     try {
-      const { data: rUser } = await supabase.from('users').select('display_name').eq('id', recipientId).single();
-      recipientName = rUser?.display_name || recipientName;
+      const profile = getCurrentProfile();
+      recipientName = profile?.display_name || profile?.full_name || '';
     } catch(_) {}
+    if (!recipientName) {
+      try {
+        const { data: rUser } = await supabase.from('users').select('display_name').eq('id', recipientId).single();
+        recipientName = rUser?.display_name || '';
+      } catch(_) {}
+    }
+    recipientName = recipientName || 'Someone';
     const amtFmt = token.entry.currency + ' ' + ((token.entry.amount || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
     await supabase.from('notifications').insert({
       user_id:      token.sender_id,
       type:         'confirmed',
       contact_name: recipientName,
       contact_id:   contactId || null,
-      message:      `${recipientName} confirmed your shared record — ${amtFmt}`,
+      message:      `Your shared record was confirmed by ${recipientName} — ${amtFmt}`,
       entry_id:     token.entry_id,
       amount:       token.entry.amount,
       currency:     token.entry.currency,

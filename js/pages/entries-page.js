@@ -889,19 +889,8 @@ window.saveMarkPaid = async function(entryId, currency) {
       contact_name: contactName, entry_id: entryId, read: false
     });
 
-    // 5. In-app notification to linked contact
-    if (linkedUserId) {
-      // If I owe them and I'm recording payment → needs their verification
-      const contactType = iOwe ? 'settlement_pending' : 'payment_received';
-      await supabase.from('notifications').insert({
-        user_id: linkedUserId, type: contactType,
-        message: `${fromName} recorded a payment of ${fmtAmt}${note ? ' — ' + note : ''}`,
-        amount: amountCents, currency: cur,
-        contact_name: fromName, entry_id: entryId, read: false
-      });
-    }
-
-    // 6. Mirror settlement to linked user's entry (both panels show same balance)
+    // 5. Mirror settlement to linked user's entry FIRST (so we have mirror entry ID for notification)
+    let mirrorEntryId = null;
     if (linkedUserId) {
       const { data: mirrorEntry } = await supabase
         .from('entries')
@@ -910,6 +899,7 @@ window.saveMarkPaid = async function(entryId, currency) {
         .eq('linked_entry_id', entryId)
         .maybeSingle();
       if (mirrorEntry?.id) {
+        mirrorEntryId = mirrorEntry.id;
         await supabase.from('settlements').insert({
           entry_id:    mirrorEntry.id,
           amount:      amountCents,
@@ -920,6 +910,17 @@ window.saveMarkPaid = async function(entryId, currency) {
           status:      iOwe ? 'pending' : 'confirmed'
         });
       }
+    }
+
+    // 6. In-app notification to linked contact — use THEIR mirror entry ID so they can open it
+    if (linkedUserId) {
+      const contactType = iOwe ? 'settlement_pending' : 'payment_received';
+      await supabase.from('notifications').insert({
+        user_id: linkedUserId, type: contactType,
+        message: `${fromName} recorded a payment of ${fmtAmt}${note ? ' — ' + note : ''}`,
+        amount: amountCents, currency: cur,
+        contact_name: fromName, entry_id: mirrorEntryId || entryId, read: false
+      });
     }
 
     // 5. Email to contact (non-blocking)

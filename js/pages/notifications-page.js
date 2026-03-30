@@ -1,7 +1,7 @@
 // Money IntX — Notifications Page Module
 // Extracted from index.html page modules
 
-import { getCurrentUser, contactColor } from './state.js';
+import { getCurrentUser, getCurrentProfile, contactColor } from './state.js';
 import { esc, toast, fmtRelative } from '../ui.js';
 import { fmtMoney } from '../entries.js';
 import { supabase } from '../supabase.js';
@@ -55,8 +55,29 @@ export async function renderNotifications(el) {
       return new Date(b.created_at) - new Date(a.created_at);
     });
 
+    const myName = getCurrentProfile()?.display_name || getCurrentProfile()?.full_name || '';
+
     notifs.forEach(n => {
       const nColor = n.contact_id ? contactColor(n.contact_id) : null;
+      // Resolve display name — never show '—' or empty
+      let displayName = n.contact_name || '';
+      if (!displayName && n.message) {
+        // Try to extract name from message (e.g. "SomeName shared a record...")
+        const nameMatch = n.message.match(/^(\S+)/);
+        if (nameMatch) displayName = nameMatch[1];
+      }
+      if (!displayName) displayName = 'Unknown';
+
+      // Replace self-references: if the notification message mentions our own name
+      // talking about our own record, rewrite for clarity
+      let displayMessage = n.message || '';
+      if (myName && displayMessage.includes(myName + "'s shared record was confirmed")) {
+        displayMessage = displayMessage.replace(myName + "'s shared record was confirmed", "Your shared record was confirmed");
+      }
+      if (myName && displayMessage.includes(myName + "'s shared record")) {
+        displayMessage = displayMessage.replace(myName + "'s shared record", "Your shared record");
+      }
+
       // Action button: any notification with an entry_id gets a "View" that opens the entry detail
       let actionBtn = '';
       if (n.entry_id && (n.type === 'settlement_pending' || n.type === 'payment_received')) {
@@ -67,9 +88,9 @@ export async function renderNotifications(el) {
         actionBtn = `<button onclick="navTo('entries')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View</button>`;
       }
       html += `<tr>
-        <td style="font-weight:600;font-size:13px;"><span style="display:inline-flex;align-items:center;gap:6px;">${nColor ? `<span style="width:22px;height:22px;border-radius:50%;background:${nColor};display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0;">${esc((n.contact_name||'?').charAt(0).toUpperCase())}</span>` : ''}<span style="color:${nColor || 'var(--text)'};">${esc(n.contact_name || '—')}</span></span></td>
+        <td style="font-weight:600;font-size:13px;"><span style="display:inline-flex;align-items:center;gap:6px;">${nColor ? `<span style="width:22px;height:22px;border-radius:50%;background:${nColor};display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0;">${esc(displayName.charAt(0).toUpperCase())}</span>` : ''}<span style="color:${nColor || 'var(--text)'};">${esc(displayName)}</span></span></td>
         <td style="font-weight:700;font-size:13px;">${n.amount ? fmtMoney(n.amount, n.currency || 'USD') : '—'}</td>
-        <td class="hide-mobile" style="font-size:13px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(n.message)}">${esc(n.message)}</td>
+        <td class="hide-mobile" style="font-size:13px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(displayMessage)}">${esc(displayMessage)}</td>
         <td style="font-size:12px;color:var(--muted);">${fmtRelative(n.created_at)}</td>
         <td>${typeBadge(n.type)}</td>
         <td style="white-space:nowrap;">${actionBtn}<button onclick="deleteNotif('${n.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;">✕</button></td>
