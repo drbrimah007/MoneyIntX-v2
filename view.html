@@ -130,24 +130,28 @@ async function loadRecord() {
     ${note ? `<div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:20px;font-size:14px;">${esc(note)}</div>` : ''}
 
     <div style="display:flex;flex-direction:column;gap:10px;">
-      ${share.status !== 'confirmed' ? `<button class="btn btn-green" onclick="confirmRecord('${share.id}')">Confirm & Track</button>` : `<button class="btn btn-outline" disabled>Already Confirmed</button>`}
+      ${share.status !== 'confirmed' ? `<button class="btn btn-green" onclick="confirmRecord('${share.id}','${token}')">Confirm & Track</button>` : `<button class="btn btn-outline" disabled>Already Confirmed</button>`}
       ${share.status !== 'confirmed' ? `<button class="btn btn-outline" onclick="dismissRecord('${share.id}')">Dismiss</button>` : ''}
       <a href="/" style="text-align:center;color:var(--accent);font-size:13px;margin-top:8px;">Open Money IntX →</a>
     </div>
   `;
 }
 
-window.confirmRecord = async function(shareId) {
+window.confirmRecord = async function(shareId, shareToken) {
   // This page is for external viewers only.
   // Registered platform users should open Money IntX and confirm via "Shared With Me".
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
+    // Store the share token so the app can auto-claim it after signup/login
+    try { localStorage.setItem('mxi_pending_claim', shareToken); } catch(e) {}
     document.getElementById('view-card').innerHTML = `
       <div style="text-align:center;padding:30px;">
-        <div style="font-size:40px;margin-bottom:12px;">🔐</div>
-        <p style="font-size:18px;font-weight:700;margin-bottom:8px;">Sign in to track this</p>
-        <p style="font-size:14px;color:#8892a4;margin-bottom:20px;">Create a free Money IntX account to confirm and track this record in your ledger.</p>
-        <a href="/" style="display:inline-block;padding:10px 24px;background:#6c63ff;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;margin-right:8px;">Sign In / Sign Up →</a>
+        <img src="https://moneyinteractions.com/money.png" style="height:36px;margin-bottom:12px;" alt="Money IntX">
+        <p style="font-size:18px;font-weight:700;margin-bottom:8px;">Sign up to track this record</p>
+        <p style="font-size:14px;color:#8892a4;margin-bottom:20px;">Create a free Money IntX account and this record will automatically appear in your ledger.</p>
+        <a href="/?register=1" style="display:inline-block;padding:12px 28px;background:var(--green);color:#000;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;margin-bottom:10px;">Sign Up Free</a>
+        <br>
+        <a href="/?login=1" style="color:var(--accent);font-size:13px;">Already have an account? Sign In →</a>
       </div>`;
     return;
   }

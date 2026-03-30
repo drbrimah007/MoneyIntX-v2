@@ -207,7 +207,20 @@ window.filterEntryRows = function(q) {
 window.openEntryDetail = async function(id, options) {
   options = options || {};
   const reviewMode = options.reviewMode || false;
-  const entry = await getEntry(id);
+  let entry = await getEntry(id);
+  // Fallback: if entry not found (e.g. notification has sender's entry_id which recipient can't access),
+  // try finding the recipient's own mirror entry linked to this one
+  if (!entry && id) {
+    const { data: mirror } = await supabase
+      .from('entries')
+      .select('id')
+      .eq('linked_entry_id', id)
+      .eq('user_id', getCurrentUser()?.id)
+      .maybeSingle();
+    if (mirror?.id) {
+      entry = await getEntry(mirror.id);
+    }
+  }
   if (!entry) return toast('Entry not found.', 'error');
   const cName = entry.contact?.name || '—';
   const _ecat    = entry.category || entry.tx_type;
