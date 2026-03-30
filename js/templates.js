@@ -53,14 +53,21 @@ export async function deleteTemplate(id) {
 }
 
 export async function copyPublicTemplate(userId, templateId) {
-  const original = await getTemplate(templateId);
-  if (!original) return null;
+  // Try getTemplate first (works when RLS allows public reads)
+  let original = await getTemplate(templateId);
+  // Fallback: if getTemplate failed due to RLS, try fetching from public list
+  if (!original) {
+    const publicList = await listPublicTemplates();
+    original = publicList.find(t => t.id === templateId);
+  }
+  if (!original) { console.error('[copyPublicTemplate] Template not found:', templateId); return null; }
   return createTemplate(userId, {
     name: original.name + ' (Copy)',
     description: original.description,
     txType: original.tx_type,
     fields: original.fields,
-    invoicePrefix: original.invoice_prefix
+    invoicePrefix: original.invoice_prefix,
+    currency: original.currency
   });
 }
 

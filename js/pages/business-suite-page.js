@@ -2,8 +2,8 @@
 // Business Suite Page — Self-contained business environment
 // ────────────────────────────────────────────────────────────────────────────
 // Left-side menu with business-branded tools:
-//   Dashboard, Invoices, Clients, Suppliers, Business Panels, Templates,
-//   Recurring, Investments, Panel Public DB, Settings/Tools
+//   Dashboard, Invoices, Clients, Suppliers, Business Ledgers, Templates,
+//   Recurring, Investments, Ledger Public DB, Settings/Tools
 // ────────────────────────────────────────────────────────────────────────────
 
 import { getCurrentUser, getCurrentProfile, contactColor, contactAvatar, renderPagination, PAGE_SIZE, _fmtAmt } from './state.js';
@@ -43,7 +43,7 @@ const BS_TOOLS = [
   { id: 'bs-clients',    icon: '👥', label: 'Clients',          always: true },
   { id: 'bs-suppliers',  icon: '🏪', label: 'Suppliers',        always: true },
   { id: 'bs-recurring',  icon: '🔁', label: 'Recurring',        always: false },
-  { id: 'bs-panels',     icon: '📋', label: 'Panels',           always: true },
+  { id: 'bs-panels',     icon: '📋', label: 'Ledgers',           always: true },
   { id: 'bs-templates',  icon: '📑', label: 'Templates',        always: false },
   { id: 'bs-investments',icon: '📈', label: 'Investments',      always: false },
   { id: 'bs-branding',   icon: '🏷️', label: 'Branding',          always: false },
@@ -267,7 +267,7 @@ async function _bsRenderSection(section) {
     case 'bs-panels':      await _bsRenderPanels(el); break;
     case 'bs-templates':   await _bsRenderTemplates(el); break;
     case 'bs-investments': await _bsRenderInvestments(el); break;
-    case 'bs-panel-db':    await _bsRenderPanelDB(el); break;
+    // bs-panel-db removed — Public DB is now a tab inside bs-panels
     case 'bs-branding':    _bsRenderBranding(el); break;
     case 'bs-operatives':  await _bsRenderOperatives(el); break;
     case 'bs-settings':    _bsRenderSettings(el); break;
@@ -391,7 +391,7 @@ async function _bsRenderDash(el) {
       <button class="btn btn-primary" onclick="window._bsQuickAction('invoice')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">+ New Invoice</button>
       <button class="btn btn-secondary" onclick="window._bsReceiveBill?window._bsReceiveBill():window._bsQuickAction('bill')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">+ Receive Bill</button>
       <button class="btn btn-secondary" onclick="window._bsNavigate('bs-clients')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">Clients</button>
-      <button class="btn btn-secondary" onclick="window._bsNavigate('bs-panels')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">Panels</button>
+      <button class="btn btn-secondary" onclick="window._bsNavigate('bs-panels')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">Ledgers</button>
     </div>
 
     <!-- Activity Summary -->
@@ -1356,7 +1356,7 @@ async function _bsRenderRecurring(el) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// SECTION: Business Panels (Form Generator)
+// SECTION: Business Ledgers (Form Generator)
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderPanels(el) {
   const user = getCurrentUser();
@@ -1380,16 +1380,16 @@ async function _bsRenderPanels(el) {
     el.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
         <div>
-          <h2 style="font-size:20px;font-weight:800;margin:0;">Business Panels</h2>
-          <p style="color:var(--muted);font-size:13px;margin-top:2px;">${panels.length} public panel${panels.length!==1?'s':''} available</p>
+          <h2 style="font-size:20px;font-weight:800;margin:0;">Business Ledgers</h2>
+          <p style="color:var(--muted);font-size:13px;margin-top:2px;">${panels.length} public ledger${panels.length!==1?'s':''} available</p>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="window._bsCreatePanel()">+ New Panel</button>
+        <button class="btn btn-primary btn-sm" onclick="window._bsCreatePanel()">+ New Ledger</button>
       </div>
       <!-- Tabs -->
       <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
         <button onclick="window._bsPanelTab='mine';window._bsNavigate('bs-panels');"
           style="padding:10px 20px;font-size:13px;font-weight:500;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;">
-          My Panels
+          My Ledgers
         </button>
         <button onclick="window._bsPanelTab='public';window._bsNavigate('bs-panels');"
           style="padding:10px 20px;font-size:13px;font-weight:700;color:var(--accent);background:none;border:none;border-bottom:2px solid var(--accent);margin-bottom:-2px;cursor:pointer;">
@@ -1399,8 +1399,8 @@ async function _bsRenderPanels(el) {
       ${panels.length === 0
         ? `<div class="card" style="text-align:center;padding:40px;">
             <div style="font-size:32px;margin-bottom:12px;">📋</div>
-            <p style="color:var(--muted);margin-bottom:12px;">No public panels available yet.</p>
-            <p style="color:var(--muted);font-size:12px;">Publish one of your panels to share it here.</p>
+            <p style="color:var(--muted);margin-bottom:12px;">No public ledgers available yet.</p>
+            <p style="color:var(--muted);font-size:12px;">Publish one of your ledgers to share it here.</p>
           </div>`
         : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;">
             ${panels.map(p => {
@@ -1419,8 +1419,8 @@ async function _bsRenderPanels(el) {
                 </div>
                 <div style="font-size:11px;color:var(--muted);margin-top:6px;">Published ${fmtRelative(p.created_at)}</div>
                 <div style="margin-top:10px;display:flex;gap:6px;">
-                  ${!isOwn ? `<button class="btn btn-primary btn-sm" onclick="window._bsCopyPanel('${p.id}')">+ Import to My Panels</button>` : `<button class="btn btn-secondary btn-sm" onclick="if(window._bpEngine?.openPanel)window._bpEngine.openPanel('${p.id}');">Open</button>`}
-                  <button class="bs sm" onclick="window._bsPreviewPanel('${p.id}')" style="font-size:12px;">Preview</button>
+                  ${!isOwn ? `<button class="btn btn-primary btn-sm" onclick="window._bsCopyPanel('${p.id}')">📋 Copy</button>` : `<button class="btn btn-secondary btn-sm" onclick="if(window._bpEngine?.openPanel)window._bpEngine.openPanel('${p.id}');">Open</button>`}
+                  <button class="bs sm" onclick="window._bsPreviewPanel('${p.id}')" style="font-size:12px;">👁 Preview</button>
                 </div>
               </div>`;
             }).join('')}
@@ -1430,7 +1430,7 @@ async function _bsRenderPanels(el) {
     return;
   }
 
-  // ── My Panels tab ──
+  // ── My Ledgers tab ──
   const allPanels = await listPanels(user.id);
   const bsPanelIds = new Set(_getBsItems().panels || []);
   const panels = allPanels.filter(p => bsPanelIds.has(p.id));
@@ -1438,16 +1438,16 @@ async function _bsRenderPanels(el) {
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
       <div>
-        <h2 style="font-size:20px;font-weight:800;margin:0;">Business Panels</h2>
+        <h2 style="font-size:20px;font-weight:800;margin:0;">Business Ledgers</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${panels.length} panel${panels.length!==1?'s':''} · ${panels.filter(p=>p.is_public).length} published</p>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="window._bsCreatePanel()">+ New Panel</button>
+      <button class="btn btn-primary btn-sm" onclick="window._bsCreatePanel()">+ New Ledger</button>
     </div>
     <!-- Tabs -->
     <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
       <button onclick="window._bsPanelTab='mine';window._bsNavigate('bs-panels');"
         style="padding:10px 20px;font-size:13px;font-weight:700;color:var(--accent);background:none;border:none;border-bottom:2px solid var(--accent);margin-bottom:-2px;cursor:pointer;">
-        My Panels
+        My Ledgers
       </button>
       <button onclick="window._bsPanelTab='public';window._bsNavigate('bs-panels');"
         style="padding:10px 20px;font-size:13px;font-weight:500;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;">
@@ -1457,10 +1457,10 @@ async function _bsRenderPanels(el) {
     ${panels.length === 0
       ? `<div class="card" style="text-align:center;padding:40px;">
           <div style="font-size:36px;margin-bottom:10px;">📋</div>
-          <p style="font-weight:700;font-size:15px;margin-bottom:6px;">No business panels yet</p>
-          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Your business starts fresh. Create a new panel or import one from the Public DB.</p>
+          <p style="font-weight:700;font-size:15px;margin-bottom:6px;">No business ledgers yet</p>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Your business starts fresh. Create a new ledger or import one from the Public DB.</p>
           <div style="display:flex;gap:8px;justify-content:center;">
-            <button class="btn btn-primary btn-sm" onclick="window._bsCreatePanel()">Create Panel</button>
+            <button class="btn btn-primary btn-sm" onclick="window._bsCreatePanel()">Create Ledger</button>
             <button class="btn btn-secondary btn-sm" onclick="window._bsPanelTab='public';window._bsNavigate('bs-panels');">Browse Public DB</button>
           </div>
         </div>`
@@ -1468,14 +1468,14 @@ async function _bsRenderPanels(el) {
           ${panels.map(p => `
             <div class="card" style="padding:18px;">
               <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-                <div style="font-size:16px;font-weight:700;cursor:pointer;flex:1;" onclick="if(window._bpEngine?.openPanel)window._bpEngine.openPanel('${p.id}');else toast('Panel engine not loaded','error');">${esc(p.title)}</div>
+                <div style="font-size:16px;font-weight:700;cursor:pointer;flex:1;" onclick="if(window._bpEngine?.openPanel)window._bpEngine.openPanel('${p.id}');else toast('Ledger engine not loaded','error');">${esc(p.title)}</div>
                 ${p.is_public ? '<span class="badge badge-blue" style="font-size:10px;flex-shrink:0;">Public</span>' : ''}
               </div>
               <div style="font-size:12px;color:var(--muted);margin-top:4px;">${esc(p.session_type || 'Standard')} · ${esc(p.currency || 'USD')}</div>
               <div style="font-size:11px;color:var(--muted);margin-top:6px;">${(p.fields||[]).length} field${(p.fields||[]).length!==1?'s':''} · Updated ${fmtRelative(p.updated_at || p.created_at)}</div>
               <div style="display:flex;gap:6px;margin-top:10px;">
                 <button class="bs sm" onclick="if(window._bpEngine?.openPanel)window._bpEngine.openPanel('${p.id}');" style="font-size:12px;">Open</button>
-                <button class="bs sm" onclick="if(window._bpEngine?.togglePublicPanel)window._bpEngine.togglePublicPanel('${p.id}',${!p.is_public});" style="font-size:12px;">${p.is_public ? '🔒 Unpublish' : '🌐 Publish'}</button>
+                <button class="bs sm" onclick="if(window._bpEngine?.openEditPanelModal)window._bpEngine.openEditPanelModal('${p.id}');" style="font-size:12px;">✏ Edit</button>
               </div>
             </div>
           `).join('')}
@@ -1632,7 +1632,7 @@ async function _bsRenderTemplates(el) {
 window._bsCreatePanel = function() {
   window._bsCreatingPanel = true;
   if (window._bpEngine?.openCreateModal) window._bpEngine.openCreateModal();
-  else toast('Panel engine not loaded', 'error');
+  else toast('Ledger engine not loaded', 'error');
 };
 
 window._bsCreateTemplate = function() {
@@ -1810,64 +1810,7 @@ async function _bsRenderInvestments(el) {
   `;
 }
 
-// ══════════════════════════════════════════════════════════════════
-// SECTION: Panel Public DB
-// ══════════════════════════════════════════════════════════════════
-async function _bsRenderPanelDB(el) {
-  const userId = getCurrentUser()?.id;
-  // Fetch public business panels (is_public column may not exist yet — graceful fallback)
-  let panels = [];
-  try {
-    const { data, error } = await supabase
-      .from('business_panels')
-      .select('id, title, currency, session_type, fields, user_id, created_at, updated_at')
-      .eq('is_public', true)
-      .order('created_at', { ascending: false })
-      .limit(50);
-    if (!error) panels = data || [];
-  } catch(_) { /* is_public column may not exist yet */ }
-
-  el.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
-      <div>
-        <h2 style="font-size:20px;font-weight:800;margin:0;">Panel Public DB</h2>
-        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${panels.length} published panel${panels.length!==1?'s':''} available</p>
-      </div>
-      <button class="btn btn-secondary btn-sm" onclick="window._bsNavigate('bs-panels')">My Panels</button>
-    </div>
-    ${panels.length === 0
-      ? `<div class="card" style="text-align:center;padding:40px;">
-          <div style="font-size:32px;margin-bottom:12px;">📋</div>
-          <p style="color:var(--muted);margin-bottom:12px;">No public panels available yet.</p>
-          <p style="color:var(--muted);font-size:12px;">Publish one of your panels from the Business Panels section to share it here.</p>
-          <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="window._bsNavigate('bs-panels')">Go to My Panels</button>
-        </div>`
-      : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;">
-          ${panels.map(p => {
-            const fields = p.fields || [];
-            const isOwn = p.user_id === userId;
-            return `
-            <div class="card" style="padding:18px;">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-                <div style="font-size:16px;font-weight:700;">${esc(p.title)}</div>
-                ${isOwn ? '<span class="badge badge-purple" style="font-size:10px;">Yours</span>' : ''}
-              </div>
-              <div style="font-size:12px;color:var(--muted);margin-top:4px;">${esc(p.session_type || 'Standard')} · ${esc(p.currency || 'USD')}</div>
-              <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;">
-                ${fields.slice(0,5).map(f => `<span class="badge badge-gray" style="font-size:10px;">${esc(f.name||f.label||'Field')}</span>`).join('')}
-                ${fields.length > 5 ? `<span class="badge badge-gray" style="font-size:10px;">+${fields.length-5} more</span>` : ''}
-              </div>
-              <div style="font-size:11px;color:var(--muted);margin-top:6px;">Published ${fmtRelative(p.created_at)}</div>
-              <div style="margin-top:10px;display:flex;gap:6px;">
-                ${!isOwn ? `<button class="btn btn-primary btn-sm" onclick="window._bsCopyPanel('${p.id}')">+ Import to My Panels</button>` : `<button class="btn btn-secondary btn-sm" onclick="if(window._bpEngine?.openPanel)window._bpEngine.openPanel('${p.id}');">Open</button>`}
-                <button class="bs sm" onclick="window._bsPreviewPanel('${p.id}')" style="font-size:12px;">Preview Fields</button>
-              </div>
-            </div>`;
-          }).join('')}
-        </div>`
-    }
-  `;
-}
+// Legacy _bsRenderPanelDB removed — Public DB is now a tab inside _bsRenderPanels
 
 // Preview panel fields in a modal
 window._bsPreviewPanel = async function(panelId) {
@@ -1876,13 +1819,13 @@ window._bsPreviewPanel = async function(panelId) {
     .select('*')
     .eq('id', panelId)
     .single();
-  if (!panel) { toast('Panel not found', 'error'); return; }
+  if (!panel) { toast('Ledger not found', 'error'); return; }
 
   const fields = panel.fields || [];
   openModal(`
     <div class="modal-title">${esc(panel.title)} — Fields Preview</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">${esc(panel.session_type || 'Standard')} · ${esc(panel.currency || 'USD')} · ${fields.length} field${fields.length!==1?'s':''}</div>
-    ${fields.length === 0 ? '<p style="color:var(--muted);">This panel has no fields defined yet.</p>' : `
+    ${fields.length === 0 ? '<p style="color:var(--muted);">This ledger has no fields defined yet.</p>' : `
       <div style="max-height:300px;overflow-y:auto;">
         ${fields.map((f, i) => `
           <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
@@ -1897,7 +1840,7 @@ window._bsPreviewPanel = async function(panelId) {
     `}
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="bs sm" onclick="closeModal()">Close</button>
-      ${panel.user_id !== getCurrentUser()?.id ? `<button class="btn btn-primary sm" onclick="closeModal();window._bsCopyPanel('${panelId}')">+ Import</button>` : ''}
+      ${panel.user_id !== getCurrentUser()?.id ? `<button class="btn btn-primary btn-sm" onclick="closeModal();window._bsCopyPanel('${panelId}')">📋 Copy to My Ledgers</button>` : ''}
     </div>
   `, { maxWidth: '500px' });
 };
@@ -1910,7 +1853,7 @@ window._bsCopyPanel = async function(panelId) {
     .eq('id', panelId)
     .single();
 
-  if (!source) { toast('Panel not found', 'error'); return; }
+  if (!source) { toast('Ledger not found', 'error'); return; }
 
   const { data, error } = await supabase
     .from('business_panels')
@@ -1927,7 +1870,7 @@ window._bsCopyPanel = async function(panelId) {
   if (error) { toast('Failed to copy: ' + error.message, 'error'); return; }
   // Track the newly imported panel in business context
   if (data?.id) _addBsItem('panels', data.id);
-  toast('Panel copied to your Business Panels', 'success');
+  toast('Panel copied to your Business Ledgers', 'success');
   window._bsNavigate('bs-panels');
 };
 
@@ -2094,7 +2037,7 @@ window._bsSaveBranding = async function() {
 
 const BS_ROLES = [
   { id: 'owner',   label: 'Owner',   badge: 'badge-purple', desc: 'Full control — manage team, settings, all tools' },
-  { id: 'admin',   label: 'Admin',   badge: 'badge-blue',   desc: 'Manage entries, clients, panels — cannot delete suite' },
+  { id: 'admin',   label: 'Admin',   badge: 'badge-blue',   desc: 'Manage entries, clients, ledgers — cannot delete suite' },
   { id: 'manager', label: 'Manager', badge: 'badge-gray',   desc: 'Create entries, view clients, limited editing' },
   { id: 'viewer',  label: 'Viewer',  badge: 'badge-yellow', desc: 'Read-only access to all data' }
 ];
@@ -2505,7 +2448,7 @@ function _bsRenderSettings(el) {
         <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:rgba(208,120,120,.06);border-radius:8px;border:1px solid rgba(208,120,120,.2);">
           <div>
             <div style="font-weight:600;font-size:13px;">Clear Business Tracker</div>
-            <div style="font-size:11px;color:var(--muted);">Remove all business panel/template/recurring/investment associations (data remains, just unlinked from BS)</div>
+            <div style="font-size:11px;color:var(--muted);">Remove all business ledger/template/recurring/investment associations (data remains, just unlinked from BS)</div>
           </div>
           <button class="btn btn-sm" style="background:var(--red,#d07878);color:#fff;border:none;" onclick="window._bsClearTracker()">Clear</button>
         </div>
@@ -2517,6 +2460,14 @@ function _bsRenderSettings(el) {
           <button class="btn btn-sm" style="background:var(--red,#d07878);color:#fff;border:none;" onclick="window._bsResetOperatives()">Reset</button>
         </div>
       </div>
+    </div>
+
+    <!-- Exit to Personal -->
+    <div class="card" style="padding:18px;margin-bottom:16px;text-align:center;">
+      <button class="btn btn-primary" onclick="window._bsNavigate('bs-back')" style="width:100%;padding:14px;font-size:15px;font-weight:700;">
+        ← Exit to Personal Dashboard
+      </button>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px;">Leave Business Suite and return to your personal dashboard</p>
     </div>
 
     <!-- Legal Notice -->
@@ -2562,7 +2513,7 @@ window._bsExportData = async function() {
 };
 
 window._bsClearTracker = function() {
-  if (!confirm('Clear all business panel, template, recurring, and investment associations? Your data remains — items are just unlinked from the Business Suite.')) return;
+  if (!confirm('Clear all business ledger, template, recurring, and investment associations? Your data remains — items are just unlinked from the Business Suite.')) return;
   _saveBsItems({ templates: [], panels: [], recurring: [], investments: [] });
   toast('Business tracker cleared', 'success');
   window._bsNavigate('bs-settings');

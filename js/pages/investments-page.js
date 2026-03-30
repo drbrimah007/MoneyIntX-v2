@@ -8,7 +8,8 @@ import { supabase } from '../supabase.js';
 import { listContacts } from '../contacts.js';
 import {
   createInvestment, getInvestment, deleteInvestment,
-  addInvestmentMember, addInvestmentTransaction,
+  addInvestmentMember, updateInvestmentMember, removeInvestmentMember,
+  addInvestmentTransaction,
   calcInvestmentStats
 } from '../investments.js';
 
@@ -258,10 +259,36 @@ window.openInvestmentDetail = async function(id) {
   const isOwner = inv.user_id === currentUser.id;
   const members = inv.members || [];
 
-  const membersHtml = members.map(m => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
-      <div><span style="font-weight:600;">${esc(m.name)}</span> <span class="badge badge-gray" style="font-size:10px;">${esc(m.role)}</span></div>
-    </div>`).join('') || '<p style="color:var(--muted);font-size:13px;">No members.</p>';
+  // Fetch notice board posts
+  let notices = [];
+  try {
+    const { data } = await supabase.from('notice_board').select('*').eq('investment_id', id).order('created_at', { ascending: false }).limit(20);
+    notices = data || [];
+  } catch(_) {}
+
+  // Fetch documents
+  let docs = [];
+  try {
+    const { data } = await supabase.from('investment_documents').select('*').eq('investment_id', id).order('created_at', { ascending: false }).limit(20);
+    docs = data || [];
+  } catch(_) {}
+
+  const ROLES = ['owner','admin','partner','investor','advisor','observer','member'];
+  const membersHtml = members.map(m => {
+    const isSelf = m.user_id === currentUser.id;
+    const roleSelect = isOwner && !isSelf
+      ? `<select onchange="window._changeInvMemberRole('${m.id}','${id}',this.value)" style="font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--text);">
+          ${ROLES.map(r => `<option value="${r}" ${m.role===r?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}</option>`).join('')}
+        </select>`
+      : `<span class="badge badge-gray" style="font-size:10px;">${esc(m.role)}</span>`;
+    const removeBtn = isOwner && !isSelf
+      ? `<button class="bs sm" style="font-size:11px;color:var(--red);" onclick="window._removeInvMember('${m.id}','${id}')">Remove</button>`
+      : '';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
+      <div style="display:flex;align-items:center;gap:8px;"><span style="font-weight:600;">${esc(m.name)}</span>${roleSelect}</div>
+      ${removeBtn}
+    </div>`;
+  }).join('') || '<p style="color:var(--muted);font-size:13px;">No members.</p>';
 
   const txHtml = txs.length === 0 ? '<p style="color:var(--muted);font-size:13px;">No transactions yet.</p>' :
     txs.slice(0,10).map(t=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
@@ -269,6 +296,32 @@ window.openInvestmentDetail = async function(id) {
       <div style="font-size:11px;color:var(--muted);">${fmtDate(t.created_at)}</div></div>
       <div style="font-weight:700;color:${['deposit','capital_contribution','revenue','dividend','return'].includes(t.type)?'var(--green)':'var(--red)'};">${['deposit','capital_contribution','revenue','dividend','return'].includes(t.type)?'+':'−'}${fmtMoney(t.amount,inv.currency)}</div>
     </div>`).join('');
+
+  const noticesHtml = notices.length === 0
+    ? '<p style="color:var(--muted);font-size:13px;">No notices yet. Post the first update.</p>'
+    : notices.map(n => `<div style="padding:10px;background:var(--bg3);border-radius:8px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-weight:600;font-size:13px;">${esc(n.user_name)}</span>
+          <span style="font-size:11px;color:var(--muted);">${fmtDate(n.created_at)}</span>
+        </div>
+        <div style="font-size:13px;white-space:pre-wrap;word-break:break-word;">${esc(n.message)}</div>
+      </div>`).join('');
+
+  const docsHtml = docs.length === 0
+    ? '<p style="color:var(--muted);font-size:13px;">No documents uploaded yet.</p>'
+    : docs.map(d => {
+        const sizeKb = d.file_size ? (d.file_size / 1024).toFixed(1) + ' KB' : '';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--bg3);border-radius:8px;margin-bottom:6px;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(d.file_name)}</div>
+            <div style="font-size:11px;color:var(--muted);">${sizeKb} · ${fmtDate(d.created_at)}${d.note ? ' · ' + esc(d.note) : ''}</div>
+          </div>
+          <button class="bs sm" style="flex-shrink:0;font-size:11px;" onclick="window._downloadInvDoc('${d.file_path}','${esc(d.file_name)}')">Download</button>
+        </div>`;
+      }).join('');
+
+  // Store current investment ID for post/upload handlers
+  window._invDetailId = id;
 
   openModal(`
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
@@ -288,21 +341,144 @@ window.openInvestmentDetail = async function(id) {
       <div class="stat-card"><div class="stat-lbl">ROI</div><div class="stat-val" style="font-size:17px;color:${parseFloat(stats.roi)>=0?'var(--green)':'var(--red)'};">${stats.roi}%</div></div>
     </div>
     ${inv.description?`<p style="color:var(--muted);font-size:13px;margin-bottom:14px;">${esc(inv.description)}</p>`:''}
-    <div style="margin-bottom:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <h4 style="font-size:14px;font-weight:700;">Partners (${members.length})</h4>
-        ${isOwner?`<button class="btn btn-primary btn-sm" style="font-size:11px;" onclick="closeModal();openAddInvPartnerModal('${inv.id}')">+ Partner</button>`:''}
-      </div>
-      ${membersHtml}
+
+    <!-- Tabs: Overview | Notice Board | Documents -->
+    <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:14px;">
+      <button class="bs sm inv-detail-tab" data-tab="overview" onclick="window._invDetailTab('overview')" style="border-bottom:2px solid var(--accent);font-weight:700;border-radius:8px 8px 0 0;padding:8px 14px;">Overview</button>
+      <button class="bs sm inv-detail-tab" data-tab="notices" onclick="window._invDetailTab('notices')" style="border-radius:8px 8px 0 0;padding:8px 14px;">Notice Board (${notices.length})</button>
+      <button class="bs sm inv-detail-tab" data-tab="docs" onclick="window._invDetailTab('docs')" style="border-radius:8px 8px 0 0;padding:8px 14px;">Documents (${docs.length})</button>
     </div>
-    <div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <h4 style="font-size:14px;font-weight:700;">Transactions</h4>
-        ${isOwner?`<button class="btn btn-primary btn-sm" style="font-size:11px;" onclick="closeModal();openAddInvTxModal('${inv.id}')">+ Add</button>`:''}
+
+    <!-- Tab: Overview -->
+    <div id="inv-tab-overview">
+      <div style="margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h4 style="font-size:14px;font-weight:700;">Partners (${members.length})</h4>
+          ${isOwner?`<button class="btn btn-primary btn-sm" style="font-size:11px;" onclick="closeModal();openAddInvPartnerModal('${inv.id}')">+ Partner</button>`:''}
+        </div>
+        ${membersHtml}
       </div>
-      ${txHtml}
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h4 style="font-size:14px;font-weight:700;">Transactions</h4>
+          ${isOwner?`<button class="btn btn-primary btn-sm" style="font-size:11px;" onclick="closeModal();openAddInvTxModal('${inv.id}')">+ Add</button>`:''}
+        </div>
+        ${txHtml}
+      </div>
     </div>
-  `, { maxWidth:'560px' });
+
+    <!-- Tab: Notice Board -->
+    <div id="inv-tab-notices" style="display:none;">
+      <div style="margin-bottom:12px;">
+        <textarea id="inv-notice-msg" rows="2" placeholder="Post an update or notice…" style="width:100%;box-sizing:border-box;font-size:13px;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg2);color:var(--text);resize:vertical;"></textarea>
+        <div style="text-align:right;margin-top:6px;">
+          <button class="btn btn-primary btn-sm" onclick="window._postInvNotice('${id}')">Post Notice</button>
+        </div>
+      </div>
+      <div id="inv-notices-list" style="max-height:250px;overflow-y:auto;">
+        ${noticesHtml}
+      </div>
+    </div>
+
+    <!-- Tab: Documents -->
+    <div id="inv-tab-docs" style="display:none;">
+      <div style="margin-bottom:12px;padding:12px;border:2px dashed var(--border);border-radius:10px;text-align:center;">
+        <input type="file" id="inv-doc-upload" multiple onchange="window._handleInvDocUpload('${id}', this.files)" style="display:none;">
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('inv-doc-upload').click()">Choose Files</button>
+        <p style="font-size:11px;color:var(--muted);margin-top:6px;">Upload receipts, contracts, or any documents</p>
+      </div>
+      <div id="inv-docs-list">
+        ${docsHtml}
+      </div>
+    </div>
+  `, { maxWidth:'600px' });
+};
+
+// ── Investment Detail Tabs ────────────────────────────────────────
+window._invDetailTab = function(tab) {
+  ['overview','notices','docs'].forEach(t => {
+    const el = document.getElementById('inv-tab-' + t);
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('.inv-detail-tab').forEach(btn => {
+    const isActive = btn.dataset.tab === tab;
+    btn.style.borderBottom = isActive ? '2px solid var(--accent)' : '';
+    btn.style.fontWeight = isActive ? '700' : '';
+  });
+};
+
+// ── Post Notice ───────────────────────────────────────────────────
+window._postInvNotice = async function(invId) {
+  const msgEl = document.getElementById('inv-notice-msg');
+  const msg = msgEl?.value?.trim();
+  if (!msg) return toast('Write a message first.', 'warning');
+  const user = getCurrentUser();
+  const profile = getCurrentProfile();
+  const { error } = await supabase.from('notice_board').insert({
+    investment_id: invId,
+    user_id: user.id,
+    user_name: profile?.display_name || user.email,
+    message: msg
+  });
+  if (error) return toast('Failed to post: ' + error.message, 'error');
+  toast('Notice posted.', 'success');
+  closeModal();
+  openInvestmentDetail(invId);
+};
+
+// ── Upload Investment Documents ───────────────────────────────────
+window._handleInvDocUpload = async function(invId, fileList) {
+  if (!fileList || !fileList.length) return;
+  const user = getCurrentUser();
+  let uploaded = 0;
+  for (const file of fileList) {
+    const path = `${user.id}/${invId}/${Date.now()}_${file.name}`;
+    const { error: uploadErr } = await supabase.storage.from('investment-docs').upload(path, file);
+    if (uploadErr) { toast('Upload failed: ' + uploadErr.message, 'error'); continue; }
+    const { error: dbErr } = await supabase.from('investment_documents').insert({
+      investment_id: invId,
+      user_id: user.id,
+      file_name: file.name,
+      file_path: path,
+      file_size: file.size,
+      mime_type: file.type
+    });
+    if (dbErr) { toast('Failed to save record: ' + dbErr.message, 'error'); continue; }
+    uploaded++;
+  }
+  if (uploaded > 0) {
+    toast(`${uploaded} file${uploaded > 1 ? 's' : ''} uploaded.`, 'success');
+    closeModal();
+    openInvestmentDetail(invId);
+  }
+};
+
+// ── Download Investment Document ──────────────────────────────────
+window._downloadInvDoc = async function(path, fileName) {
+  const { data, error } = await supabase.storage.from('investment-docs').download(path);
+  if (error || !data) return toast('Download failed: ' + (error?.message || 'unknown'), 'error');
+  const url = URL.createObjectURL(data);
+  const a = document.createElement('a');
+  a.href = url; a.download = fileName;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+// ── Change Investment Member Role ─────────────────────────────────
+window._changeInvMemberRole = async function(memberId, invId, newRole) {
+  const result = await updateInvestmentMember(memberId, { role: newRole });
+  if (!result) return toast('Failed to update role.', 'error');
+  toast('Role updated.', 'success');
+};
+
+// ── Remove Investment Member ──────────────────────────────────────
+window._removeInvMember = async function(memberId, invId) {
+  if (!confirm('Remove this member from the investment?')) return;
+  const ok = await removeInvestmentMember(memberId);
+  if (!ok) return toast('Failed to remove member.', 'error');
+  toast('Member removed.', 'success');
+  closeModal();
+  openInvestmentDetail(invId);
 };
 
 window.openAddInvPartnerModal = async function(invId) {

@@ -1,7 +1,8 @@
 // ── Entries Page Module ──────────────────────────────────────────
 
 import { getCurrentUser, getCurrentProfile, contactColor, contactAvatar, renderPagination, PAGE_SIZE, _invalidateEntries, _fmtAmt } from './state.js';
-import { listEntries, getEntry, createEntry, updateEntry, deleteEntry, fmtMoney, toCents, getDashboardTotals, invalidateEntryCache } from '../entries.js';
+import { listEntries, getEntry, createEntry, updateEntry, deleteEntry, archiveEntry, unarchiveEntry, restoreEntry, voidEntry, fmtMoney, toCents, getDashboardTotals, invalidateEntryCache } from '../entries.js';
+import { bulkArchive, bulkNoLedger, bulkDelete } from '../bulk.js';
 import { listContacts, createContact } from '../contacts.js';
 import { createShareToken, getShareUrl, listReceivedShares, dismissShare } from '../sharing.js';
 import { listTemplates } from '../templates.js';
@@ -1174,14 +1175,27 @@ window.sendInvoiceNotification = async function(entryId) {
     const emailTo = contact?.email || cEmail;
     if (sendEmail && emailTo) {
       try {
-        const fromName = getCurrentProfile()?.display_name || getCurrentProfile()?.company_name || 'Money IntX';
+        const fromName = window._getBsSenderName?.() || getCurrentProfile()?.display_name || getCurrentProfile()?.company_name || 'Money IntX';
+        // Generate share link so email CTA points to the actual record
+        let _shareLink = '';
+        try {
+          const { data: _sTok } = await supabase.from('share_tokens').select('token').eq('entry_id', entryId).maybeSingle();
+          if (_sTok?.token) {
+            _shareLink = window.location.origin + '/view?t=' + _sTok.token;
+          } else {
+            const _snap = { amount: entry.amount, currency: entry.currency, tx_type: entry.tx_type, date: entry.date, from_name: fromName };
+            const _newTok = await createShareToken(getCurrentUser().id, entryId, { recipientEmail: emailTo, entrySnapshot: _snap });
+            if (_newTok?.token) _shareLink = window.location.origin + '/view?t=' + _newTok.token;
+          }
+        } catch(_) {}
         const result = await sendNotificationEmail(getCurrentUser().id, {
           to: emailTo, fromName, txType: entry.category || entry.tx_type,
           amount: entry.amount,
           currency: entry.currency, message, entryId, isReminder: false,
           logoUrl: getCurrentProfile()?.logo_url,
           fromEmail: getCurrentProfile()?.company_email || getCurrentUser()?.email,
-          siteUrl: 'https://moneyinteractions.com'
+          siteUrl: 'https://moneyinteractions.com',
+          shareLink: _shareLink || undefined
         });
         if (!result?.ok) toast('Email failed: ' + (result?.error || 'check Settings → Email Diagnostics'), 'info');
       } catch(e) { console.warn('Email send failed:', e); toast('Email failed: ' + e.message, 'error'); }
@@ -1238,7 +1252,7 @@ window.handleArchiveEntry = async function(id, action) {
   _invalidateEntries(); navTo('entries');
 };
 
-// ── Share Entry Modal ─────────────────────────────────────────────
+// ── Share Entry — 1-step flow (generate link + show share options immediately) ──
 window.openShareModal = async function(id) {
   const entry = await getEntry(id);
   if (!entry) return;
@@ -1247,62 +1261,13 @@ window.openShareModal = async function(id) {
   const txLabel = TX_LABELS[entry.tx_type] || entry.tx_type;
   const amtStr = fmtMoney(entry.amount, entry.currency);
 
+  // Show loading state
   openModal(`
-    <h3 style="margin-bottom:4px;">Share Record</h3>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">Send this record to someone via link, WhatsApp, or email.</p>
-    <div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
-      <div>
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Record</div>
-        <div style="font-weight:700;">${esc(cName)}</div>
-        <div style="font-size:13px;color:var(--muted);">${esc(txLabel)} · ${amtStr}</div>
-      </div>
-      <div style="font-size:24px;">📋</div>
-    </div>
-
-    <div class="form-group" style="margin-bottom:10px;">
-      <label>Recipient Email <span style="color:var(--muted);font-weight:400;">(optional, to notify them)</span></label>
-      <input type="email" id="share-email" value="${esc(cEmail)}" placeholder="recipient@example.com">
-    </div>
-
-    <div class="form-group" style="margin-bottom:10px;">
-      <label>Share Type</label>
-      <div style="display:flex;gap:8px;">
-        <label style="flex:1;display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:8px;border:2px solid var(--accent);background:rgba(108,99,255,.08);cursor:pointer;font-size:13px;font-weight:600;">
-          <input type="radio" name="share-type" value="message" checked style="accent-color:var(--accent);"> 💬 Message + URL
-        </label>
-        <label style="flex:1;display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:8px;border:2px solid var(--border);cursor:pointer;font-size:13px;font-weight:500;">
-          <input type="radio" name="share-type" value="url" style="accent-color:var(--accent);"> 🔗 URL Only
-        </label>
-      </div>
-    </div>
-    <div id="share-msg-wrap" class="form-group" style="margin-bottom:14px;">
-      <label>Message</label>
-      <textarea id="share-message" rows="3" style="font-size:13px;">Hi ${esc(cName)}, please review this record: ${esc(txLabel)} of ${amtStr}. [LINK]</textarea>
-      <p style="font-size:11px;color:var(--muted);margin:4px 0 0;">[LINK] will be replaced with the share URL.</p>
-    </div>
-
-    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:4px;">
-      <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="doShareEntry('${id}')">Create Share Link →</button>
-    </div>
+    <h3 style="margin-bottom:8px;">Share Record</h3>
+    <p style="color:var(--muted);font-size:13px;">Generating share link…</p>
   `, { maxWidth: '460px' });
 
-  // Toggle message field based on share type
-  document.querySelectorAll('input[name="share-type"]').forEach(r => {
-    r.addEventListener('change', () => {
-      document.getElementById('share-msg-wrap').style.display = r.value === 'url' && r.checked ? 'none' : '';
-    });
-  });
-};
-
-window.doShareEntry = async function(entryId) {
-  const email = (document.getElementById('share-email').value || '').trim();
-  const shareType = document.querySelector('input[name="share-type"]:checked')?.value || 'message';
-  const message = document.getElementById('share-message')?.value?.trim() || '';
-
-  const entry = await getEntry(entryId);
-  if (!entry) return;
-  // Use business sender name when sharing from BS context
+  // Generate share token immediately
   const _shareSenderName = window._getBsSenderName?.() || getCurrentProfile()?.display_name || '';
   const _shareSenderEmail = window._getBsSenderEmail?.() || getCurrentUser().email;
   const snapshot = {
@@ -1311,60 +1276,74 @@ window.doShareEntry = async function(entryId) {
     status: entry.status, from_name: _shareSenderName,
     from_email: _shareSenderEmail
   };
-  const token = await createShareToken(getCurrentUser().id, entryId, {
-    recipientEmail: email, entrySnapshot: snapshot
-  });
-  if (!token) return toast('Failed to create share.', 'error');
-  const url = getShareUrl(token.token);
 
-  // Notify linked recipient if email provided
-  // NOTE: We use an RPC (find_user_id_by_email) instead of a direct table
-  // query because RLS on `users` prevents one user from reading another's row.
-  if (email) {
-    const { data: recipientId } = await supabase.rpc('find_user_id_by_email', { p_email: email });
-    if (recipientId) {
-      await supabase.from('share_tokens').update({ recipient_id: recipientId, status: 'sent' }).eq('id', token.id);
-      await supabase.from('notifications').insert({
-        user_id: recipientId,
-        type: 'shared_record',
-        message: `${_shareSenderName || 'Someone'} shared a record with you: ${fmtMoney(entry.amount, entry.currency)}`,
-        entry_id: entryId,
-        contact_name: _shareSenderName || '',
-        amount: entry.amount, currency: entry.currency,
-        read: false
+  // Re-use existing token if one exists
+  let url = '';
+  let tokenObj = null;
+  try {
+    const { data: existing } = await supabase.from('share_tokens').select('id, token').eq('entry_id', id).maybeSingle();
+    if (existing?.token) {
+      url = window.location.origin + '/view?t=' + existing.token;
+      tokenObj = existing;
+    } else {
+      tokenObj = await createShareToken(getCurrentUser().id, id, {
+        recipientEmail: cEmail, entrySnapshot: snapshot
       });
+      if (tokenObj?.token) url = getShareUrl(tokenObj.token);
     }
+  } catch(_) {}
+  if (!url) { closeModal(); return toast('Could not generate share link.', 'error'); }
+
+  // Notify linked recipient if contact has email
+  if (cEmail && tokenObj) {
+    try {
+      const { data: recipientId } = await supabase.rpc('find_user_id_by_email', { p_email: cEmail });
+      if (recipientId) {
+        await supabase.from('share_tokens').update({ recipient_id: recipientId, status: 'sent' }).eq('id', tokenObj.id);
+        await supabase.from('notifications').insert({
+          user_id: recipientId, type: 'shared_record',
+          message: `${_shareSenderName || 'Someone'} shared a record with you: ${fmtMoney(entry.amount, entry.currency)}`,
+          entry_id: id, contact_name: _shareSenderName || '',
+          amount: entry.amount, currency: entry.currency, read: false
+        });
+      }
+    } catch(_) {}
   }
 
-  const cName = entry.contact?.name || 'Contact';
-  const txLabel = TX_LABELS[entry.tx_type] || entry.tx_type;
-  const amtStr = fmtMoney(entry.amount, entry.currency);
-  const finalMsg = shareType === 'message'
-    ? (message || `Hi ${cName}, please review this record: ${txLabel} of ${amtStr}.`).replace('[LINK]', url)
-    : url;
-
-  const encodedMsg = encodeURIComponent(finalMsg);
+  // Build default message
+  const defaultMsg = `Hi ${cName}, please review this record: ${txLabel} — ${amtStr}.\n${url}`;
+  const encodedMsg = encodeURIComponent(defaultMsg);
   const waUrl = `https://wa.me/?text=${encodedMsg}`;
-  const emailUrl = `mailto:${email || ''}?subject=${encodeURIComponent('Record from ' + (getCurrentProfile()?.display_name || 'Money IntX'))}&body=${encodedMsg}`;
-  const safeFinalMsg = finalMsg.replace(/'/g, '&#39;');
+  const emailSubject = encodeURIComponent('Record from ' + (getCurrentProfile()?.display_name || 'Money IntX'));
+  const emailUrl = `mailto:${cEmail || ''}?subject=${emailSubject}&body=${encodedMsg}`;
+  const safeUrl = url.replace(/'/g, '&#39;');
+  const safeMsg = defaultMsg.replace(/'/g, '&#39;');
 
-  closeModal();
-
+  // Show single-step share modal with all options
   openModal(`
-    <h3 style="margin-bottom:4px;">Share Link Ready ✓</h3>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">Copy the link or open your preferred app to share.</p>
+    <h3 style="margin-bottom:4px;">Share Record</h3>
+    <div style="background:var(--bg3);border-radius:10px;padding:12px;margin:12px 0;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-weight:700;">${esc(cName)}</div>
+        <div style="font-size:13px;color:var(--muted);">${esc(txLabel)} — ${amtStr}</div>
+      </div>
+    </div>
 
-    <div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:12px;">
+    <div style="background:var(--bg3);border-radius:10px;padding:10px 12px;margin-bottom:14px;">
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;">SHARE LINK</div>
       <div style="font-size:12px;word-break:break-all;color:var(--accent);">${esc(url)}</div>
     </div>
 
-    ${shareType === 'message' ? `<div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:14px;">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;">MESSAGE</div>
-      <div style="font-size:13px;color:var(--text);white-space:pre-wrap;word-break:break-word;">${esc(finalMsg)}</div>
-    </div>` : ''}
-
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+      <button class="bs sm" style="flex:1;" onclick="navigator.clipboard.writeText('${safeUrl}');toast('Link copied!','success');">
+        🔗 Copy Link
+      </button>
+      <button class="bs sm" style="flex:1;" onclick="navigator.clipboard.writeText('${safeMsg}');toast('Message copied!','success');">
+        📋 Copy Message
+      </button>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
       <button class="btn sm" style="background:#25D366;flex:1;" onclick="window.open('${esc(waUrl)}','_blank')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff" style="vertical-align:middle;margin-right:4px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
         WhatsApp
@@ -1372,15 +1351,15 @@ window.doShareEntry = async function(entryId) {
       <button class="btn sm" style="background:#0a66c2;flex:1;" onclick="window.location.href='${esc(emailUrl)}'">
         ✉️ Email
       </button>
-      <button class="bs sm" style="flex:1;" onclick="navigator.clipboard.writeText('${safeFinalMsg}');toast('Copied!','success');">
-        📋 Copy ${shareType === 'message' ? 'Message' : 'URL'}
-      </button>
+      ${'share' in navigator ? `<button class="btn sm" style="background:var(--accent);flex:1;" onclick="navigator.share({title:'Record from ${esc(_shareSenderName || 'Money IntX')}',text:'${safeMsg}',url:'${safeUrl}'}).catch(()=>{});">
+        📤 Share via…
+      </button>` : ''}
     </div>
+
     <div style="display:flex;gap:8px;justify-content:flex-end;">
       <button class="btn btn-primary btn-sm" onclick="closeModal()">Done</button>
     </div>
   `, { maxWidth: '460px' });
-  toast('Share link ready!', 'success');
 };
 
 // ── Shared With Me page ───────────────────────────────────────────
@@ -2505,5 +2484,62 @@ window.confirmDeleteEntry = async function(id) {
   await deleteEntry(id);
   toast('Entry deleted.', 'success');
   _invalidateEntries(); navTo('entries');
+};
+
+// ── Selection / Bulk Actions ─────────────────────────────────────
+window.toggleSelectMode = function() {
+  window._selectMode = !window._selectMode;
+  if (!window._selectMode) window._selectedEntries.clear();
+  navTo('entries');
+};
+
+window.selectAllEntries = function(checked) {
+  if (!window._selectedEntries) window._selectedEntries = new Set();
+  if (checked) {
+    _entriesAll.forEach(e => window._selectedEntries.add(e.id));
+  } else {
+    window._selectedEntries.clear();
+  }
+  navTo('entries');
+};
+
+window.toggleEntrySelect = function(id, checked) {
+  if (!window._selectedEntries) window._selectedEntries = new Set();
+  if (checked) window._selectedEntries.add(id);
+  else window._selectedEntries.delete(id);
+  // Re-render to update count badge without full page nav
+  const el = document.getElementById('page-content') || document.getElementById('bs-content');
+  if (el) renderEntries(el);
+};
+
+window.bulkAction = async function(action) {
+  const ids = [...(window._selectedEntries || [])];
+  if (!ids.length) { toast('No entries selected.', 'warning'); return; }
+  const count = ids.length;
+
+  if (action === 'delete') {
+    if (!confirm(`Delete ${count} entries? This cannot be undone.`)) return;
+    const ok = await bulkDelete(ids);
+    toast(ok ? `${count} entries deleted.` : 'Delete failed.', ok ? 'success' : 'error');
+  } else if (action === 'archive') {
+    const ok = await bulkArchive(ids);
+    toast(ok ? `${count} entries archived.` : 'Archive failed.', ok ? 'success' : 'error');
+  } else if (action === 'noledger') {
+    const ok = await bulkNoLedger(ids, true);
+    toast(ok ? `${count} entries removed from ledger.` : 'Update failed.', ok ? 'success' : 'error');
+  } else if (action === 'restore') {
+    // Restore = unarchive + add back to ledger
+    let ok = true;
+    for (const id of ids) {
+      const r = await restoreEntry(id);
+      if (!r) ok = false;
+    }
+    toast(ok ? `${count} entries restored.` : 'Some restores failed.', ok ? 'success' : 'error');
+  }
+
+  window._selectedEntries.clear();
+  window._selectMode = false;
+  _invalidateEntries();
+  navTo('entries');
 };
 

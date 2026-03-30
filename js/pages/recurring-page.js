@@ -394,9 +394,12 @@ window.doSaveRecurring = async function() {
       });
       closeModal();
       toast('Recurring rule created!', 'success');
-      // If created from Business Suite, add to BS tracker and navigate back
-      if (window._bsCreatingRecurring && newRule?.id) {
+      // If created from Business Suite context, add to BS tracker
+      const _insideBS = document.getElementById('bs-content') && window._bsNavigate;
+      if ((window._bsCreatingRecurring || _insideBS) && newRule?.id) {
         if (typeof window._recAfterSave === 'function') window._recAfterSave(newRule.id);
+        // Also directly add to tracker as safety net
+        if (typeof window._addBsItem === 'function') window._addBsItem('recurring', newRule.id);
         window._bsCreatingRecurring = false;
         if (window._bsNavigate) { window._bsNavigate('bs-recurring'); return; }
       }

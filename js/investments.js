@@ -73,6 +73,21 @@ export async function addInvestmentMember(investmentId, { userId = null, contact
   return data;
 }
 
+export async function updateInvestmentMember(memberId, updates) {
+  const { data, error } = await supabase.from('investment_members')
+    .update(updates)
+    .eq('id', memberId)
+    .select().single();
+  if (error) console.error('[updateInvestmentMember]', error.message);
+  return data;
+}
+
+export async function removeInvestmentMember(memberId) {
+  const { error } = await supabase.from('investment_members').delete().eq('id', memberId);
+  if (error) console.error('[removeInvestmentMember]', error.message);
+  return !error;
+}
+
 export async function addInvestmentTransaction(investmentId, { type, amount, note = '', recordedBy }) {
   const { data, error } = await supabase.from('investment_transactions').insert({
     investment_id: investmentId, type, amount: toCents(amount), note, recorded_by: recordedBy

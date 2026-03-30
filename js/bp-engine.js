@@ -1,4 +1,4 @@
-// Money IntX v2 — Business Panel Engine
+// Money IntX v2 — Business Ledger Engine
 // Reuses calculator system from template-engine.js
 import { supabase } from './supabase.js';
 import { CALC_OPS, _isNumericField, _isPairedField, _isCalcField } from './template-engine.js';
@@ -302,11 +302,11 @@ export async function renderBusinessPage(el) {
   const { error: chkErr } = await supabase.from('business_panels').select('id').limit(1);
   const _tableOk = !chkErr || (!chkErr.message?.includes('does not exist') && !chkErr.message?.includes('Could not find') && chkErr.code !== '42P01' && chkErr.code !== 'PGRST200' && chkErr.code !== 'PGRST116' && chkErr.code !== '404');
   if (!_tableOk) {
-    el.innerHTML = `<div class="page-header"><h2 style="margin:0;">Business Panels</h2></div>
+    el.innerHTML = `<div class="page-header"><h2 style="margin:0;">Business Ledgers</h2></div>
     <div class="card" style="border:1px solid var(--amber);background:rgba(251,191,36,.07);">
       <div style="font-size:20px;margin-bottom:8px;">⚙️ One-time setup required</div>
       <p style="font-size:14px;color:var(--muted);margin-bottom:16px;">
-        The Business Panel tables don't exist in your database yet.<br>
+        The Business Ledger tables don't exist in your database yet.<br>
         Copy the SQL below and run it in your <strong style="color:var(--text);">Supabase SQL Editor</strong> → then refresh this page.
       </p>
       <details>
@@ -318,15 +318,38 @@ export async function renderBusinessPage(el) {
     return;
   }
 
+  // ── Tab state ──
+  if (!window._bpPanelTab) window._bpPanelTab = 'mine';
+  const _tab = window._bpPanelTab;
+
+  if (_tab === 'public') {
+    // ── Public Ledger DB view ──
+    await _renderPublicPanelDB(el);
+    return;
+  }
+
+  // ── My Ledgers tab ──
   const [panels, sharedPanels] = await Promise.all([
     listPanels(_userId),
     listSharedPanels(_userId)
   ]);
 
-  let html = `<div class="page-header">
-    <h2 style="margin:0;">Business Panels</h2>
-    <button class="btn btn-primary btn-sm" onclick="window._bpEngine.openCreateModal()">+ New Panel</button>
+  const _tabBar = `<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
+    <button onclick="window._bpPanelTab='mine';window._bpEngine.renderBusinessPage(document.getElementById('content'));"
+      style="padding:10px 20px;font-size:13px;font-weight:700;color:var(--accent);background:none;border:none;border-bottom:2px solid var(--accent);margin-bottom:-2px;cursor:pointer;">
+      My Ledgers
+    </button>
+    <button onclick="window._bpPanelTab='public';window._bpEngine.renderBusinessPage(document.getElementById('content'));"
+      style="padding:10px 20px;font-size:13px;font-weight:500;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;">
+      Public Ledger DB
+    </button>
   </div>`;
+
+  let html = `<div class="page-header">
+    <h2 style="margin:0;">Business Ledgers</h2>
+    <button class="btn btn-primary btn-sm" onclick="window._bpEngine.openCreateModal()">+ New Ledger</button>
+  </div>
+  ${_tabBar}`;
 
   const _panelCard = (p, badge) => `<div class="card" style="cursor:pointer;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;"
     onclick="window._bpEngine.openPanel('${p.id}')">
@@ -344,9 +367,12 @@ export async function renderBusinessPage(el) {
   if (!panels.length && !sharedPanels.length) {
     html += `<div class="card" style="text-align:center;padding:48px 24px;">
       <div style="font-size:48px;margin-bottom:12px;">📊</div>
-      <div style="font-size:16px;font-weight:600;margin-bottom:8px;">No business panels yet</div>
-      <p style="color:var(--muted);margin-bottom:20px;font-size:14px;">Create a panel to track income, expenses, and sessions.</p>
-      <button class="btn btn-primary" onclick="window._bpEngine.openCreateModal()">Create Your First Panel</button>
+      <div style="font-size:16px;font-weight:600;margin-bottom:8px;">No business ledgers yet</div>
+      <p style="color:var(--muted);margin-bottom:20px;font-size:14px;">Create a ledger to track income, expenses, and sessions.</p>
+      <div style="display:flex;gap:8px;justify-content:center;">
+        <button class="btn btn-primary" onclick="window._bpEngine.openCreateModal()">Create Your First Ledger</button>
+        <button class="btn btn-secondary btn-sm" onclick="window._bpPanelTab='public';window._bpEngine.renderBusinessPage(document.getElementById('content'));">Browse Public DB</button>
+      </div>
     </div>`;
   } else {
     html += `<div style="display:grid;gap:12px;">`;
@@ -362,15 +388,177 @@ export async function renderBusinessPage(el) {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// PUBLIC PANEL DB — browse, preview, install (copy) for personal panels
+// ─────────────────────────────────────────────────────────────────
+async function _renderPublicPanelDB(el) {
+  let panels = [];
+  try {
+    const { data, error } = await supabase
+      .from('business_panels')
+      .select('id, title, currency, session_type, fields, user_id, created_at, updated_at')
+      .eq('is_public', true)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (!error) panels = data || [];
+  } catch(_) {}
+
+  window._publicPanelsCache = panels;
+
+  const _tabBar = `<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
+    <button onclick="window._bpPanelTab='mine';window._bpEngine.renderBusinessPage(document.getElementById('content'));"
+      style="padding:10px 20px;font-size:13px;font-weight:500;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;">
+      My Ledgers
+    </button>
+    <button onclick="window._bpPanelTab='public';window._bpEngine.renderBusinessPage(document.getElementById('content'));"
+      style="padding:10px 20px;font-size:13px;font-weight:700;color:var(--accent);background:none;border:none;border-bottom:2px solid var(--accent);margin-bottom:-2px;cursor:pointer;">
+      Public Ledger DB
+    </button>
+  </div>`;
+
+  el.innerHTML = `
+    <div class="page-header">
+      <h2 style="margin:0;">Business Ledgers</h2>
+      <button class="btn btn-primary btn-sm" onclick="window._bpEngine.openCreateModal()">+ New Ledger</button>
+    </div>
+    ${_tabBar}
+    <div style="margin-bottom:14px;">
+      <input id="bp-pub-search" type="text" placeholder="Search public ledgers…" oninput="window._bpEngine.filterPublicPanels(this.value)"
+        style="width:100%;max-width:400px;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:14px;">
+    </div>
+    <div id="bp-pub-list"></div>`;
+
+  _renderPublicPanelList(panels);
+}
+
+function _renderPublicPanelList(panels) {
+  const list = document.getElementById('bp-pub-list');
+  if (!list) return;
+  if (panels.length === 0) {
+    list.innerHTML = `<div class="card" style="text-align:center;padding:40px;">
+      <div style="font-size:32px;margin-bottom:12px;">📋</div>
+      <p style="color:var(--muted);margin-bottom:12px;">No public ledgers match your search.</p>
+    </div>`;
+    return;
+  }
+  list.innerHTML = panels.map(p => {
+    const fields = p.fields || [];
+    const isOwn = p.user_id === _userId;
+    return `<div class="card" style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+            <span style="font-size:15px;font-weight:700;">${esc(p.title)}</span>
+            ${isOwn ? '<span class="badge badge-purple" style="font-size:10px;">Yours</span>' : ''}
+            <span class="badge badge-blue" style="font-size:11px;">${fields.length} field${fields.length !== 1 ? 's' : ''}</span>
+            <span class="badge badge-gray" style="font-size:11px;">${esc(p.session_type === 'weekly' ? 'Weekly' : 'Monthly')}</span>
+          </div>
+          <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">
+            ${fields.slice(0,5).map(f => `<span style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:1px 7px;font-size:10px;">${esc(f.name||f.label||'Field')}</span>`).join('')}
+            ${fields.length > 5 ? `<span style="font-size:10px;color:var(--muted);">+${fields.length-5} more</span>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+          ${!isOwn ? `<button class="btn btn-primary btn-sm" onclick="window._bpEngine.copyPublicPanel('${p.id}')">📋 Copy</button>` : `<button class="btn btn-secondary btn-sm" onclick="window._bpEngine.openPanel('${p.id}')">Open</button>`}
+          <button class="btn btn-secondary btn-sm" onclick="window._bpEngine.previewPublicPanel('${p.id}')">👁 Preview</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterPublicPanels(query) {
+  const q = (query || '').toLowerCase();
+  const all = window._publicPanelsCache || [];
+  const filtered = all.filter(p =>
+    !q ||
+    (p.title || '').toLowerCase().includes(q) ||
+    (p.fields || []).some(f => ((f.name||f.label)||'').toLowerCase().includes(q))
+  );
+  _renderPublicPanelList(filtered);
+}
+
+function previewPublicPanel(panelId) {
+  const p = (window._publicPanelsCache || []).find(x => x.id === panelId);
+  if (!p) return;
+  const fields = p.fields || [];
+  const fieldHtml = fields.length === 0
+    ? '<p style="color:var(--muted);">This ledger has no fields defined yet.</p>'
+    : `<div style="max-height:300px;overflow-y:auto;">
+        ${fields.map((f, i) => `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:11px;color:var(--muted);width:20px;text-align:right;">${i+1}.</span>
+            <div style="flex:1;">
+              <div style="font-weight:600;font-size:13px;">${esc(f.name || f.label || 'Unnamed')}</div>
+              <div style="font-size:11px;color:var(--muted);">${esc(f.type || 'text')}${f.unitType ? ' · ' + esc(f.unitType + (f.unitValue ? ':'+f.unitValue : '')) : ''}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
+
+  const isOwn = p.user_id === _userId;
+  // Use global openModal from ui.js
+  const modalHtml = `
+    <div style="max-width:480px;">
+      <h3 style="margin-bottom:4px;">${esc(p.title)}</h3>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">${esc(p.session_type === 'weekly' ? 'Weekly' : 'Monthly')} · ${esc(p.currency || 'USD')} · ${fields.length} field${fields.length !== 1 ? 's' : ''}</div>
+      ${fieldHtml}
+      <div style="display:flex;gap:8px;margin-top:16px;">
+        ${!isOwn ? `<button class="btn btn-primary btn-sm" onclick="window._bpEngine.copyPublicPanel('${panelId}');if(window.closeModal)closeModal();">📋 Copy to My Ledgers</button>` : ''}
+        <button class="bs sm" onclick="if(window.closeModal)closeModal();">Close</button>
+      </div>
+    </div>`;
+
+  if (typeof window.openModal === 'function') {
+    window.openModal(modalHtml);
+  } else {
+    // Fallback: render inline modal
+    const bg = document.createElement('div');
+    bg.className = 'modal-bg';
+    bg.id = 'bpPreviewBg';
+    bg.onclick = (e) => { if (e.target === bg) bg.remove(); };
+    bg.innerHTML = `<div class="modal" style="max-width:500px;" onclick="event.stopPropagation()">${modalHtml}</div>`;
+    document.body.appendChild(bg);
+  }
+}
+
+async function copyPublicPanel(panelId) {
+  // Fetch the public panel, create a copy owned by current user
+  const srcPanel = await getPanel(panelId);
+  if (!srcPanel) { toast('Ledger not found', 'error'); return; }
+  const { data: newPanel, error } = await createPanel(_userId, {
+    title: srcPanel.title + ' (Copy)',
+    currency: srcPanel.currency,
+    session_type: srcPanel.session_type
+  });
+  if (error || !newPanel) { toast('Failed to copy ledger', 'error'); return; }
+  // Copy fields to the new panel
+  if (srcPanel.fields && srcPanel.fields.length) {
+    await updatePanel(newPanel.id, { fields: srcPanel.fields });
+  }
+  toast('Ledger copied to My Ledgers!', 'success');
+  // If inside BS context, add to BS tracker
+  if (window._bsCreatingPanel || (window._bsActiveContext && window._bsActiveBizId)) {
+    if (typeof window._bpAfterSave === 'function') window._bpAfterSave(newPanel.id);
+  }
+  // Switch to My Ledgers tab
+  window._bpPanelTab = 'mine';
+  if (document.getElementById('bs-content') && window._bsNavigate) {
+    window._bsNavigate('bs-panels');
+  } else {
+    renderBusinessPage(document.getElementById('content'));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
 // CREATE PANEL MODAL
 // ─────────────────────────────────────────────────────────────────
 function openCreateModal() {
   const curOpts = CURRENCIES.map(c => `<option value="${c}">${c}</option>`).join('');
   const html = `<div class="modal-bg" id="bpCreateBg" onclick="if(event.target===this)this.remove()">
     <div class="modal" style="max-width:500px;" onclick="event.stopPropagation()">
-      <div class="modal-title">New Business Panel</div>
+      <div class="modal-title">New Business Ledger</div>
       <div class="fg" style="margin-bottom:12px;">
-        <label>Panel Title *</label>
+        <label>Ledger Title *</label>
         <input id="bp-title" placeholder="e.g. Monthly Sales, Weekly Expenses" autofocus>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
@@ -386,9 +574,13 @@ function openCreateModal() {
           </select>
         </div>
       </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <input type="checkbox" id="bp-public" style="width:auto;accent-color:var(--accent);">
+        <label for="bp-public" style="cursor:pointer;font-size:13px;font-weight:500;">Publish to Public Ledger DB</label>
+      </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:14px;">
         <button class="bs" onclick="document.getElementById('bpCreateBg').remove()">Cancel</button>
-        <button class="btn btn-primary" onclick="window._bpEngine._doCreate()">Create Panel →</button>
+        <button class="btn btn-primary" onclick="window._bpEngine._doCreate()">Create Ledger →</button>
       </div>
     </div>
   </div>`;
@@ -399,16 +591,21 @@ async function _doCreate() {
   const title = document.getElementById('bp-title')?.value.trim();
   const currency = document.getElementById('bp-currency')?.value || 'USD';
   const session_type = document.getElementById('bp-sestype')?.value || 'monthly';
-  if (!title) { toast('Panel title required.', 'error'); return; }
+  const is_public = document.getElementById('bp-public')?.checked || false;
+  if (!title) { toast('Ledger title required.', 'error'); return; }
   document.getElementById('bpCreateBg')?.remove();
   const { data: panel, error } = await createPanel(_userId, { title, currency, session_type });
   if (error || !panel) {
     const msg = error?.message || 'Unknown error';
-    toast(`Failed to create panel: ${msg}`, 'error');
+    toast(`Failed to create ledger: ${msg}`, 'error');
     console.error('[_doCreate] userId:', _userId, 'error:', error);
     return;
   }
-  toast('Panel created');
+  // Set is_public if checkbox was checked
+  if (is_public && panel.id) {
+    await updatePanel(panel.id, { is_public: true });
+  }
+  toast('Ledger created');
   // If created from Business Suite context, add to BS tracker and return to BS
   if (window._bsCreatingPanel && panel.id) {
     if (typeof window._bpAfterSave === 'function') window._bpAfterSave(panel.id);
@@ -416,6 +613,60 @@ async function _doCreate() {
     if (window._bsNavigate) { window._bsNavigate('bs-panels'); return; }
   }
   openPanel(panel.id);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// EDIT PANEL MODAL (title, currency, session type, publish toggle)
+// ─────────────────────────────────────────────────────────────────
+async function openEditPanelModal(panelId) {
+  const panel = await getPanel(panelId);
+  if (!panel) { toast('Ledger not found', 'error'); return; }
+  const curOpts = CURRENCIES.map(c => `<option value="${c}" ${panel.currency===c?'selected':''}>${c}</option>`).join('');
+  const html = `<div class="modal-bg" id="bpEditBg" onclick="if(event.target===this)this.remove()">
+    <div class="modal" style="max-width:500px;" onclick="event.stopPropagation()">
+      <div class="modal-title">Edit Ledger</div>
+      <div class="fg" style="margin-bottom:12px;">
+        <label>Ledger Title *</label>
+        <input id="bp-edit-title" value="${esc(panel.title)}" autofocus>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div class="fg">
+          <label>Currency</label>
+          <select id="bp-edit-currency">${curOpts}</select>
+        </div>
+        <div class="fg">
+          <label>Session Type</label>
+          <select id="bp-edit-sestype">
+            <option value="monthly" ${panel.session_type==='monthly'?'selected':''}>Monthly</option>
+            <option value="weekly" ${panel.session_type==='weekly'?'selected':''}>Weekly</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <input type="checkbox" id="bp-edit-public" ${panel.is_public?'checked':''} style="width:auto;accent-color:var(--accent);">
+        <label for="bp-edit-public" style="cursor:pointer;font-size:13px;font-weight:500;">Publish to Public Ledger DB</label>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:14px;">
+        <button class="bs" onclick="document.getElementById('bpEditBg').remove()">Cancel</button>
+        <button class="btn btn-primary" onclick="window._bpEngine._doEditPanel('${panelId}')">Save Changes</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+async function _doEditPanel(panelId) {
+  const title = document.getElementById('bp-edit-title')?.value.trim();
+  const currency = document.getElementById('bp-edit-currency')?.value || 'USD';
+  const session_type = document.getElementById('bp-edit-sestype')?.value || 'monthly';
+  const is_public = document.getElementById('bp-edit-public')?.checked || false;
+  if (!title) { toast('Ledger title required.', 'error'); return; }
+  document.getElementById('bpEditBg')?.remove();
+  const ok = await updatePanel(panelId, { title, currency, session_type, is_public });
+  if (!ok) { toast('Failed to update panel', 'error'); return; }
+  toast(is_public ? 'Ledger updated & published' : 'Ledger updated', 'success');
+  // Re-open the panel to refresh the view
+  openPanel(panelId);
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -430,7 +681,7 @@ async function openPanel(panelId) {
     listRows(panelId),
     getMyMembership(panelId, _userId)
   ]);
-  if (!panel) { toast('Panel not found.', 'error'); return; }
+  if (!panel) { toast('Ledger not found.', 'error'); return; }
   _curPanel      = panel;
   _curRows       = rows;
   // null = owner; { can_add, can_edit } = shared member
@@ -470,7 +721,7 @@ function renderPanelView(el) {
 
   let html = `<div class="page-header">
     <div>
-      <button class="gh sm" onclick="window._bpEngine.backToList()" style="margin-bottom:6px;">← Business Panels</button>
+      <button class="gh sm" onclick="window._bpEngine.backToList()" style="margin-bottom:6px;">← Business Ledgers</button>
       <h2 style="margin:0;">${esc(p.title)}</h2>
       <div style="font-size:12px;color:var(--muted);margin-top:3px;">${p.currency} · ${p.session_type === 'weekly' ? 'Weekly' : 'Monthly'} sessions${!isOwner ? ' · <span style="color:var(--accent);">Shared with you</span>' : ''}</div>
     </div>
@@ -478,7 +729,7 @@ function renderPanelView(el) {
       ${isOwner ? `<button class="bs sm" onclick="window._bpEngine.openFieldBuilder()">⚙ Fields</button>
       <button class="bs sm" onclick="window._bpEngine.openMembersModal()">👥 Members</button>
       <button class="bs sm" onclick="window._bpEngine.openArchiveView('${p.id}')">🗂 Archive</button>
-      <button class="bs sm" onclick="window._bpEngine.togglePublicPanel('${p.id}',${!p.is_public})">${p.is_public ? '🔒 Unpublish' : '🌐 Publish to Public DB'}</button>
+      <button class="bs sm" onclick="window._bpEngine.openEditPanelModal('${p.id}')">✏ Edit</button>
       <button class="bs sm" style="color:var(--red);" onclick="window._bpEngine._bpDeletePanel('${p.id}')">🗑 Delete</button>` : ''}
       ${canAdd ? `<button class="btn btn-primary btn-sm" onclick="window._bpEngine.openAddRowModal('${todayKey}')">+ Add Row</button>` : ''}
     </div>
@@ -1576,10 +1827,10 @@ function backToList() {
 
 // ── Members Modal ─────────────────────────────────────────────────
 async function _bpDeletePanel(panelId) {
-  if (!confirm('Delete this panel and ALL its rows? This cannot be undone.')) return;
+  if (!confirm('Delete this ledger and ALL its rows? This cannot be undone.')) return;
   const { error } = await deletePanel(panelId);
   if (error) { toast('Error deleting panel: ' + error.message, 'error'); return; }
-  toast('Panel deleted.', 'success');
+  toast('Ledger deleted.', 'success');
   backToList();
 }
 
@@ -1621,8 +1872,8 @@ async function openMembersModal() {
 
   const html = `<div class="modal-bg" id="bpMembersBg" onclick="if(event.target===this)this.remove()">
     <div class="modal" style="max-width:560px;" onclick="event.stopPropagation()">
-      <div class="modal-title">👥 Panel Members — ${esc(p.title)}</div>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Members can view this panel. Control whether they can add or edit rows.</p>
+      <div class="modal-title">👥 Ledger Members — ${esc(p.title)}</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Members can view this ledger. Control whether they can add or edit rows.</p>
       <div id="bpm-list">${memberRows}</div>
       <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
         <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">Add Member</div>
@@ -1726,7 +1977,7 @@ async function _bpmSaveAll() {
 async function togglePublicPanel(panelId, makePublic) {
   const ok = await updatePanel(panelId, { is_public: makePublic });
   if (ok) {
-    toast(makePublic ? 'Panel published to Public DB' : 'Panel unpublished', 'success');
+    toast(makePublic ? 'Ledger published to Public DB' : 'Ledger unpublished', 'success');
     // Refresh view — if inside a panel view, re-open; if BS list view, re-render
     if (_curPanel?.id === panelId) {
       openPanel(panelId);
@@ -1736,7 +1987,7 @@ async function togglePublicPanel(panelId, makePublic) {
       openPanel(panelId);
     }
   } else {
-    toast('Failed to update panel visibility', 'error');
+    toast('Failed to update ledger visibility', 'error');
   }
 }
 
@@ -1745,6 +1996,7 @@ export function exposeBpEngine() {
   window._bpEngine = {
     renderBusinessPage,
     openCreateModal, _doCreate,
+    openEditPanelModal, _doEditPanel,
     openPanel, backToList,
     openFieldBuilder, openAddFieldChoice,
     _bpOpenFieldModal, _bpTypeChange, _bpUnitTypeChange, _bpUnitTypeChangeP, _bpRenderCalcList, _bpAddCalc, _bpUpdCalc, _bpRemCalc, _bpCalcOpChange, _bpSetSide, _bpPickColor, _bpSaveField,
@@ -1755,6 +2007,7 @@ export function exposeBpEngine() {
     openArchiveView,
     openMembersModal, _bpmAdd, _bpmAddByUserId, _bpmRemove, _bpmSaveAll,
     _bpDeletePanel,
-    togglePublicPanel
+    togglePublicPanel,
+    filterPublicPanels, previewPublicPanel, copyPublicPanel
   };
 }
