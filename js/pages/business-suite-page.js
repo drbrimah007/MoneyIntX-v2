@@ -226,6 +226,15 @@ async function _bsRenderDash(el) {
   const overdueInv = invoicesSent.filter(e => e.status !== 'settled' && e.status !== 'voided' && e.metadata?.due_date && new Date(e.metadata.due_date) < new Date());
   const netPosition = totalOutstanding - totalBills;
 
+  // Today / this week / this month activity breakdown
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0,10);
+  const weekAgo = new Date(now - 7*24*60*60*1000);
+  const monthAgo = new Date(now - 30*24*60*60*1000);
+  const todayEntries = biz.filter(e => (e.created_at||'').slice(0,10) === todayStr);
+  const weekEntries = biz.filter(e => new Date(e.created_at) >= weekAgo);
+  const monthEntries = biz.filter(e => new Date(e.created_at) >= monthAgo);
+
   el.innerHTML = `
     <!-- Business header with branding -->
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
@@ -234,16 +243,19 @@ async function _bsRenderDash(el) {
         <h2 style="font-size:22px;font-weight:800;margin:0;">${esc(profile?.company_name || 'Business Overview')}</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">Welcome back, ${esc(userName)} · <span style="font-family:monospace;font-size:12px;">${_getBizId()}</span></p>
       </div>
-      <button class="btn btn-secondary btn-sm" onclick="window._bsNavigate('bs-branding')" style="white-space:nowrap;">Edit Branding</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary btn-sm" onclick="window._bsNavigate('bs-branding')" style="white-space:nowrap;">Edit Branding</button>
+        <button class="btn btn-secondary btn-sm" onclick="window._bsNavigate('bs-dash')" title="Refresh" style="padding:6px 10px;">↻</button>
+      </div>
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:24px;">
-      <div class="card" style="padding:18px;border-left:3px solid var(--green,#7fe0d0);">
+      <div class="card" style="padding:18px;border-left:3px solid var(--green,#7fe0d0);cursor:pointer;" onclick="window._bsNavigate('bs-invoices')">
         <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Receivables</div>
         <div style="font-size:24px;font-weight:800;margin-top:4px;color:var(--green,#7fe0d0);">${fmtMoney(totalOutstanding, cur)}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px;">${invoicesSent.filter(e=>e.status!=='settled'&&e.status!=='voided').length} unpaid invoice${invoicesSent.filter(e=>e.status!=='settled'&&e.status!=='voided').length!==1?'s':''}</div>
       </div>
-      <div class="card" style="padding:18px;border-left:3px solid var(--blue,#8fa8d6);">
+      <div class="card" style="padding:18px;border-left:3px solid var(--blue,#8fa8d6);cursor:pointer;" onclick="window._bsNavigate('bs-bills')">
         <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Payables</div>
         <div style="font-size:24px;font-weight:800;margin-top:4px;color:var(--blue,#8fa8d6);">${fmtMoney(totalBills, cur)}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px;">${billsSent.filter(e=>e.status!=='settled'&&e.status!=='voided').length} pending bill${billsSent.filter(e=>e.status!=='settled'&&e.status!=='voided').length!==1?'s':''}</div>
@@ -260,6 +272,7 @@ async function _bsRenderDash(el) {
       </div>
     </div>
 
+    <!-- Quick Actions -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:28px;">
       <button class="btn btn-primary" onclick="window._bsQuickAction('invoice')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">+ New Invoice</button>
       <button class="btn btn-secondary" onclick="window._bsQuickAction('bill')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">+ New Bill</button>
@@ -267,11 +280,35 @@ async function _bsRenderDash(el) {
       <button class="btn btn-secondary" onclick="window._bsNavigate('bs-panels')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">Panels</button>
     </div>
 
+    <!-- Activity Summary -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">
+      <div style="padding:12px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);text-align:center;">
+        <div style="font-size:20px;font-weight:800;">${todayEntries.length}</div>
+        <div style="font-size:11px;color:var(--muted);">Today</div>
+      </div>
+      <div style="padding:12px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);text-align:center;">
+        <div style="font-size:20px;font-weight:800;">${weekEntries.length}</div>
+        <div style="font-size:11px;color:var(--muted);">This Week</div>
+      </div>
+      <div style="padding:12px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);text-align:center;">
+        <div style="font-size:20px;font-weight:800;">${monthEntries.length}</div>
+        <div style="font-size:11px;color:var(--muted);">This Month</div>
+      </div>
+    </div>
+
     <h3 style="font-size:16px;font-weight:700;margin-bottom:12px;">Recent Business Activity</h3>
     ${biz.length === 0
-      ? '<div class="card" style="text-align:center;padding:32px;"><p style="color:var(--muted);">No business entries yet. Create your first invoice or bill to get started.</p></div>'
+      ? `<div class="card" style="text-align:center;padding:40px;">
+          <div style="font-size:40px;margin-bottom:12px;">📊</div>
+          <p style="font-weight:700;font-size:15px;margin-bottom:6px;">No business entries yet</p>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Create your first invoice or bill to start tracking your business finances.</p>
+          <div style="display:flex;gap:8px;justify-content:center;">
+            <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('invoice')">Create Invoice</button>
+            <button class="btn btn-secondary btn-sm" onclick="window._bsQuickAction('bill')">Create Bill</button>
+          </div>
+        </div>`
       : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Contact</th><th>Amount</th><th>Status</th></tr></thead><tbody>
-          ${biz.slice(0,15).map(e => `<tr>
+          ${biz.slice(0,15).map(e => `<tr style="cursor:pointer;" onclick="window._bsViewEntry('${e.id}')">
             <td style="color:var(--muted);font-size:13px;">${fmtDate(e.created_at)}</td>
             <td><span style="color:${TX_COLORS[e.tx_type]||'var(--text)'};font-weight:600;font-size:13px;">${esc(_bsTxLabel(e.tx_type))}</span></td>
             <td style="font-weight:600;font-size:13px;">${esc(e.contact_name || '—')}</td>
@@ -328,12 +365,20 @@ async function _bsRenderInvoices(el) {
 
   // Filter state
   if (!window._bsInvFilter) window._bsInvFilter = 'all';
+  if (!window._bsInvSearch) window._bsInvSearch = '';
   const f = window._bsInvFilter;
-  const filtered = f === 'all' ? inv
+  const q = window._bsInvSearch.toLowerCase();
+  let filtered = f === 'all' ? inv
     : f === 'unpaid' ? unpaid
     : f === 'overdue' ? overdue
     : f === 'settled' ? inv.filter(e => e.status === 'settled')
     : inv;
+  // Apply search
+  if (q) filtered = filtered.filter(e =>
+    (e.contact_name||'').toLowerCase().includes(q) ||
+    (e.metadata?.inv_number||'').toLowerCase().includes(q) ||
+    String(e.amount||'').includes(q)
+  );
 
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
@@ -343,15 +388,25 @@ async function _bsRenderInvoices(el) {
       </div>
       <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('invoice')">+ New Invoice</button>
     </div>
-    <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;">
-      ${['all','unpaid','overdue','settled'].map(v => `
-        <button class="bs sm" onclick="window._bsInvFilter='${v}';window._bsNavigate('bs-invoices');"
-          style="font-weight:${f===v?'700':'500'};background:${f===v?'var(--accent)':'var(--bg3)'};color:${f===v?'#fff':'var(--text)'};border:1px solid ${f===v?'var(--accent)':'var(--border)'};border-radius:6px;padding:5px 12px;font-size:12px;">
-          ${v.charAt(0).toUpperCase()+v.slice(1)}${v==='all'?' ('+inv.length+')':v==='unpaid'?' ('+unpaid.length+')':v==='overdue'?' ('+overdue.length+')':' ('+inv.filter(e=>e.status==='settled').length+')'}
-        </button>`).join('')}
+    <!-- Search + Filters -->
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+      <input type="text" placeholder="Search invoices…" value="${esc(window._bsInvSearch||'')}"
+        oninput="window._bsInvSearch=this.value;window._bsNavigate('bs-invoices');"
+        style="flex:1;min-width:180px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${['all','unpaid','overdue','settled'].map(v => `
+          <button class="bs sm" onclick="window._bsInvFilter='${v}';window._bsNavigate('bs-invoices');"
+            style="font-weight:${f===v?'700':'500'};background:${f===v?'var(--accent)':'var(--bg3)'};color:${f===v?'#fff':'var(--text)'};border:1px solid ${f===v?'var(--accent)':'var(--border)'};border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">
+            ${v.charAt(0).toUpperCase()+v.slice(1)}${v==='all'?' ('+inv.length+')':v==='unpaid'?' ('+unpaid.length+')':v==='overdue'?' ('+overdue.length+')':' ('+inv.filter(e=>e.status==='settled').length+')'}
+          </button>`).join('')}
+      </div>
     </div>
     ${filtered.length === 0
-      ? '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No invoices match this filter.</p></div>'
+      ? `<div class="card" style="text-align:center;padding:40px;">
+          <div style="font-size:36px;margin-bottom:10px;">🧾</div>
+          <p style="color:var(--muted);margin-bottom:12px;">${q ? 'No invoices match your search.' : 'No invoices match this filter.'}</p>
+          ${!q ? '<button class="btn btn-primary btn-sm" onclick="window._bsQuickAction(\'invoice\')">Create First Invoice</button>' : ''}
+        </div>`
       : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Client</th><th>Invoice #</th><th>Amount</th><th>Due</th><th>Status</th></tr></thead><tbody>
           ${filtered.map(e => {
             const isOverdue = e.status !== 'settled' && e.status !== 'voided' && e.metadata?.due_date && new Date(e.metadata.due_date) < new Date();
@@ -395,12 +450,19 @@ async function _bsRenderBills(el) {
   const totalUnpaid = unpaid.filter(e => (e.currency||'USD') === cur).reduce((s,e) => s+(e.amount||0), 0);
 
   if (!window._bsBillFilter) window._bsBillFilter = 'all';
+  if (!window._bsBillSearch) window._bsBillSearch = '';
   const f = window._bsBillFilter;
-  const filtered = f === 'all' ? bills
+  const q = window._bsBillSearch.toLowerCase();
+  let filtered = f === 'all' ? bills
     : f === 'unpaid' ? unpaid
     : f === 'overdue' ? overdue
     : f === 'settled' ? bills.filter(e => e.status === 'settled')
     : bills;
+  if (q) filtered = filtered.filter(e =>
+    (e.contact_name||'').toLowerCase().includes(q) ||
+    (e.metadata?.ref_number||'').toLowerCase().includes(q) ||
+    String(e.amount||'').includes(q)
+  );
 
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
@@ -410,15 +472,24 @@ async function _bsRenderBills(el) {
       </div>
       <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('bill')">+ New Bill</button>
     </div>
-    <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;">
-      ${['all','unpaid','overdue','settled'].map(v => `
-        <button class="bs sm" onclick="window._bsBillFilter='${v}';window._bsNavigate('bs-bills');"
-          style="font-weight:${f===v?'700':'500'};background:${f===v?'var(--accent)':'var(--bg3)'};color:${f===v?'#fff':'var(--text)'};border:1px solid ${f===v?'var(--accent)':'var(--border)'};border-radius:6px;padding:5px 12px;font-size:12px;">
-          ${v.charAt(0).toUpperCase()+v.slice(1)}${v==='all'?' ('+bills.length+')':v==='unpaid'?' ('+unpaid.length+')':v==='overdue'?' ('+overdue.length+')':' ('+bills.filter(e=>e.status==='settled').length+')'}
-        </button>`).join('')}
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+      <input type="text" placeholder="Search bills…" value="${esc(window._bsBillSearch||'')}"
+        oninput="window._bsBillSearch=this.value;window._bsNavigate('bs-bills');"
+        style="flex:1;min-width:180px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${['all','unpaid','overdue','settled'].map(v => `
+          <button class="bs sm" onclick="window._bsBillFilter='${v}';window._bsNavigate('bs-bills');"
+            style="font-weight:${f===v?'700':'500'};background:${f===v?'var(--accent)':'var(--bg3)'};color:${f===v?'#fff':'var(--text)'};border:1px solid ${f===v?'var(--accent)':'var(--border)'};border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">
+            ${v.charAt(0).toUpperCase()+v.slice(1)}${v==='all'?' ('+bills.length+')':v==='unpaid'?' ('+unpaid.length+')':v==='overdue'?' ('+overdue.length+')':' ('+bills.filter(e=>e.status==='settled').length+')'}
+          </button>`).join('')}
+      </div>
     </div>
     ${filtered.length === 0
-      ? '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No bills match this filter.</p></div>'
+      ? `<div class="card" style="text-align:center;padding:40px;">
+          <div style="font-size:36px;margin-bottom:10px;">📄</div>
+          <p style="color:var(--muted);margin-bottom:12px;">${q ? 'No bills match your search.' : 'No bills match this filter.'}</p>
+          ${!q ? '<button class="btn btn-primary btn-sm" onclick="window._bsQuickAction(\'bill\')">Create First Bill</button>' : ''}
+        </div>`
       : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Supplier</th><th>Ref #</th><th>Amount</th><th>Due</th><th>Status</th></tr></thead><tbody>
           ${filtered.map(e => {
             const isOverdue = e.status !== 'settled' && e.status !== 'voided' && e.metadata?.due_date && new Date(e.metadata.due_date) < new Date();
@@ -473,6 +544,12 @@ async function _bsRenderClients(el) {
   const cur = getCurrentProfile()?.default_currency || 'USD';
   const totalReceivable = clients.reduce((s,c) => s + c.unpaid, 0);
 
+  // Search
+  if (!window._bsClientSearch) window._bsClientSearch = '';
+  const cq = window._bsClientSearch.toLowerCase();
+  const displayClients = cq ? clients.filter(c => (c.name||'').toLowerCase().includes(cq) || (c.email||'').toLowerCase().includes(cq)) : clients;
+  const topClients = clients.slice(0, 3);
+
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <div>
@@ -481,10 +558,34 @@ async function _bsRenderClients(el) {
       </div>
       <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('invoice')">+ Invoice Client</button>
     </div>
-    ${clients.length === 0
-      ? '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No clients yet. Clients appear here automatically when you send your first invoice.</p></div>'
-      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Client</th><th>Contact</th><th>Invoices</th><th>Total</th><th>Outstanding</th><th>Last Invoice</th></tr></thead><tbody>
-          ${clients.map(c => `<tr>
+
+    <!-- Top Clients summary -->
+    ${topClients.length > 0 ? `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:16px;">
+      ${topClients.map(c => `
+        <div class="card" style="padding:14px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            ${contactAvatar(c.name, c.id, 28)}
+            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(c.name)}</div>
+          </div>
+          <div style="font-size:18px;font-weight:800;color:${c.unpaid > 0 ? 'var(--green,#7fe0d0)' : 'var(--muted)'};">${fmtMoney(c.unpaid, cur)}</div>
+          <div style="font-size:11px;color:var(--muted);">${c.count} invoice${c.count!==1?'s':''} · owed</div>
+        </div>
+      `).join('')}
+    </div>` : ''}
+
+    <input type="text" placeholder="Search clients…" value="${esc(window._bsClientSearch||'')}"
+      oninput="window._bsClientSearch=this.value;window._bsNavigate('bs-clients');"
+      style="width:100%;max-width:320px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;margin-bottom:14px;">
+
+    ${displayClients.length === 0
+      ? `<div class="card" style="text-align:center;padding:40px;">
+          <div style="font-size:36px;margin-bottom:10px;">👥</div>
+          <p style="color:var(--muted);margin-bottom:12px;">${cq ? 'No clients match your search.' : 'No clients yet. Clients appear here automatically when you send your first invoice.'}</p>
+          ${!cq ? '<button class="btn btn-primary btn-sm" onclick="window._bsQuickAction(\'invoice\')">Send First Invoice</button>' : ''}
+        </div>`
+      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Client</th><th>Contact</th><th>Invoices</th><th>Total Billed</th><th>Outstanding</th><th>Last Invoice</th></tr></thead><tbody>
+          ${displayClients.map(c => `<tr>
             <td style="font-weight:600;">${contactAvatar(c.name, c.id, 28)} ${esc(c.name)}</td>
             <td style="font-size:12px;color:var(--muted);">${esc(c.email || c.phone || '—')}</td>
             <td style="text-align:center;">${c.count}</td>
@@ -533,6 +634,11 @@ async function _bsRenderSuppliers(el) {
   const cur = getCurrentProfile()?.default_currency || 'USD';
   const totalPayable = suppliers.reduce((s,c) => s + c.unpaid, 0);
 
+  if (!window._bsSupplierSearch) window._bsSupplierSearch = '';
+  const sq = window._bsSupplierSearch.toLowerCase();
+  const displaySuppliers = sq ? suppliers.filter(c => (c.name||'').toLowerCase().includes(sq) || (c.email||'').toLowerCase().includes(sq)) : suppliers;
+  const topSuppliers = suppliers.slice(0, 3);
+
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <div>
@@ -541,10 +647,34 @@ async function _bsRenderSuppliers(el) {
       </div>
       <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('bill')">+ New Bill</button>
     </div>
-    ${suppliers.length === 0
-      ? '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No suppliers yet. Suppliers appear here automatically when you create a bill or record a payable.</p></div>'
-      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Supplier</th><th>Contact</th><th>Bills</th><th>Total</th><th>Outstanding</th><th>Last Bill</th></tr></thead><tbody>
-          ${suppliers.map(c => `<tr>
+
+    <!-- Top Suppliers summary -->
+    ${topSuppliers.length > 0 ? `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:16px;">
+      ${topSuppliers.map(c => `
+        <div class="card" style="padding:14px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            ${contactAvatar(c.name, c.id, 28)}
+            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(c.name)}</div>
+          </div>
+          <div style="font-size:18px;font-weight:800;color:${c.unpaid > 0 ? 'var(--red,#d07878)' : 'var(--muted)'};">${fmtMoney(c.unpaid, cur)}</div>
+          <div style="font-size:11px;color:var(--muted);">${c.count} bill${c.count!==1?'s':''} · owed to them</div>
+        </div>
+      `).join('')}
+    </div>` : ''}
+
+    <input type="text" placeholder="Search suppliers…" value="${esc(window._bsSupplierSearch||'')}"
+      oninput="window._bsSupplierSearch=this.value;window._bsNavigate('bs-suppliers');"
+      style="width:100%;max-width:320px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;margin-bottom:14px;">
+
+    ${displaySuppliers.length === 0
+      ? `<div class="card" style="text-align:center;padding:40px;">
+          <div style="font-size:36px;margin-bottom:10px;">🏪</div>
+          <p style="color:var(--muted);margin-bottom:12px;">${sq ? 'No suppliers match your search.' : 'No suppliers yet. Suppliers appear here automatically when you create a bill or record a payable.'}</p>
+          ${!sq ? '<button class="btn btn-primary btn-sm" onclick="window._bsQuickAction(\'bill\')">Create First Bill</button>' : ''}
+        </div>`
+      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Supplier</th><th>Contact</th><th>Bills</th><th>Total Billed</th><th>Outstanding</th><th>Last Bill</th></tr></thead><tbody>
+          ${displaySuppliers.map(c => `<tr>
             <td style="font-weight:600;">${contactAvatar(c.name, c.id, 28)} ${esc(c.name)}</td>
             <td style="font-size:12px;color:var(--muted);">${esc(c.email || c.phone || '—')}</td>
             <td style="text-align:center;">${c.count}</td>
@@ -562,27 +692,65 @@ async function _bsRenderSuppliers(el) {
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderRecurring(el) {
   const user = getCurrentUser();
+  const cur = getCurrentProfile()?.default_currency || 'USD';
   const rules = await listRecurring(user.id);
 
   // Filter to business-relevant types
   const bizTypes = new Set(['invoice_sent','bill_sent']);
   const bizRules = rules.filter(r => bizTypes.has(r.tx_type));
+  const activeRules = bizRules.filter(r => r.active);
+  const pausedRules = bizRules.filter(r => !r.active);
+  const totalRecurring = activeRules.reduce((s,r) => s + (r.amount||0), 0);
+
+  if (!window._bsRecFilter) window._bsRecFilter = 'all';
+  const rf = window._bsRecFilter;
+  const displayRules = rf === 'all' ? bizRules : rf === 'active' ? activeRules : pausedRules;
 
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
       <div>
         <h2 style="font-size:20px;font-weight:800;margin:0;">Recurring Billing</h2>
-        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${bizRules.length} recurring rule${bizRules.length!==1?'s':''}</p>
+        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${bizRules.length} rule${bizRules.length!==1?'s':''} · ${activeRules.length} active · ${fmtMoney(totalRecurring, cur)} recurring revenue</p>
       </div>
       <button class="btn btn-primary btn-sm" onclick="if(window.openNewRecurringModal)window.openNewRecurringModal()">+ New Rule</button>
     </div>
-    ${bizRules.length === 0
-      ? '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No recurring billing rules yet. Set up automatic invoices or bills on a schedule.</p></div>'
+
+    <!-- Summary cards -->
+    ${bizRules.length > 0 ? `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px;">
+      <div class="card" style="padding:14px;border-left:3px solid var(--green,#7fe0d0);">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600;">Active Rules</div>
+        <div style="font-size:22px;font-weight:800;margin-top:4px;">${activeRules.length}</div>
+      </div>
+      <div class="card" style="padding:14px;border-left:3px solid var(--gold,#d6b97a);">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600;">Recurring Total</div>
+        <div style="font-size:22px;font-weight:800;margin-top:4px;">${fmtMoney(totalRecurring, cur)}</div>
+      </div>
+      <div class="card" style="padding:14px;border-left:3px solid var(--border);">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600;">Paused</div>
+        <div style="font-size:22px;font-weight:800;margin-top:4px;">${pausedRules.length}</div>
+      </div>
+    </div>` : ''}
+
+    <div style="display:flex;gap:6px;margin-bottom:16px;">
+      ${['all','active','paused'].map(v => `
+        <button class="bs sm" onclick="window._bsRecFilter='${v}';window._bsNavigate('bs-recurring');"
+          style="font-weight:${rf===v?'700':'500'};background:${rf===v?'var(--accent)':'var(--bg3)'};color:${rf===v?'#fff':'var(--text)'};border:1px solid ${rf===v?'var(--accent)':'var(--border)'};border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">
+          ${v.charAt(0).toUpperCase()+v.slice(1)} (${v==='all'?bizRules.length:v==='active'?activeRules.length:pausedRules.length})
+        </button>`).join('')}
+    </div>
+
+    ${displayRules.length === 0
+      ? `<div class="card" style="text-align:center;padding:40px;">
+          <div style="font-size:36px;margin-bottom:10px;">🔁</div>
+          <p style="color:var(--muted);margin-bottom:12px;">${bizRules.length === 0 ? 'No recurring billing rules yet. Set up automatic invoices or bills on a schedule.' : 'No rules match this filter.'}</p>
+          ${bizRules.length === 0 ? '<button class="btn btn-primary btn-sm" onclick="if(window.openNewRecurringModal)window.openNewRecurringModal()">Create First Rule</button>' : ''}
+        </div>`
       : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Contact</th><th>Type</th><th>Amount</th><th>Frequency</th><th>Next Run</th><th>Status</th></tr></thead><tbody>
-          ${bizRules.map(r => `<tr>
+          ${displayRules.map(r => `<tr>
             <td style="font-weight:600;">${esc(r.contact?.name || 'Self')}</td>
             <td style="font-size:13px;">${esc(_bsTxLabel(r.tx_type))}</td>
-            <td style="font-weight:700;">${fmtMoney(r.amount)}</td>
+            <td style="font-weight:700;">${fmtMoney(r.amount, r.currency)}</td>
             <td>${esc(FREQUENCIES[r.frequency] || r.frequency)}</td>
             <td style="color:var(--muted);font-size:13px;">${fmtDate(r.next_run_at)}</td>
             <td><span class="badge ${r.active ? 'badge-green' : 'badge-gray'}">${r.active ? 'Active' : 'Paused'}</span></td>
@@ -639,31 +807,46 @@ async function _bsRenderTemplates(el) {
   const user = getCurrentUser();
   const templates = await listTemplates(user.id);
 
+  if (!window._bsTmplSearch) window._bsTmplSearch = '';
+  const tq = window._bsTmplSearch.toLowerCase();
+  const display = tq ? templates.filter(t => (t.name||'').toLowerCase().includes(tq) || (t.description||'').toLowerCase().includes(tq)) : templates;
+
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
       <div>
         <h2 style="font-size:20px;font-weight:800;margin:0;">Templates</h2>
-        <p style="color:var(--muted);font-size:13px;margin-top:2px;">Invoice and form templates</p>
+        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${templates.length} template${templates.length!==1?'s':''} · Reusable invoice and form layouts</p>
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn btn-primary btn-sm" onclick="if(window.openNewTemplateModal)window.openNewTemplateModal()">+ New Template</button>
-        <button class="btn btn-secondary btn-sm" onclick="if(window.openPublicTemplateDB)window.openPublicTemplateDB()">Public DB</button>
+        <button class="btn btn-secondary btn-sm" onclick="if(window.openPublicTemplateDB)window.openPublicTemplateDB()">Browse Public DB</button>
       </div>
     </div>
-    ${templates.length === 0
-      ? '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No templates yet. Create reusable templates for your invoices and forms.</p></div>'
+
+    <input type="text" placeholder="Search templates…" value="${esc(window._bsTmplSearch||'')}"
+      oninput="window._bsTmplSearch=this.value;window._bsNavigate('bs-templates');"
+      style="width:100%;max-width:320px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;margin-bottom:14px;">
+
+    ${display.length === 0
+      ? `<div class="card" style="text-align:center;padding:40px;">
+          <div style="font-size:36px;margin-bottom:10px;">📑</div>
+          <p style="font-weight:700;font-size:15px;margin-bottom:6px;">${tq ? 'No templates match your search' : 'No templates yet'}</p>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Create reusable templates for your invoices and forms to save time.</p>
+          ${!tq ? '<button class="btn btn-primary btn-sm" onclick="if(window.openNewTemplateModal)window.openNewTemplateModal()">Create First Template</button>' : ''}
+        </div>`
       : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
-          ${templates.map(t => `
-            <div class="card" style="padding:18px;cursor:pointer;" onclick="if(window.openEditTemplate)window.openEditTemplate('${t.id}')">
+          ${display.map(t => `
+            <div class="card" style="padding:18px;cursor:pointer;transition:border-color .15s;" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor=''" onclick="if(window.openEditTemplate)window.openEditTemplate('${t.id}')">
               <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                 <div style="font-size:16px;font-weight:700;">${esc(t.name)}</div>
-                ${t.is_public ? '<span class="badge badge-blue" style="font-size:10px;">Public</span>' : ''}
+                ${t.is_public ? '<span class="badge badge-blue" style="font-size:10px;">Public</span>' : '<span class="badge badge-gray" style="font-size:10px;">Private</span>'}
               </div>
-              ${t.description ? `<p style="font-size:12px;color:var(--muted);margin-top:4px;">${esc(t.description)}</p>` : ''}
+              ${t.description ? `<p style="font-size:12px;color:var(--muted);margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(t.description)}</p>` : ''}
               <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
                 <span class="badge badge-blue">${(t.fields||[]).length} field${(t.fields||[]).length!==1?'s':''}</span>
                 ${t.tx_type ? `<span class="badge badge-gray">${esc(_bsTxLabel(t.tx_type))}</span>` : ''}
               </div>
+              <div style="font-size:11px;color:var(--muted);margin-top:8px;">Updated ${fmtRelative(t.updated_at || t.created_at)}</div>
             </div>
           `).join('')}
         </div>`
@@ -676,6 +859,7 @@ async function _bsRenderTemplates(el) {
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderInvestments(el) {
   const user = getCurrentUser();
+  const cur = getCurrentProfile()?.default_currency || 'USD';
 
   const { data: investments } = await supabase
     .from('investments')
@@ -685,28 +869,53 @@ async function _bsRenderInvestments(el) {
     .order('created_at', { ascending: false });
 
   const inv = investments || [];
+  const totalMembers = inv.reduce((s,i) => s + (i.members||[]).length, 0);
+  const totalTx = inv.reduce((s,i) => s + (i.transactions||[]).length, 0);
 
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
       <div>
         <h2 style="font-size:20px;font-weight:800;margin:0;">Investments</h2>
-        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${inv.length} investment${inv.length!==1?'s':''}</p>
+        <p style="color:var(--muted);font-size:13px;margin-top:2px;">${inv.length} investment${inv.length!==1?'s':''} · ${totalMembers} member${totalMembers!==1?'s':''} · ${totalTx} transaction${totalTx!==1?'s':''}</p>
       </div>
       <button class="btn btn-primary btn-sm" onclick="if(window.openNewInvestmentModal)window.openNewInvestmentModal()">+ New Investment</button>
     </div>
+
+    ${inv.length > 0 ? `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;">
+      <div class="card" style="padding:14px;border-left:3px solid var(--accent,#6366F1);">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600;">Pools</div>
+        <div style="font-size:22px;font-weight:800;margin-top:4px;">${inv.length}</div>
+      </div>
+      <div class="card" style="padding:14px;border-left:3px solid var(--green,#7fe0d0);">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600;">Members</div>
+        <div style="font-size:22px;font-weight:800;margin-top:4px;">${totalMembers}</div>
+      </div>
+      <div class="card" style="padding:14px;border-left:3px solid var(--gold,#d6b97a);">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600;">Transactions</div>
+        <div style="font-size:22px;font-weight:800;margin-top:4px;">${totalTx}</div>
+      </div>
+    </div>` : ''}
+
     ${inv.length === 0
-      ? '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No investments yet. Track investment pools and returns here.</p></div>'
+      ? `<div class="card" style="text-align:center;padding:40px;">
+          <div style="font-size:36px;margin-bottom:10px;">📈</div>
+          <p style="font-weight:700;font-size:15px;margin-bottom:6px;">No investments yet</p>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Track investment pools, member contributions, and returns all in one place.</p>
+          <button class="btn btn-primary btn-sm" onclick="if(window.openNewInvestmentModal)window.openNewInvestmentModal()">Create First Investment</button>
+        </div>`
       : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
           ${inv.map(i => {
             const memberCount = (i.members||[]).length;
             const txCount = (i.transactions||[]).length;
-            return `<div class="card" style="padding:18px;cursor:pointer;" onclick="if(window.openInvestmentDetail)window.openInvestmentDetail('${i.id}')">
+            return `<div class="card" style="padding:18px;cursor:pointer;transition:border-color .15s;" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor=''" onclick="if(window.openInvestmentDetail)window.openInvestmentDetail('${i.id}')">
               <div style="font-size:16px;font-weight:700;">${esc(i.name)}</div>
               <div style="font-size:12px;color:var(--muted);margin-top:4px;">${esc(i.type || 'Standard')}</div>
               <div style="display:flex;gap:8px;margin-top:8px;">
                 <span class="badge badge-blue">${memberCount} member${memberCount!==1?'s':''}</span>
-                <span class="badge badge-gray">${txCount} transaction${txCount!==1?'s':''}</span>
+                <span class="badge badge-gray">${txCount} tx</span>
               </div>
+              <div style="font-size:11px;color:var(--muted);margin-top:8px;">Created ${fmtRelative(i.created_at)}</div>
             </div>`;
           }).join('')}
         </div>`
@@ -1261,45 +1470,43 @@ window._bsEditOperative = function(opId) {
   const ops = _getOperatives();
   const op = ops.find(o => o.id === opId);
   if (!op) return;
+  const currentRole = BS_ROLES.find(r => r.id === op.role) || BS_ROLES[3];
 
   openModal(`
-    <div class="modal-title">Edit Operative</div>
-    <div class="form-group">
-      <label>Name</label>
-      <input type="text" id="bs-op-name" value="${esc(op.name)}" style="width:100%;">
+    <div class="modal-title">Edit Operative Role</div>
+    <div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);margin-bottom:16px;">
+      <div style="width:38px;height:38px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0;">
+        ${esc((op.name||'?').charAt(0).toUpperCase())}
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:14px;">${esc(op.name)}</div>
+        <div style="font-size:12px;color:var(--muted);">${esc(op.email || 'No email')}</div>
+      </div>
+      <span class="badge ${currentRole.badge}" style="margin-left:auto;">${currentRole.label}</span>
     </div>
     <div class="form-group">
-      <label>Email</label>
-      <input type="email" id="bs-op-email" value="${esc(op.email||'')}" style="width:100%;">
-    </div>
-    <div class="form-group">
-      <label>Role</label>
+      <label>Change Role</label>
       <select id="bs-op-role" style="width:100%;">
         ${BS_ROLES.filter(r => r.id !== 'owner').map(r => `<option value="${r.id}" ${r.id===op.role?'selected':''}>${r.label} — ${r.desc}</option>`).join('')}
       </select>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="bs sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary sm" onclick="window._bsSaveEditOperative('${opId}')">Save</button>
+      <button class="btn btn-primary sm" onclick="window._bsSaveEditOperative('${opId}')">Update Role</button>
     </div>
   `, { maxWidth: '440px' });
 };
 
 window._bsSaveEditOperative = function(opId) {
-  const name = (document.getElementById('bs-op-name')?.value || '').trim();
-  const email = (document.getElementById('bs-op-email')?.value || '').trim();
   const role = document.getElementById('bs-op-role')?.value || 'viewer';
-  if (!name) { toast('Name is required', 'error'); return; }
 
   const ops = _getOperatives();
   const idx = ops.findIndex(o => o.id === opId);
   if (idx < 0) return;
-  ops[idx].name = name;
-  ops[idx].email = email;
   ops[idx].role = role;
   _saveOperatives(ops);
   closeModal();
-  toast('Operative updated', 'success');
+  toast('Role updated to ' + (BS_ROLES.find(r=>r.id===role)?.label || role), 'success');
   _bsRenderOperatives(document.getElementById('bs-content'));
 };
 
@@ -1316,13 +1523,43 @@ window._bsRemoveOperative = function(opId) {
 // ══════════════════════════════════════════════════════════════════
 function _bsRenderSettings(el) {
   const tools = _getBsTools();
+  const profile = getCurrentProfile() || {};
+  const bizId = _getBizId();
 
   el.innerHTML = `
     <div style="margin-bottom:20px;">
       <h2 style="font-size:20px;font-weight:800;margin:0;">Suite Settings</h2>
-      <p style="color:var(--muted);font-size:13px;margin-top:2px;">Choose which tools appear in your Business Suite sidebar</p>
+      <p style="color:var(--muted);font-size:13px;margin-top:2px;">Configure your Business Suite preferences</p>
     </div>
-    <div class="card" style="padding:20px;">
+
+    <!-- Business Info Summary -->
+    <div class="card" style="padding:18px;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">Business Information</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;">
+        <div>
+          <span style="color:var(--muted);">Business Name:</span>
+          <span style="font-weight:600;margin-left:4px;">${esc(profile.company_name || '—')}</span>
+        </div>
+        <div>
+          <span style="color:var(--muted);">Business ID:</span>
+          <span style="font-weight:600;font-family:monospace;margin-left:4px;">${bizId}</span>
+        </div>
+        <div>
+          <span style="color:var(--muted);">Email:</span>
+          <span style="font-weight:600;margin-left:4px;">${esc(profile.company_email || '—')}</span>
+        </div>
+        <div>
+          <span style="color:var(--muted);">Currency:</span>
+          <span style="font-weight:600;margin-left:4px;">${esc(profile.default_currency || 'USD')}</span>
+        </div>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="window._bsNavigate('bs-branding')" style="margin-top:12px;">Edit Branding</button>
+    </div>
+
+    <!-- Sidebar Tools -->
+    <div class="card" style="padding:18px;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:4px;">Sidebar Tools</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Choose which tools appear in your Business Suite sidebar. Changes apply after refreshing.</p>
       ${BS_TOOLS.map(t => {
         const checked = tools[t.id] !== false;
         const disabled = t.always ? 'disabled' : '';
@@ -1331,19 +1568,81 @@ function _bsRenderSettings(el) {
             onchange="window._bsToggleTool('${t.id}',this.checked)"
             style="width:18px;height:18px;accent-color:var(--accent,#6366F1);">
           <span style="font-size:18px;">${t.icon}</span>
-          <span style="font-weight:600;font-size:14px;">${t.label}</span>
-          ${t.always ? '<span class="badge badge-gray" style="font-size:10px;margin-left:auto;">Always on</span>' : ''}
+          <div style="flex:1;">
+            <span style="font-weight:600;font-size:14px;">${t.label}</span>
+          </div>
+          ${t.always ? '<span class="badge badge-gray" style="font-size:10px;">Always on</span>' : ''}
         </label>`;
       }).join('')}
     </div>
+
+    <!-- Data & Privacy -->
+    <div class="card" style="padding:18px;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">Data & Privacy</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);">
+          <div>
+            <div style="font-weight:600;font-size:13px;">Export Business Data</div>
+            <div style="font-size:11px;color:var(--muted);">Download all invoices, bills, and contacts as CSV</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="window._bsExportData()">Export</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);">
+          <div>
+            <div style="font-weight:600;font-size:13px;">Operatives</div>
+            <div style="font-size:11px;color:var(--muted);">Manage team access and roles</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="window._bsNavigate('bs-operatives')">Manage</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Legal Notice -->
+    <div style="padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);font-size:11px;color:var(--muted);line-height:1.5;">
+      <strong>Legal Disclaimer:</strong> Money IntX is a financial tracking and information system. It does not hold, transfer, or process money. It is not a bank, payment processor, escrow service, or estate planning tool. All financial data is user-defined and for recordkeeping purposes only.
+    </div>
   `;
 }
+
+// Export business data as CSV
+window._bsExportData = async function() {
+  const user = getCurrentUser();
+  toast('Preparing export…', 'info');
+  const { data: entries } = await supabase
+    .from('entries')
+    .select('*')
+    .eq('user_id', user.id)
+    .in('tx_type', ['invoice_sent','bill_sent'])
+    .is('archived_at', null)
+    .order('created_at', { ascending: false });
+  if (!entries || entries.length === 0) { toast('No business data to export', 'info'); return; }
+  const headers = ['Date','Type','Contact','Amount','Currency','Status','Invoice #','Due Date'];
+  const rows = entries.map(e => [
+    (e.created_at||'').slice(0,10),
+    _bsTxLabel(e.tx_type),
+    e.contact_name || '',
+    e.amount || 0,
+    e.currency || 'USD',
+    e.status || 'draft',
+    e.metadata?.inv_number || e.metadata?.ref_number || '',
+    e.metadata?.due_date || ''
+  ]);
+  const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `business-export-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Export downloaded', 'success');
+};
 
 window._bsToggleTool = function(id, enabled) {
   const tools = _getBsTools();
   tools[id] = enabled;
   _setBsTools(tools);
-  toast(`${enabled ? 'Enabled' : 'Disabled'} — refresh sidebar to apply`, 'info');
+  const label = BS_TOOLS.find(t => t.id === id)?.label || id;
+  toast(`${label} ${enabled ? 'enabled' : 'disabled'} — will update on next visit`, 'info');
 };
 
 // ══════════════════════════════════════════════════════════════════
