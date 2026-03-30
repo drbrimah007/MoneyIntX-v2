@@ -9,8 +9,9 @@ import { listTemplates } from '../templates.js';
 import { createScheduledReminder } from '../reminders.js';
 import { esc, statusBadge, TX_LABELS, TX_COLORS, DIRECTION_SIGN, fmtDate, toast, openModal, closeModal } from '../ui.js';
 import { supabase } from '../supabase.js';
-import { reviewSettlement, deleteSettlement } from '../settlements.js';
+import { createSettlement, reviewSettlement, deleteSettlement } from '../settlements.js';
 import { sendNotificationEmail } from '../email.js';
+import { renderDash } from './dashboard.js';
 
 let _entriesAll = [];
 let _pendingSharesAll = null; // null = not yet loaded; [] = loaded but empty

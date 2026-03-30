@@ -800,6 +800,7 @@ function renderOpenSession(p, rows, colFields, rowFields, sessionKey, label) {
 
   if (!rows.length) {
     html += `<tr><td colspan="${1 + colFields.length + rowFields.length + 1}" style="text-align:center;padding:28px;color:var(--muted);font-size:14px;">No entries yet. Add your first row above.</td></tr>`;
+    html += `</tbody></table></div>`;
   } else {
 
     rows.forEach(row => {
@@ -855,9 +856,6 @@ function renderOpenSession(p, rows, colFields, rowFields, sessionKey, label) {
       }
       html += `</div>`;
     }
-  } else {
-    // Close table for empty state (headers were already rendered above)
-    html += `</tbody></table></div>`;
   }
 
   html += `</div>`;
