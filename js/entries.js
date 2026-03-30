@@ -102,26 +102,37 @@ export async function createEntry(userId, {
     nextNum = counterData;
   }
 
+  // Build insert payload — only include optional columns when they have values
+  const insertPayload = {
+    user_id: userId,
+    contact_id: contactId,
+    tx_type: txType,
+    amount: toCents(amount),
+    currency,
+    note,
+    date: date || new Date().toISOString().slice(0, 10),
+    invoice_number: invoiceNumber,
+    entry_number: nextNum,
+    status
+  };
+  if (templateId) insertPayload.template_id = templateId;
+  if (templateId && templateData && Object.keys(templateData).length > 0) insertPayload.template_data = templateData;
+  if (metadata) insertPayload.metadata = metadata;
+
   const { data, error } = await supabase
     .from('entries')
-    .insert({
-      user_id: userId,
-      contact_id: contactId,
-      tx_type: txType,
-      amount: toCents(amount),
-      currency,
-      note,
-      date: date || new Date().toISOString().slice(0, 10),
-      invoice_number: invoiceNumber,
-      entry_number: nextNum,
-      template_id: templateId,
-      template_data: templateData,
-      status,
-      ...(metadata ? { metadata } : {})
-    })
+    .insert(insertPayload)
     .select('*, contact:contacts(id, name, email)')
     .single();
-  if (error) console.error('[createEntry]', error.message);
+  if (error) {
+    console.error('[createEntry]', error.message, error.details, error.hint);
+    // Expose error for callers that want to surface it
+    if (!data) {
+      const err = new Error(error.message);
+      err.sbError = error;
+      throw err;
+    }
+  }
   return data;
 }
 

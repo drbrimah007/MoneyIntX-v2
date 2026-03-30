@@ -2269,12 +2269,19 @@ window.saveNewEntry = async function() {
   // If creating from Business Suite, include business_id in metadata at creation time
   const _bsMeta = window._bsActiveContext && window._bsActiveBizId
     ? { business_id: window._bsActiveBizId } : null;
-  const entry = await createEntry(getCurrentUser().id, {
-    contactId, txType, amount: parseFloat(amount), currency, date,
-    note: combinedNote,
-    invoiceNumber: invNumber || refNumber || '',
-    metadata: _bsMeta
-  });
+  let entry;
+  try {
+    entry = await createEntry(getCurrentUser().id, {
+      contactId, txType, amount: parseFloat(amount), currency, date,
+      note: combinedNote,
+      invoiceNumber: invNumber || refNumber || '',
+      metadata: _bsMeta
+    });
+  } catch (err) {
+    console.error('[saveNewEntry] createEntry threw:', err);
+    toast('Save failed: ' + (err.sbError?.message || err.message || 'unknown error'), 'error');
+    return;
+  }
 
   if (!entry || !entry.id) {
     toast('Failed to save entry — please try again.', 'error');

@@ -1080,17 +1080,24 @@ window._bsSaveReceivedBill = async function() {
   if (notes) metadata.notes = notes;
 
   // Use createEntry for proper entry_number counter tracking
-  const entry = await createEntry(user.id, {
-    contactId: finalContactId,
-    txType: 'bill_sent',
-    amount,
-    currency,
-    date: billDate,
-    note: description || '',
-    invoiceNumber: refNum || '',
-    status: 'pending',
-    metadata
-  });
+  let entry;
+  try {
+    entry = await createEntry(user.id, {
+      contactId: finalContactId,
+      txType: 'bill_sent',
+      amount,
+      currency,
+      date: billDate,
+      note: description || '',
+      invoiceNumber: refNum || '',
+      status: 'pending',
+      metadata
+    });
+  } catch (err) {
+    console.error('[_bsSaveReceivedBill] createEntry threw:', err);
+    toast('Save failed: ' + (err.sbError?.message || err.message || 'unknown error'), 'error');
+    return;
+  }
 
   if (!entry) { toast('Failed to log bill', 'error'); return; }
   // Update contact_name on the entry (createEntry doesn't set it)

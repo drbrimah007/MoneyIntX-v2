@@ -439,6 +439,12 @@
 <script>
 (function() {
   var h = window.location.hash || '';
+  // Capture page hash BEFORE Supabase module clears it (detectSessionInUrl strips hash)
+  // Only capture simple page hashes (not auth fragments)
+  if (h && !h.includes('access_token') && !h.includes('type=recovery') && !h.includes('error=')) {
+    var page = h.replace('#', '').split('?')[0];
+    if (page) window._mxi_preload_hash = page;
+  }
   if (h.includes('type=recovery') || h.includes('access_token')) {
     // Store in sessionStorage so module scripts can read it even after hash is cleared
     window._isRecovery = true;
@@ -875,7 +881,18 @@ async function enterApp(user) {
   const isNewUser = currentProfile?.created_at && (Date.now() - new Date(currentProfile.created_at).getTime()) < 3 * 60 * 1000;
   const firstLoginKey = 'mxi_welcomed_' + user.id;
   const alreadyWelcomed = localStorage.getItem(firstLoginKey);
-  navTo('dash'); // always start on dashboard
+
+  // Restore page from URL hash (returning user), or default to dash
+  // Use pre-captured hash (saved before Supabase cleared it) → current hash → localStorage fallback
+  const hashPage = window._mxi_preload_hash
+    || (window.location.hash || '').replace('#', '').split('?')[0]
+    || '';
+  delete window._mxi_preload_hash; // consumed — clean up
+  const validPages = ['dash','entries','contacts','settings','groups','investments','business','business-suite','templates','recurring','notifications','nok','trash','admin','view-all','user-entries'];
+  const pageToRestore = (!isNewUser && validPages.includes(hashPage)) ? hashPage : (localStorage.getItem('mxi_last_page') || 'dash');
+  navTo(pageToRestore);
+
+  // Welcome modal for brand-new users (after navigation so it overlays the correct page)
   if (isNewUser && !alreadyWelcomed) {
     localStorage.setItem(firstLoginKey, '1');
     setTimeout(() => {
@@ -905,12 +922,6 @@ async function enterApp(user) {
       `);
     }, 600);
   }
-
-  // Restore page from URL hash (returning user), or default to dash
-  const hashPage = (window.location.hash || '').replace('#', '').split('?')[0] || '';
-  const validPages = ['dash','entries','contacts','settings','groups','investments','business','business-suite','templates','recurring','notifications','nok','trash','admin','view-all','user-entries'];
-  const pageToRestore = (!isNewUser && validPages.includes(hashPage)) ? hashPage : (localStorage.getItem('mxi_last_page') || 'dash');
-  navTo(pageToRestore);
   // Process scheduled reminders + recurring rules every 60s
   setInterval(() => { processDueReminders(user.id, { emailFn: sendNotificationEmail }); processDueRecurring(user.id); }, 60000);
   processDueReminders(user.id, { emailFn: sendNotificationEmail });
@@ -963,8 +974,8 @@ function navTo(page) {
   if (window._navHistory.length > 20) window._navHistory.shift();
   window._currentPage = page;
   localStorage.setItem('mxi_last_page', page);
-  // Update URL hash for refresh persistence (don't trigger popstate)
-  try { history.replaceState(null, '', '#' + page); } catch(_) {}
+  // Update URL hash for refresh persistence
+  try { history.replaceState({ page }, '', '#' + page); } catch(_) {}
 
   // Business Suite: hide all top chrome (topbar, nav, tip bar, mobile tabs)
   const _isBs = page === 'business-suite';
@@ -1022,7 +1033,6 @@ function navTo(page) {
     case 'settings': renderSettings(content); break;
     default: renderDash(content);
   }
-  history.pushState({ page }, '', '#' + page);
 }
 
 // ── Back-button handler ──────────────────────────────────────────
