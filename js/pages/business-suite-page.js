@@ -54,6 +54,11 @@ const BS_TOOLS = [
 
 // ── Constants ────────────────────────────────────────────────────
 const BS_CURRENCIES = ['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF','CHF'];
+// tx_type variants: entries-page maps invoice_sent→'invoice', bill_sent→'bill'
+// We must query for BOTH to find all business entries regardless of creation path
+const BS_INVOICE_TYPES = ['invoice_sent', 'invoice'];
+const BS_BILL_TYPES = ['bill_sent', 'bill'];
+const BS_ALL_BIZ_TYPES = ['invoice_sent', 'invoice', 'bill_sent', 'bill'];
 const BS_EXPENSE_CATEGORIES = ['Stock/Inventory','Transport/Logistics','Utilities','Rent/Lease','Salaries/Wages','Marketing/Ads','Insurance','Professional Services','Office Supplies','Equipment','Maintenance','Travel','Telecommunications','Taxes/Fees','Miscellaneous'];
 
 // ── Business Context Tracker ──────────────────────────────────────
@@ -252,15 +257,15 @@ async function _bsRenderDash(el) {
     .from('entries')
     .select('*')
     .eq('user_id', user.id)
-    .in('tx_type', ['invoice_sent','bill_sent'])
+    .in('tx_type', BS_ALL_BIZ_TYPES)
     .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false })
     .limit(50);
 
   const biz = entries || [];
-  const invoicesSent = biz.filter(e => e.tx_type === 'invoice_sent');
-  const billsSent = biz.filter(e => e.tx_type === 'bill_sent');
+  const invoicesSent = biz.filter(e => BS_INVOICE_TYPES.includes(e.tx_type));
+  const billsSent = biz.filter(e => BS_BILL_TYPES.includes(e.tx_type));
   const totalOutstanding = invoicesSent
     .filter(e => e.status !== 'settled' && e.status !== 'voided' && (e.currency || 'USD') === cur)
     .reduce((s,e) => s + (e.amount || 0), 0);
@@ -385,8 +390,8 @@ async function _bsRenderDash(el) {
         const m = (e.created_at||'').slice(0,7);
         const mo = months.find(x => x.key === m);
         if (!mo) return;
-        if (e.tx_type === 'invoice_sent') mo.invoiced += (e.amount || 0);
-        else if (e.tx_type === 'bill_sent') mo.billed += (e.amount || 0);
+        if (BS_INVOICE_TYPES.includes(e.tx_type)) mo.invoiced += (e.amount || 0);
+        else if (BS_BILL_TYPES.includes(e.tx_type)) mo.billed += (e.amount || 0);
       });
       const maxVal = Math.max(...months.map(m => Math.max(m.invoiced, m.billed)), 1);
       return months.some(m => m.invoiced > 0 || m.billed > 0) ? `
@@ -442,7 +447,9 @@ async function _bsRenderDash(el) {
 function _bsTxLabel(type) {
   const map = {
     invoice_sent: 'Invoice',
+    invoice: 'Invoice',
     bill_sent: 'Bill',
+    bill: 'Bill',
     owed_to_me: 'Receivable',
     i_owe: 'Payable',
     advance_paid: 'Advance Out',
@@ -476,7 +483,7 @@ async function _bsRenderInvoices(el) {
     .from('entries')
     .select('*')
     .eq('user_id', user.id)
-    .eq('tx_type', 'invoice_sent')
+    .in('tx_type', BS_INVOICE_TYPES)
     .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false });
@@ -564,7 +571,7 @@ async function _bsRenderBills(el) {
     .from('entries')
     .select('*')
     .eq('user_id', user.id)
-    .eq('tx_type', 'bill_sent')
+    .in('tx_type', BS_BILL_TYPES)
     .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false });
@@ -644,7 +651,7 @@ async function _bsRenderClients(el) {
     .from('entries')
     .select('contact_id, contact_name, amount, currency, status, created_at')
     .eq('user_id', user.id)
-    .eq('tx_type', 'invoice_sent')
+    .in('tx_type', BS_INVOICE_TYPES)
     .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false });
@@ -740,7 +747,7 @@ async function _bsRenderSuppliers(el) {
     .from('entries')
     .select('*')
     .eq('user_id', user.id)
-    .in('tx_type', ['bill_sent','i_owe'])
+    .in('tx_type', [...BS_BILL_TYPES, 'i_owe'])
     .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false });
@@ -1149,7 +1156,7 @@ async function _bsRenderRecurring(el) {
   const rules = await listRecurring(user.id);
 
   // Filter to business-relevant types AND only those tracked in business context
-  const bizTypes = new Set(['invoice_sent','bill_sent']);
+  const bizTypes = new Set(BS_ALL_BIZ_TYPES);
   const bsItems = _getBsItems();
   const bsRecurringIds = new Set(bsItems.recurring || []);
   const bizRules = rules.filter(r => bizTypes.has(r.tx_type) && bsRecurringIds.has(r.id));
@@ -2313,7 +2320,7 @@ window._bsExportData = async function() {
     .from('entries')
     .select('*')
     .eq('user_id', user.id)
-    .in('tx_type', ['invoice_sent','bill_sent'])
+    .in('tx_type', BS_ALL_BIZ_TYPES)
     .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false });

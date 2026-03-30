@@ -2285,7 +2285,9 @@ window.saveNewEntry = async function() {
   // Persist new fields onto the entry row
   const isAdvance = ['advance_paid', 'advance_received'].includes(category);
   if (entry?.id) {
+    const contactName = (window._neContacts || []).find(c => c.id === contactId)?.name || entry?.contact?.name || '';
     const updates = { category, direction_sign: dirSign, outstanding_amount: Math.round(parseFloat(amount) * 100) };
+    if (contactName) updates.contact_name = contactName;
     if (dueDate) updates.due_date = dueDate;
     // Save repayment date as due_date for advances
     if (isAdvance && advEndDate) updates.due_date = advEndDate;
