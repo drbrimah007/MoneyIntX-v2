@@ -91,7 +91,7 @@ export async function confirmShare(tokenId, recipientId) {
   // Get the share token with full entry + snapshot + sender profile
   const { data: token } = await supabase
     .from('share_tokens')
-    .select('*, entry:entries(id, amount, currency, tx_type, date, note, invoice_number, user_id, settled_amount)')
+    .select('*, entry:entries(id, amount, currency, tx_type, date, note, invoice_number, user_id, settled_amount, contact_id)')
     .eq('id', tokenId)
     .single();
   if (!token?.entry) return null;
@@ -198,10 +198,23 @@ export async function confirmShare(tokenId, recipientId) {
     .single();
   if (error) console.error('[confirmShare]', error.message);
 
-  // Also link the original entry back to this new entry
+  // Bidirectionally link both entries via SECURITY DEFINER RPC (bypasses RLS)
   if (newEntry && token.entry_id) {
-    await supabase.from('entries').update({ linked_entry_id: newEntry.id })
-      .eq('id', token.entry_id).catch(() => {});
+    await supabase.rpc('link_mirror_entries', {
+      p_entry_id: token.entry_id,
+      p_linked_entry_id: newEntry.id
+    }).catch(err => console.error('[confirmShare] link_mirror_entries failed:', err.message));
+  }
+
+  // Link the sender's contact to the recipient's user account
+  // This is critical for name-only contacts (no email) — without this,
+  // future payments/settlements won't sync to the linked user
+  if (token.sender_id && token.entry?.contact_id) {
+    await supabase.from('contacts')
+      .update({ linked_user_id: recipientId })
+      .eq('id', token.entry.contact_id)
+      .eq('user_id', token.sender_id)  // safety: only update sender's own contact
+      .catch(() => {});
   }
 
   // Notify the sender that the share was confirmed
