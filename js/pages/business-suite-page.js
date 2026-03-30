@@ -11,7 +11,7 @@ import { esc, toast, openModal, closeModal, fmtDate, fmtRelative, statusBadge, T
 import { supabase } from '../supabase.js';
 import { listContacts } from '../contacts.js';
 import { fmtMoney } from '../entries.js';
-import { listTemplates } from '../templates.js';
+import { listTemplates, listPublicTemplates, copyPublicTemplate } from '../templates.js';
 import { listRecurring, FREQUENCIES } from '../recurring.js';
 import { listPanels } from '../business-panels.js';
 
@@ -339,7 +339,10 @@ function _bsTxLabel(type) {
 }
 
 // Quick action — opens new entry modal with business presets
+// Sets _bsActiveContext so saveNewEntry knows to return to BS (not personal entries)
 window._bsQuickAction = function(type) {
+  window._bsActiveContext = true;
+  window._bsActiveBizId = _getBizId();
   if (type === 'invoice') {
     if (window.openNewEntryModal) window.openNewEntryModal('invoice');
   } else if (type === 'bill') {
@@ -889,7 +892,7 @@ window._bsSaveReceivedBill = async function() {
     _bsContacts = []; // clear cache
   }
 
-  const metadata = {};
+  const metadata = { business_id: _getBizId() };
   if (dueDate) metadata.due_date = dueDate;
   if (description) metadata.description = description;
   if (category) metadata.expense_category = category;
@@ -1077,10 +1080,80 @@ async function _bsRenderPanels(el) {
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderTemplates(el) {
   const user = getCurrentUser();
-  const templates = await listTemplates(user.id);
+  const userId = user.id;
 
+  // Tab state: my templates vs public DB
+  if (!window._bsTmplTab) window._bsTmplTab = 'mine';
   if (!window._bsTmplSearch) window._bsTmplSearch = '';
+  const tab = window._bsTmplTab;
   const tq = window._bsTmplSearch.toLowerCase();
+
+  if (tab === 'public') {
+    // ── Public Template DB ──────────────────────────────
+    const publicTemplates = await listPublicTemplates();
+    const display = tq ? publicTemplates.filter(t => (t.name||'').toLowerCase().includes(tq) || (t.description||'').toLowerCase().includes(tq)) : publicTemplates;
+
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+        <div>
+          <h2 style="font-size:20px;font-weight:800;margin:0;">Template Public DB</h2>
+          <p style="color:var(--muted);font-size:13px;margin-top:2px;">${publicTemplates.length} public template${publicTemplates.length!==1?'s':''} available</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="if(window.openNewTemplateModal)window.openNewTemplateModal()">+ New Template</button>
+      </div>
+
+      <!-- Tabs -->
+      <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
+        <button onclick="window._bsTmplTab='mine';window._bsNavigate('bs-templates');"
+          style="padding:10px 20px;font-size:13px;font-weight:500;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;">
+          My Templates
+        </button>
+        <button onclick="window._bsTmplTab='public';window._bsNavigate('bs-templates');"
+          style="padding:10px 20px;font-size:13px;font-weight:700;color:var(--accent);background:none;border:none;border-bottom:2px solid var(--accent);margin-bottom:-2px;cursor:pointer;">
+          Public DB
+        </button>
+      </div>
+
+      <input type="text" placeholder="Search public templates…" value="${esc(window._bsTmplSearch||'')}"
+        oninput="window._bsTmplSearch=this.value;window._bsNavigate('bs-templates');"
+        style="width:100%;max-width:320px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;margin-bottom:14px;">
+
+      ${display.length === 0
+        ? `<div class="card" style="text-align:center;padding:40px;">
+            <div style="font-size:36px;margin-bottom:10px;">📑</div>
+            <p style="color:var(--muted);margin-bottom:12px;">${tq ? 'No templates match your search.' : 'No public templates available yet. Publish one of your templates to share it here.'}</p>
+          </div>`
+        : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;">
+            ${display.map(t => {
+              const isOwn = t.user_id === userId;
+              const fCount = (t.fields||[]).length;
+              const creator = t.creator?.display_name || '';
+              return `
+              <div class="card" style="padding:18px;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                  <div style="font-size:16px;font-weight:700;">${esc(t.name)}</div>
+                  ${isOwn ? '<span class="badge badge-purple" style="font-size:10px;">Yours</span>' : ''}
+                </div>
+                ${t.description ? `<p style="font-size:12px;color:var(--muted);margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(t.description)}</p>` : ''}
+                <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+                  <span class="badge badge-blue">${fCount} field${fCount!==1?'s':''}</span>
+                  ${t.tx_type ? `<span class="badge badge-gray">${esc(_bsTxLabel(t.tx_type))}</span>` : ''}
+                </div>
+                ${creator ? `<div style="font-size:11px;color:var(--muted);margin-top:6px;">by ${esc(creator)}</div>` : ''}
+                <div style="margin-top:10px;display:flex;gap:6px;">
+                  ${!isOwn ? `<button class="btn btn-primary btn-sm" onclick="window._bsCopyTemplate('${t.id}')">+ Install</button>` : `<button class="btn btn-secondary btn-sm" onclick="if(window.openEditTemplate)window.openEditTemplate('${t.id}')">Edit</button>`}
+                  <button class="bs sm" onclick="window._bsPreviewTemplate('${t.id}')" style="font-size:12px;">Preview</button>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>`
+      }
+    `;
+    return;
+  }
+
+  // ── My Templates tab ──────────────────────────────────
+  const templates = await listTemplates(user.id);
   const display = tq ? templates.filter(t => (t.name||'').toLowerCase().includes(tq) || (t.description||'').toLowerCase().includes(tq)) : templates;
 
   el.innerHTML = `
@@ -1089,13 +1162,22 @@ async function _bsRenderTemplates(el) {
         <h2 style="font-size:20px;font-weight:800;margin:0;">Templates</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${templates.length} template${templates.length!==1?'s':''} · Reusable invoice and form layouts</p>
       </div>
-      <div style="display:flex;gap:8px;">
-        <button class="btn btn-primary btn-sm" onclick="if(window.openNewTemplateModal)window.openNewTemplateModal()">+ New Template</button>
-        <button class="btn btn-secondary btn-sm" onclick="if(window.openPublicTemplateDB)window.openPublicTemplateDB()">Browse Public DB</button>
-      </div>
+      <button class="btn btn-primary btn-sm" onclick="if(window.openNewTemplateModal)window.openNewTemplateModal()">+ New Template</button>
     </div>
 
-    <input type="text" placeholder="Search templates…" value="${esc(window._bsTmplSearch||'')}"
+    <!-- Tabs -->
+    <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
+      <button onclick="window._bsTmplTab='mine';window._bsNavigate('bs-templates');"
+        style="padding:10px 20px;font-size:13px;font-weight:700;color:var(--accent);background:none;border:none;border-bottom:2px solid var(--accent);margin-bottom:-2px;cursor:pointer;">
+        My Templates
+      </button>
+      <button onclick="window._bsTmplTab='public';window._bsNavigate('bs-templates');"
+        style="padding:10px 20px;font-size:13px;font-weight:500;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;">
+        Public DB
+      </button>
+    </div>
+
+    <input type="text" placeholder="Search my templates…" value="${esc(window._bsTmplSearch||'')}"
       oninput="window._bsTmplSearch=this.value;window._bsNavigate('bs-templates');"
       style="width:100%;max-width:320px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;margin-bottom:14px;">
 
@@ -1103,8 +1185,11 @@ async function _bsRenderTemplates(el) {
       ? `<div class="card" style="text-align:center;padding:40px;">
           <div style="font-size:36px;margin-bottom:10px;">📑</div>
           <p style="font-weight:700;font-size:15px;margin-bottom:6px;">${tq ? 'No templates match your search' : 'No templates yet'}</p>
-          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Create reusable templates for your invoices and forms to save time.</p>
-          ${!tq ? '<button class="btn btn-primary btn-sm" onclick="if(window.openNewTemplateModal)window.openNewTemplateModal()">Create First Template</button>' : ''}
+          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Create your own or install one from the Public DB.</p>
+          <div style="display:flex;gap:8px;justify-content:center;">
+            ${!tq ? '<button class="btn btn-primary btn-sm" onclick="if(window.openNewTemplateModal)window.openNewTemplateModal()">Create Template</button>' : ''}
+            <button class="btn btn-secondary btn-sm" onclick="window._bsTmplTab=\'public\';window._bsNavigate(\'bs-templates\')">Browse Public DB</button>
+          </div>
         </div>`
       : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
           ${display.map(t => `
@@ -1125,6 +1210,45 @@ async function _bsRenderTemplates(el) {
     }
   `;
 }
+
+// Copy/install a public template
+window._bsCopyTemplate = async function(templateId) {
+  const user = getCurrentUser();
+  await copyPublicTemplate(user.id, templateId);
+  toast('Template installed to your library', 'success');
+  window._bsTmplTab = 'mine';
+  window._bsNavigate('bs-templates');
+};
+
+// Preview a public template's fields
+window._bsPreviewTemplate = async function(templateId) {
+  const { getTemplate } = await import('../templates.js');
+  const t = await getTemplate(templateId);
+  if (!t) { toast('Template not found', 'error'); return; }
+  const fields = t.fields || [];
+  openModal(`
+    <div class="modal-title">${esc(t.name)} — Preview</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">${esc(t.tx_type ? _bsTxLabel(t.tx_type) : 'General')} · ${fields.length} field${fields.length!==1?'s':''}</div>
+    ${t.description ? `<p style="font-size:13px;color:var(--muted);margin-bottom:12px;">${esc(t.description)}</p>` : ''}
+    ${fields.length === 0 ? '<p style="color:var(--muted);">This template has no fields.</p>' : `
+      <div style="max-height:300px;overflow-y:auto;">
+        ${fields.map((f, i) => `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:11px;color:var(--muted);width:20px;text-align:right;">${i+1}.</span>
+            <div style="flex:1;">
+              <div style="font-weight:600;font-size:13px;">${esc(f.name || f.label || 'Unnamed')}</div>
+              <div style="font-size:11px;color:var(--muted);">${esc(f.type || 'text')}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `}
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="bs sm" onclick="closeModal()">Close</button>
+      ${t.user_id !== getCurrentUser()?.id ? `<button class="btn btn-primary sm" onclick="closeModal();window._bsCopyTemplate('${templateId}')">+ Install</button>` : ''}
+    </div>
+  `, { maxWidth: '500px' });
+};
 
 // ══════════════════════════════════════════════════════════════════
 // SECTION: Investments

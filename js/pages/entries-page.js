@@ -2312,7 +2312,19 @@ window.saveNewEntry = async function() {
 
   closeModal();
   toast('Entry created.', 'success');
-  _invalidateEntries(); navTo('entries');
+
+  // If created from Business Suite context, tag with Business ID and return to BS
+  if (window._bsActiveContext && entry?.id) {
+    const bizMeta = entry.metadata || {};
+    bizMeta.business_id = window._bsActiveBizId || '';
+    await supabase.from('entries').update({ metadata: bizMeta }).eq('id', entry.id);
+    window._bsActiveContext = false;
+    window._bsActiveBizId = '';
+    _invalidateEntries();
+    if (window.app?.navigate) window.app.navigate('business-suite');
+  } else {
+    _invalidateEntries(); navTo('entries');
+  }
 
   // ── Auto-share via SECURITY DEFINER RPC (handles unlinked contacts too) ──
   // Replaces the old client-side approach that:
