@@ -215,6 +215,11 @@ export async function confirmShare(tokenId, recipientId) {
       .eq('id', token.entry.contact_id)
       .eq('user_id', token.sender_id)  // safety: only update sender's own contact
       .catch(() => {});
+
+    // Sync the linked user's email/name back to the sender's contact record
+    await supabase.rpc('sync_contact_from_linked_user', {
+      p_contact_id: token.entry.contact_id
+    }).catch(() => {});
   }
 
   // Notify the sender that the share was confirmed
