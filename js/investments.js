@@ -64,7 +64,12 @@ export async function addInvestmentMember(investmentId, { userId = null, contact
   if (userId) row.user_id = userId;
   if (contactId) row.contact_id = contactId;
   const { data, error } = await supabase.from('investment_members').insert(row).select().single();
-  if (error) console.error('[addInvestmentMember]', error.message);
+  if (error) {
+    console.error('[addInvestmentMember]', error.message, error.details);
+    const err = new Error(error.message);
+    err.sbError = error;
+    throw err;
+  }
   return data;
 }
 

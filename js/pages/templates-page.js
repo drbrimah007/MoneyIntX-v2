@@ -728,25 +728,50 @@ window.saveTemplateEntry = async function(templateId, invNum) {
     }
   });
 
-  const entry = await createEntry(currentUser.id, {
-    contactId, txType, amount,
-    currency: document.getElementById('tfe-currency')?.value || window._activeTplCurrency || 'USD',
-    date: document.getElementById('tfe-date').value,
-    note: document.getElementById('tfe-note').value.trim(),
-    invoiceNumber: invNum, templateId, templateData: tplData
-  });
+  // Build metadata for business context if active
+  const _bsMeta = window._bsActiveContext && window._bsActiveBizId
+    ? { business_id: window._bsActiveBizId } : null;
+  const tfeDueDateVal = document.getElementById('tfe-due-date')?.value || null;
+  if (_bsMeta && tfeDueDateVal) _bsMeta.due_date = tfeDueDateVal;
 
-  // Persist due_date if provided
-  const tfeDueDate = document.getElementById('tfe-due-date')?.value || null;
-  if (entry?.id && tfeDueDate) {
-    await supabase.from('entries').update({ due_date: tfeDueDate }).eq('id', entry.id);
+  let entry;
+  try {
+    entry = await createEntry(currentUser.id, {
+      contactId, txType, amount,
+      currency: document.getElementById('tfe-currency')?.value || window._activeTplCurrency || 'USD',
+      date: document.getElementById('tfe-date').value,
+      note: document.getElementById('tfe-note').value.trim(),
+      invoiceNumber: invNum, templateId, templateData: tplData,
+      metadata: _bsMeta
+    });
+  } catch (err) {
+    toast('Failed to create entry: ' + (err.message || 'Unknown error'), 'error');
+    return;
+  }
+
+  // Persist due_date if provided (only for non-BS or when metadata didn't already carry it)
+  if (entry?.id && tfeDueDateVal && !_bsMeta) {
+    await supabase.from('entries').update({ due_date: tfeDueDateVal }).eq('id', entry.id);
   }
 
   // Increment template invoice counter
   const { data: tpl } = await supabase.from('templates').select('invoice_next_num').eq('id', templateId).single();
   if (tpl) await supabase.from('templates').update({ invoice_next_num: (tpl.invoice_next_num || 1) + 1 }).eq('id', templateId);
 
-  closeModal(); toast('Entry created from template!', 'success'); _invalidateEntries(); navTo('entries');
+  closeModal(); toast('Entry created from template!', 'success');
+
+  // Navigate back to BS if we came from there, otherwise entries page
+  if (window._bsActiveContext) {
+    window._bsActiveContext = false;
+    window._bsActiveBizId = '';
+    if (document.getElementById('bs-content') && window._bsNavigate) {
+      window._bsNavigate('bs-invoices');
+    } else {
+      navTo('business-suite');
+    }
+  } else {
+    _invalidateEntries(); navTo('entries');
+  }
 };
 
 window._publicTemplatesCache = null;

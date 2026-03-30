@@ -43,6 +43,7 @@ const BS_TOOLS = [
   { id: 'bs-clients',    icon: '👥', label: 'Clients',          always: true },
   { id: 'bs-suppliers',  icon: '🏪', label: 'Suppliers',        always: true },
   { id: 'bs-recurring',  icon: '🔁', label: 'Recurring',        always: false },
+  { id: 'bs-panels',     icon: '📋', label: 'Panels',           always: true },
   { id: 'bs-templates',  icon: '📑', label: 'Templates',        always: false },
   { id: 'bs-investments',icon: '📈', label: 'Investments',      always: false },
   { id: 'bs-branding',   icon: '🏷️', label: 'Branding',          always: false },
@@ -177,9 +178,17 @@ export async function renderBusinessSuite(el) {
           <button class="bs-hamburger" onclick="document.getElementById('bs-sidebar').classList.toggle('bs-sidebar-open')">☰</button>
           <span style="font-weight:700;font-size:15px;">Business Suite</span>
         </div>
-        <div id="bs-content" style="padding:20px 24px;max-width:1100px;">
+        <div id="bs-content" style="padding:20px 24px;max-width:1100px;padding-bottom:80px;">
           <p style="color:var(--muted);">Loading…</p>
         </div>
+        <nav class="bs-mobile-bottom-nav" id="bs-mobile-bottom-nav">
+          <button class="bs-mobile-nav-btn" onclick="window._bsNavigate('bs-dash')" title="Overview">📊</button>
+          <button class="bs-mobile-nav-btn" onclick="window._bsNavigate('bs-invoices')" title="Invoices">🧾</button>
+          <button class="bs-mobile-nav-btn" onclick="window._bsNavigate('bs-bills')" title="Bills">📄</button>
+          <button class="bs-mobile-nav-btn bs-mobile-nav-plus" onclick="openModal(\`<div style='text-align:center;padding:20px;'><p style='font-weight:700;margin-bottom:16px;'>Quick Actions</p><div style='display:flex;flex-direction:column;gap:8px;'><button class='btn btn-primary' onclick='closeModal();window._bsNavigate(&quot;bs-clients&quot;)'>New Client</button><button class='btn btn-primary' onclick='closeModal();window._bsNavigate(&quot;bs-suppliers&quot;)'>New Supplier</button></div></div>\`)" title="Add">+</button>
+          <button class="bs-mobile-nav-btn" onclick="window._bsNavigate('bs-clients')" title="Clients">👥</button>
+          <button class="bs-mobile-nav-btn" onclick="document.getElementById('bs-sidebar').classList.toggle('bs-sidebar-open')" title="Menu">⋯</button>
+        </nav>
       </div>
     </div>
   `;
@@ -1004,7 +1013,7 @@ window._bsReceiveBill = function() {
       <div class="form-group">
         <label>Amount *</label>
         <div style="display:flex;gap:6px;">
-          <select id="bs-rb-currency" style="flex:0 0 80px;">
+          <select id="bs-rb-currency" style="flex:0 0 90px;">
             ${BS_CURRENCIES.map(c => `<option value="${c}" ${c===cur?'selected':''}>${c}</option>`).join('')}
           </select>
           <input type="number" id="bs-rb-amount" placeholder="0.00" step="0.01" min="0" style="flex:1;">
@@ -1146,7 +1155,7 @@ window._bsSaveReceivedBill = async function() {
       date: billDate,
       note: description || '',
       invoiceNumber: refNum || '',
-      status: 'pending',
+      status: 'posted',
       metadata
     });
   } catch (err) {
@@ -1196,6 +1205,8 @@ window._bsConfirmPayment = async function(entryId) {
 
   const { data: entry } = await supabase.from('entries').select('metadata').eq('id', entryId).single();
   const meta = entry?.metadata || {};
+  // Defensively ensure business_id is preserved
+  if (!meta.business_id) meta.business_id = _getBizId();
   meta.paid_date = payDate;
   if (payNote) meta.payment_note = payNote;
 
@@ -1206,7 +1217,7 @@ window._bsConfirmPayment = async function(entryId) {
   if (error) { toast('Failed: ' + error.message, 'error'); return; }
   closeModal();
   toast('Bill marked as paid', 'success');
-  window._bsNavigate('bs-suppliers');
+  window._bsNavigate('bs-bills');
 };
 
 // ══════════════════════════════════════════════════════════════════
@@ -1532,7 +1543,7 @@ async function _bsRenderTemplates(el) {
         </div>`
       : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
           ${display.map(t => `
-            <div class="card" style="padding:18px;cursor:pointer;transition:border-color .15s;" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor=''" onclick="if(window.openEditTemplate)window.openEditTemplate('${t.id}')">
+            <div class="card" style="padding:18px;">
               <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                 <div style="font-size:16px;font-weight:700;">${esc(t.name)}</div>
                 ${t.is_public ? '<span class="badge badge-blue" style="font-size:10px;">Public</span>' : '<span class="badge badge-gray" style="font-size:10px;">Private</span>'}
@@ -1543,6 +1554,10 @@ async function _bsRenderTemplates(el) {
                 ${t.tx_type ? `<span class="badge badge-gray">${esc(_bsTxLabel(t.tx_type))}</span>` : ''}
               </div>
               <div style="font-size:11px;color:var(--muted);margin-top:8px;">Updated ${fmtRelative(t.updated_at || t.created_at)}</div>
+              <div style="margin-top:12px;display:flex;gap:6px;">
+                <button class="btn btn-primary btn-sm" onclick="window._bsActiveContext=true;window._bsActiveBizId=window._getBizId?.()??'';if(window.useTemplateForEntry)window.useTemplateForEntry('${t.id}')">Use</button>
+                <button class="btn btn-secondary btn-sm" onclick="if(window.openEditTemplate)window.openEditTemplate('${t.id}')">Edit</button>
+              </div>
             </div>
           `).join('')}
         </div>`
@@ -2613,6 +2628,42 @@ const BS_CSS = `
   padding: 4px 8px;
 }
 
+/* Mobile bottom navigation — hidden on desktop, shown via media query */
+.bs-mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  justify-content: space-around;
+  align-items: center;
+  z-index: 1000;
+}
+.bs-mobile-nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 22px;
+  cursor: pointer;
+  transition: color .15s;
+}
+.bs-mobile-nav-btn:hover {
+  color: var(--text);
+}
+.bs-mobile-nav-plus {
+  font-size: 28px;
+  font-weight: 700;
+}
+
 /* Mobile responsive */
 @media (max-width: 768px) {
   .bs-sidebar {
@@ -2631,8 +2682,12 @@ const BS_CSS = `
   .bs-mobile-header {
     display: flex;
   }
+  .bs-mobile-bottom-nav {
+    display: flex !important;
+  }
   #bs-content {
     padding: 16px !important;
+    padding-bottom: 80px !important;
   }
 }
 `;

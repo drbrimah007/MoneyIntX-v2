@@ -424,8 +424,14 @@ window.doToggleRecurring = async function(id, active) {
 window.confirmDeleteRecurring = async function(id) {
   if (!confirm('Delete this recurring rule permanently?')) return;
   try {
+    // Also remove from BS tracker if it was a business recurring rule
+    if (window._removeBsItem) window._removeBsItem('recurring', id);
     await deleteRecurring(id);
     toast('Deleted.', 'success');
+    // Stay in BS if we're in the business suite
+    if (document.getElementById('bs-content') && window._bsNavigate) {
+      window._bsNavigate('bs-recurring'); return;
+    }
     navTo('recurring');
   } catch (err) {
     console.error('Error deleting recurring rule:', err);
