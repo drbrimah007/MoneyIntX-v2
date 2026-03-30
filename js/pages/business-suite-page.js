@@ -43,7 +43,6 @@ const BS_TOOLS = [
   { id: 'bs-clients',    icon: '👥', label: 'Clients',          always: true },
   { id: 'bs-suppliers',  icon: '🏪', label: 'Suppliers',        always: true },
   { id: 'bs-recurring',  icon: '🔁', label: 'Recurring',        always: false },
-  { id: 'bs-panels',     icon: '📋', label: 'Business Panels',  always: true },
   { id: 'bs-templates',  icon: '📑', label: 'Templates',        always: false },
   { id: 'bs-investments',icon: '📈', label: 'Investments',      always: false },
   { id: 'bs-branding',   icon: '🏷️', label: 'Branding',          always: false },
@@ -121,6 +120,12 @@ function _isBsToolEnabled(id) {
   if (t?.always) return true;
   return _getBsTools()[id] !== false;
 }
+
+// ── Expose BS tracker functions to window for external modules ──────
+window._addBsItem = _addBsItem;
+window._removeBsItem = _removeBsItem;
+window._isBsItem = _isBsItem;
+window._getBsItems = _getBsItems;
 
 // ── Main Render ───────────────────────────────────────────────────
 export async function renderBusinessSuite(el) {
@@ -929,6 +934,54 @@ async function _bsRenderSuppliers(el) {
   `;
 }
 
+// ── Reusable Add New Contact Function ──────────────────────────────
+// Opens a modal to create a new contact with Name + Email fields
+// Calls the provided callback with the newly created contact object
+window._bsAddNewContact = async function(callback) {
+  openModal(`
+    <h3 style="margin-bottom:16px;">Add New Contact</h3>
+    <div class="form-group">
+      <label>Name *</label>
+      <input type="text" id="bs-new-contact-name" placeholder="Full name" autofocus>
+    </div>
+    <div class="form-group">
+      <label>Email (optional)</label>
+      <input type="email" id="bs-new-contact-email" placeholder="email@example.com">
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="bs sm" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary sm" onclick="window._bsDoAddNewContact(${typeof callback === 'function'})">Add Contact</button>
+    </div>
+  `, { maxWidth: '440px' });
+
+  // Store the callback for use in _bsDoAddNewContact
+  window._bsNewContactCallback = callback;
+};
+
+window._bsDoAddNewContact = async function() {
+  const name = (document.getElementById('bs-new-contact-name')?.value || '').trim();
+  const email = (document.getElementById('bs-new-contact-email')?.value || '').trim();
+
+  if (!name) { toast('Name is required', 'error'); return; }
+
+  const user = getCurrentUser();
+  const { data: newContact, error } = await supabase
+    .from('contacts')
+    .insert({ user_id: user.id, name, email: email || null })
+    .select().single();
+
+  if (error) { toast('Failed to add contact: ' + error.message, 'error'); return; }
+
+  closeModal();
+  toast(`Added ${name}`, 'success');
+
+  // Call the callback if provided
+  if (typeof window._bsNewContactCallback === 'function') {
+    window._bsNewContactCallback(newContact);
+  }
+  window._bsNewContactCallback = null;
+};
+
 // ── Receive Bill modal — Log an incoming supplier bill ─────────
 window._bsReceiveBill = function() {
   const cur = getCurrentProfile()?.default_currency || 'USD';
@@ -937,7 +990,10 @@ window._bsReceiveBill = function() {
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Log an incoming bill from a supplier. Record what it's for, the amount, and tag the expense category.</p>
 
     <div class="form-group">
-      <label>Supplier *</label>
+      <label style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Supplier *</span>
+        <button type="button" onclick="window._bsAddNewContact(function(c){if(c){document.getElementById('bs-rb-supplier').value=c.name;document.getElementById('bs-rb-contact-id').value=c.id;document.getElementById('bs-rb-contact-results').style.display='none';}closeModal();window._bsReceiveBill();})" style="font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;font-weight:700;">+ Add New</button>
+      </label>
       <input type="text" id="bs-rb-supplier" placeholder="Search or enter supplier name…" autocomplete="off"
         oninput="window._bsRbSearchContact(this.value)" style="width:100%;">
       <div id="bs-rb-contact-results" style="max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:4px;display:none;"></div>
@@ -1104,7 +1160,7 @@ window._bsSaveReceivedBill = async function() {
   await supabase.from('entries').update({ contact_name: supplierName }).eq('id', entry.id);
   closeModal();
   toast('Bill logged from ' + supplierName, 'success');
-  window._bsNavigate('bs-suppliers');
+  window._bsNavigate('bs-bills');
 };
 
 // Record payment against a bill

@@ -309,9 +309,19 @@ window.openAddInvPartnerModal = async function(invId) {
   const currentUser = getCurrentUser();
   const contacts = await listContacts(currentUser.id);
   const opts = contacts.map(c=>`<option value="${c.id}" data-name="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+
+  // Store invId for use in the add new contact callback
+  window._invAddPartnerInvId = invId;
+
   openModal(`
     <h3 style="margin-bottom:16px;">Add Partner</h3>
-    <div class="form-group"><label>Contact</label><select id="ipm-contact">${opts||'<option value="">No contacts</option>'}</select></div>
+    <div class="form-group">
+      <label style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Contact</span>
+        <button type="button" onclick="window._bsAddNewContactForInvPartner()" style="font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;font-weight:700;">+ Add New</button>
+      </label>
+      <select id="ipm-contact">${opts||'<option value="">No contacts</option>'}</select>
+    </div>
     <div class="form-group"><label>Role</label><select id="ipm-role">
       <option value="partner">Partner</option>
       <option value="investor">Investor</option>
@@ -325,20 +335,47 @@ window.openAddInvPartnerModal = async function(invId) {
   `);
 };
 
+window._bsAddNewContactForInvPartner = async function() {
+  if (typeof window._bsAddNewContact === 'function') {
+    window._bsAddNewContact(function(c) {
+      if (c) {
+        const sel = document.getElementById('ipm-contact');
+        if (sel) {
+          // Add new option and select it
+          const newOpt = document.createElement('option');
+          newOpt.value = c.id;
+          newOpt.textContent = c.name;
+          newOpt.dataset.name = c.name;
+          sel.appendChild(newOpt);
+          sel.value = c.id;
+        }
+        closeModal();
+        window.openAddInvPartnerModal(window._invAddPartnerInvId);
+      }
+    });
+  }
+};
+
 window.doAddInvPartner = async function(invId) {
   const sel = document.getElementById('ipm-contact');
   const cId = sel.value;
   const cName = sel.options[sel.selectedIndex]?.dataset?.name || 'Partner';
   const role = document.getElementById('ipm-role').value;
   if (!cId) return toast('Select a contact.', 'error');
-  await addInvestmentMember(invId, { contactId: cId, name: cName, role });
-  closeModal();
-  toast('Partner added.', 'success');
-  // Stay in BS if inside Business Suite
-  if (document.getElementById('bs-content') && window._bsNavigate) {
-    window._bsNavigate('bs-investments'); return;
+  try {
+    const result = await addInvestmentMember(invId, { contactId: cId, name: cName, role });
+    if (!result) return toast('Failed to add partner. Check console.', 'error');
+    closeModal();
+    toast('Partner added.', 'success');
+    // Stay in BS if inside Business Suite
+    if (document.getElementById('bs-content') && window._bsNavigate) {
+      window._bsNavigate('bs-investments'); return;
+    }
+    window.navTo('investments');
+  } catch (err) {
+    console.error('Error adding partner:', err);
+    toast('Error: ' + (err.message || 'Unknown error'), 'error');
   }
-  window.navTo('investments');
 };
 
 window.openAddInvTxModal = function(invId) {
