@@ -308,9 +308,9 @@ window.openInvestmentDetail = async function(id) {
 window.openAddInvPartnerModal = async function(invId) {
   const currentUser = getCurrentUser();
   const contacts = await listContacts(currentUser.id);
-  const opts = contacts.map(c=>`<option value="${c.id}" data-name="${esc(c.name)}">${esc(c.name)}</option>`).join('');
 
-  // Store invId for use in the add new contact callback
+  // Store for searchable typeahead
+  window._ipmContacts = contacts;
   window._invAddPartnerInvId = invId;
 
   openModal(`
@@ -320,13 +320,19 @@ window.openAddInvPartnerModal = async function(invId) {
         <span>Contact</span>
         <button type="button" onclick="window._bsAddNewContactForInvPartner()" style="font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;font-weight:700;">+ Add New</button>
       </label>
-      <select id="ipm-contact">${opts||'<option value="">No contacts</option>'}</select>
+      <div style="position:relative;">
+        <input type="text" id="ipm-contact-search" placeholder="Search contacts…" autocomplete="off"
+          style="width:100%;" oninput="window._filterIpmContacts(this.value)" onfocus="window._filterIpmContacts(this.value)">
+        <input type="hidden" id="ipm-contact" value="">
+        <input type="hidden" id="ipm-contact-name" value="">
+        <div id="ipm-contact-list" style="position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border);border-radius:8px;max-height:180px;overflow-y:auto;z-index:999;display:none;"></div>
+      </div>
     </div>
     <div class="form-group"><label>Role</label><select id="ipm-role">
       <option value="partner">Partner</option>
       <option value="investor">Investor</option>
-      <option value="beneficiary">Beneficiary</option>
-      <option value="manager">Manager</option>
+      <option value="advisor">Advisor</option>
+      <option value="observer">Observer</option>
     </select></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="bs sm" onclick="closeModal()">Cancel</button>
@@ -335,33 +341,62 @@ window.openAddInvPartnerModal = async function(invId) {
   `);
 };
 
+// Searchable contact picker for investment partner modal
+window._filterIpmContacts = function(q) {
+  const list = document.getElementById('ipm-contact-list');
+  if (!list) return;
+  const contacts = window._ipmContacts || [];
+  const filtered = q ? contacts.filter(c => c.name.toLowerCase().includes(q.toLowerCase())) : contacts;
+  if (filtered.length === 0) { list.style.display = 'none'; return; }
+  list.innerHTML = filtered.slice(0, 12).map(c =>
+    `<div style="padding:8px 12px;cursor:pointer;font-size:13px;" onmousedown="window._selectIpmContact('${c.id}','${esc(c.name)}')"
+      onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+      ${esc(c.name)}${c.email ? `<span style="color:var(--muted);font-size:11px;margin-left:6px;">${esc(c.email)}</span>` : ''}
+    </div>`
+  ).join('');
+  list.style.display = 'block';
+};
+window._selectIpmContact = function(id, name) {
+  document.getElementById('ipm-contact').value = id;
+  document.getElementById('ipm-contact-name').value = name;
+  document.getElementById('ipm-contact-search').value = name;
+  document.getElementById('ipm-contact-list').style.display = 'none';
+};
+// Close dropdown on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('#ipm-contact-search') && !e.target.closest('#ipm-contact-list')) {
+    const list = document.getElementById('ipm-contact-list');
+    if (list) list.style.display = 'none';
+  }
+});
+
 window._bsAddNewContactForInvPartner = async function() {
   if (typeof window._bsAddNewContact === 'function') {
     window._bsAddNewContact(function(c) {
       if (c) {
-        const sel = document.getElementById('ipm-contact');
-        if (sel) {
-          // Add new option and select it
-          const newOpt = document.createElement('option');
-          newOpt.value = c.id;
-          newOpt.textContent = c.name;
-          newOpt.dataset.name = c.name;
-          sel.appendChild(newOpt);
-          sel.value = c.id;
-        }
+        // Add to cached contacts and pre-fill
+        if (window._ipmContacts) window._ipmContacts.push(c);
         closeModal();
         window.openAddInvPartnerModal(window._invAddPartnerInvId);
+        // Pre-fill after modal re-opens
+        setTimeout(() => {
+          const search = document.getElementById('ipm-contact-search');
+          const hidden = document.getElementById('ipm-contact');
+          const hiddenName = document.getElementById('ipm-contact-name');
+          if (search) search.value = c.name;
+          if (hidden) hidden.value = c.id;
+          if (hiddenName) hiddenName.value = c.name;
+        }, 100);
       }
     });
   }
 };
 
 window.doAddInvPartner = async function(invId) {
-  const sel = document.getElementById('ipm-contact');
-  const cId = sel.value;
-  const cName = sel.options[sel.selectedIndex]?.dataset?.name || 'Partner';
+  const cId = document.getElementById('ipm-contact')?.value;
+  const cName = document.getElementById('ipm-contact-name')?.value || 'Partner';
   const role = document.getElementById('ipm-role').value;
-  if (!cId) return toast('Select a contact.', 'error');
+  if (!cId) return toast('Search and select a contact first.', 'error');
   try {
     const result = await addInvestmentMember(invId, { contactId: cId, name: cName, role });
     if (!result) return toast('Failed to add partner. Check console.', 'error');
