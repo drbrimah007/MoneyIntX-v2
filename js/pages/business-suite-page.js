@@ -986,14 +986,16 @@ window._bsReceiveBill = function() {
 window._bsRbSearchContact = async function(query) {
   const el = document.getElementById('bs-rb-contact-results');
   if (!el) return;
-  if (!query || query.length < 2) { el.style.display = 'none'; return; }
+  if (!query || query.length < 1) { el.style.display = 'none'; return; }
   const contacts = _bsContacts.length ? _bsContacts : await listContacts(getCurrentUser().id);
+  _bsContacts = contacts;
+  const q = query.toLowerCase();
   const matches = contacts.filter(c =>
-    (c.name||'').toLowerCase().includes(query.toLowerCase()) ||
-    (c.email||'').toLowerCase().includes(query.toLowerCase())
+    (c.name||'').toLowerCase().includes(q) ||
+    (c.email||'').toLowerCase().includes(q)
   ).slice(0, 8);
-  if (matches.length === 0) { el.style.display = 'none'; return; }
-  el.innerHTML = matches.map(c => `
+
+  let html = matches.map(c => `
     <div onclick="document.getElementById('bs-rb-supplier').value='${esc(c.name)}';document.getElementById('bs-rb-contact-id').value='${c.id}';document.getElementById('bs-rb-contact-results').style.display='none';"
       style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);"
       onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background=''">
@@ -1004,6 +1006,26 @@ window._bsRbSearchContact = async function(query) {
       </div>
     </div>
   `).join('');
+
+  // Always show "Add new" option at bottom
+  const exactMatch = matches.some(c => (c.name||'').toLowerCase() === q);
+  if (!exactMatch && query.length >= 2) {
+    html += `
+      <div onclick="document.getElementById('bs-rb-supplier').value='${esc(query)}';document.getElementById('bs-rb-contact-id').value='';document.getElementById('bs-rb-contact-results').style.display='none';"
+        style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;background:rgba(99,102,241,.06);border-top:1px solid var(--border);"
+        onmouseenter="this.style.background='rgba(99,102,241,.12)'" onmouseleave="this.style.background='rgba(99,102,241,.06)'">
+        <span style="font-size:16px;">➕</span>
+        <div>
+          <div style="font-weight:600;font-size:13px;color:var(--accent,#6366F1);">Add "${esc(query)}" as new supplier</div>
+          <div style="font-size:11px;color:var(--muted);">Will create a new contact automatically</div>
+        </div>
+      </div>`;
+  }
+
+  if (!html) {
+    html = `<div style="padding:12px;text-align:center;color:var(--muted);font-size:12px;">Type to search contacts or add a new supplier</div>`;
+  }
+  el.innerHTML = html;
   el.style.display = 'block';
 };
 

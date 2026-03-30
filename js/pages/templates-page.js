@@ -371,7 +371,7 @@ window.doCreateTemplate = async function() {
   const fields = _collectFields();
   const name = document.getElementById('nt-name').value.trim();
   if (!name) return toast('Name required.', 'error');
-  await createTemplate(currentUser.id, {
+  const newTmpl = await createTemplate(currentUser.id, {
     name, description: document.getElementById('nt-desc').value.trim(),
     txType: document.getElementById('nt-type').value || null,
     fields,
@@ -380,7 +380,14 @@ window.doCreateTemplate = async function() {
     currency: document.getElementById('nt-currency')?.value || 'USD',
     isPublic: document.getElementById('nt-public')?.checked || false
   });
-  closeModal(); toast('Template created!', 'success'); navTo('templates');
+  closeModal(); toast('Template created!', 'success');
+  // If created from Business Suite, add to BS tracker and navigate back to BS
+  if (window._bsCreatingTemplate && newTmpl?.id) {
+    if (typeof window._tmplAfterSave === 'function') window._tmplAfterSave(newTmpl.id);
+    window._bsCreatingTemplate = false;
+    if (window._bsNavigate) { window._bsNavigate('bs-templates'); return; }
+  }
+  navTo('templates');
 };
 
 // ── Edit Template ────────────────────────────────────────────────

@@ -409,6 +409,12 @@ async function _doCreate() {
     return;
   }
   toast('Panel created');
+  // If created from Business Suite context, add to BS tracker and return to BS
+  if (window._bsCreatingPanel && panel.id) {
+    if (typeof window._bpAfterSave === 'function') window._bpAfterSave(panel.id);
+    window._bsCreatingPanel = false;
+    if (window._bsNavigate) { window._bsNavigate('bs-panels'); return; }
+  }
   openPanel(panel.id);
 }
 
@@ -416,7 +422,8 @@ async function _doCreate() {
 // PANEL VIEW
 // ─────────────────────────────────────────────────────────────────
 async function openPanel(panelId) {
-  const el = document.getElementById('content');
+  // If inside Business Suite, render in BS content area instead of main content
+  const el = document.getElementById('bs-content') || document.getElementById('content');
   el.innerHTML = '<p style="color:var(--muted);padding:24px;">Loading…</p>';
   const [panel, rows, membership] = await Promise.all([
     getPanel(panelId),
@@ -1559,6 +1566,11 @@ function backToList() {
   _curPanel      = null;
   _curRows       = [];
   _curMembership = null;
+  // If inside Business Suite, navigate back to BS panels
+  if (document.getElementById('bs-content') && window._bsNavigate) {
+    window._bsNavigate('bs-panels');
+    return;
+  }
   renderBusinessPage(document.getElementById('content'));
 }
 
@@ -1715,8 +1727,14 @@ async function togglePublicPanel(panelId, makePublic) {
   const ok = await updatePanel(panelId, { is_public: makePublic });
   if (ok) {
     toast(makePublic ? 'Panel published to Public DB' : 'Panel unpublished', 'success');
-    // Refresh view
-    openPanel(panelId);
+    // Refresh view — if inside a panel view, re-open; if BS list view, re-render
+    if (_curPanel?.id === panelId) {
+      openPanel(panelId);
+    } else if (document.getElementById('bs-content') && window._bsNavigate) {
+      window._bsNavigate('bs-panels');
+    } else {
+      openPanel(panelId);
+    }
   } else {
     toast('Failed to update panel visibility', 'error');
   }

@@ -2266,10 +2266,14 @@ window.saveNewEntry = async function() {
 
   // Combine main note + advance note
   const combinedNote = [note, advNote].filter(Boolean).join(' · ');
+  // If creating from Business Suite, include business_id in metadata at creation time
+  const _bsMeta = window._bsActiveContext && window._bsActiveBizId
+    ? { business_id: window._bsActiveBizId } : null;
   const entry = await createEntry(getCurrentUser().id, {
     contactId, txType, amount: parseFloat(amount), currency, date,
     note: combinedNote,
-    invoiceNumber: invNumber || refNumber || ''
+    invoiceNumber: invNumber || refNumber || '',
+    metadata: _bsMeta
   });
 
   if (!entry || !entry.id) {
@@ -2313,11 +2317,14 @@ window.saveNewEntry = async function() {
   closeModal();
   toast('Entry created.', 'success');
 
-  // If created from Business Suite context, tag with Business ID and return to BS
+  // If created from Business Suite context, metadata already has business_id — return to BS
   if (window._bsActiveContext && entry?.id) {
-    const bizMeta = entry.metadata || {};
-    bizMeta.business_id = window._bsActiveBizId || '';
-    await supabase.from('entries').update({ metadata: bizMeta }).eq('id', entry.id);
+    // Ensure metadata has business_id (belt-and-suspenders — already set at creation)
+    if (!entry.metadata?.business_id && window._bsActiveBizId) {
+      const bizMeta = entry.metadata || {};
+      bizMeta.business_id = window._bsActiveBizId;
+      await supabase.from('entries').update({ metadata: bizMeta }).eq('id', entry.id);
+    }
     window._bsActiveContext = false;
     window._bsActiveBizId = '';
     _invalidateEntries();

@@ -966,8 +966,19 @@ function navTo(page) {
   // Update URL hash for refresh persistence (don't trigger popstate)
   try { history.replaceState(null, '', '#' + page); } catch(_) {}
 
+  // Business Suite: hide all top chrome (topbar, nav, tip bar, mobile tabs)
+  const _isBs = page === 'business-suite';
+  const _topbar = document.getElementById('topbar');
+  const _tipBar = document.getElementById('app-tip-bar');
+  const _navBar = document.getElementById('nav');
+  const _mobileTab = document.getElementById('mobile-tab-bar');
+  if (_topbar) _topbar.style.display = _isBs ? 'none' : '';
+  if (_tipBar) _tipBar.style.display = _isBs ? 'none' : '';
+  if (_navBar) _navBar.style.display = _isBs ? 'none' : '';
+  if (_mobileTab) _mobileTab.style.display = _isBs ? 'none' : '';
+
   // Reset Business Suite layout override when leaving
-  if (page !== 'business-suite') {
+  if (!_isBs) {
     const _c = document.getElementById('content');
     if (_c) { _c.style.maxWidth = ''; _c.style.margin = ''; }
     const _m = document.getElementById('main');

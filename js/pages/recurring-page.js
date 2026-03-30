@@ -377,7 +377,7 @@ window.doSaveRecurring = async function() {
       toast('Recurring rule updated!', 'success');
     } else {
       // Create new rule
-      await createRecurring(currentUser.id, {
+      const newRule = await createRecurring(currentUser.id, {
         contactId: contactId === 'self' ? null : contactId,
         txType,
         customLabel: customLabel || null,
@@ -394,6 +394,12 @@ window.doSaveRecurring = async function() {
       });
       closeModal();
       toast('Recurring rule created!', 'success');
+      // If created from Business Suite, add to BS tracker and navigate back
+      if (window._bsCreatingRecurring && newRule?.id) {
+        if (typeof window._recAfterSave === 'function') window._recAfterSave(newRule.id);
+        window._bsCreatingRecurring = false;
+        if (window._bsNavigate) { window._bsNavigate('bs-recurring'); return; }
+      }
     }
     navTo('recurring');
   } catch (err) {

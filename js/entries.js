@@ -87,7 +87,7 @@ export async function getEntry(id) {
 export async function createEntry(userId, {
   contactId, txType, amount, currency = 'USD', note = '',
   date, invoiceNumber = '', templateId = null, templateData = {},
-  status = 'posted'
+  status = 'posted', metadata = null
 }) {
   // Atomically increment counter via RPC (1 round-trip instead of 2)
   let nextNum = 1;
@@ -116,7 +116,8 @@ export async function createEntry(userId, {
       entry_number: nextNum,
       template_id: templateId,
       template_data: templateData,
-      status
+      status,
+      ...(metadata ? { metadata } : {})
     })
     .select('*, contact:contacts(id, name, email)')
     .single();
