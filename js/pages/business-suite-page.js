@@ -56,6 +56,43 @@ const BS_TOOLS = [
 const BS_CURRENCIES = ['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF','CHF'];
 const BS_EXPENSE_CATEGORIES = ['Stock/Inventory','Transport/Logistics','Utilities','Rent/Lease','Salaries/Wages','Marketing/Ads','Insurance','Professional Services','Office Supplies','Equipment','Maintenance','Travel','Telecommunications','Taxes/Fees','Miscellaneous'];
 
+// ── Business Context Tracker ──────────────────────────────────────
+// Tracks which templates, panels, and recurring rules belong to
+// the business context (vs personal). Only way to add items is
+// through creation in BS or installing from Public DB.
+function _bsItemsKey() { return 'mxi_bs_items_' + (getCurrentUser()?.id || 'def'); }
+
+function _getBsItems() {
+  try {
+    const raw = localStorage.getItem(_bsItemsKey());
+    if (raw) return JSON.parse(raw);
+  } catch(_) {}
+  return { templates: [], panels: [], recurring: [] };
+}
+
+function _saveBsItems(items) {
+  try { localStorage.setItem(_bsItemsKey(), JSON.stringify(items)); } catch(_) {}
+}
+
+function _addBsItem(type, id) {
+  const items = _getBsItems();
+  if (!items[type]) items[type] = [];
+  if (!items[type].includes(id)) items[type].push(id);
+  _saveBsItems(items);
+}
+
+function _removeBsItem(type, id) {
+  const items = _getBsItems();
+  if (!items[type]) return;
+  items[type] = items[type].filter(x => x !== id);
+  _saveBsItems(items);
+}
+
+function _isBsItem(type, id) {
+  const items = _getBsItems();
+  return (items[type] || []).includes(id);
+}
+
 // ── Helpers ───────────────────────────────────────────────────────
 function _bsModKey() { return 'mxi_bs_tools_' + (getCurrentUser()?.id || 'def'); }
 
@@ -202,12 +239,14 @@ async function _bsRenderDash(el) {
   const profile = getCurrentProfile();
   const cur = profile?.default_currency || 'USD';
 
-  // Fetch business entries (invoices, bills)
+  // Fetch business entries (invoices, bills) — filtered by business_id
+  const bizId = _getBizId();
   const { data: entries } = await supabase
     .from('entries')
     .select('*')
     .eq('user_id', user.id)
     .in('tx_type', ['invoice_sent','bill_sent'])
+    .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false })
     .limit(50);
@@ -239,7 +278,34 @@ async function _bsRenderDash(el) {
   const weekEntries = biz.filter(e => new Date(e.created_at) >= weekAgo);
   const monthEntries = biz.filter(e => new Date(e.created_at) >= monthAgo);
 
+  // First-time onboarding check — show setup wizard if no business name set
+  const isNewBusiness = !profile?.company_name && biz.length === 0;
+
   el.innerHTML = `
+    ${isNewBusiness ? `
+    <!-- Welcome Onboarding -->
+    <div class="card" style="padding:28px;text-align:center;margin-bottom:24px;background:linear-gradient(135deg, rgba(99,102,241,.08), rgba(99,102,241,.02));border:1px solid rgba(99,102,241,.15);">
+      <div style="font-size:42px;margin-bottom:12px;">🏢</div>
+      <h2 style="font-size:22px;font-weight:800;margin:0 0 8px;">Welcome to Your Business Suite</h2>
+      <p style="color:var(--muted);font-size:14px;max-width:480px;margin:0 auto 20px;">Your business environment starts completely fresh — separate from your personal records. Set up your branding to get started.</p>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="window._bsNavigate('bs-branding')" style="padding:12px 24px;font-size:14px;font-weight:700;">Set Up Business Branding</button>
+        <button class="btn btn-secondary" onclick="window._bsQuickAction('invoice')" style="padding:12px 24px;font-size:14px;">Create First Invoice</button>
+      </div>
+      <div style="display:flex;gap:16px;justify-content:center;margin-top:20px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);">
+          <span style="color:var(--green,#7fe0d0);">✓</span> Separate from personal data
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);">
+          <span style="color:var(--green,#7fe0d0);">✓</span> Install templates from Public DB
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);">
+          <span style="color:var(--green,#7fe0d0);">✓</span> Invite team operatives
+        </div>
+      </div>
+    </div>
+    ` : ''}
+
     <!-- Business header with branding -->
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
       ${profile?.logo_url ? `<img src="${esc(profile.logo_url)}" style="max-height:48px;max-width:120px;border-radius:8px;object-fit:contain;">` : ''}
@@ -300,6 +366,47 @@ async function _bsRenderDash(el) {
       </div>
     </div>
 
+    <!-- Monthly Revenue Trend (last 6 months) -->
+    ${(() => {
+      const months = [];
+      const now2 = new Date();
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now2.getFullYear(), now2.getMonth() - i, 1);
+        months.push({ key: d.toISOString().slice(0,7), label: d.toLocaleDateString('en', { month: 'short', year: '2-digit' }), invoiced: 0, billed: 0 });
+      }
+      biz.forEach(e => {
+        const m = (e.created_at||'').slice(0,7);
+        const mo = months.find(x => x.key === m);
+        if (!mo) return;
+        if (e.tx_type === 'invoice_sent') mo.invoiced += (e.amount || 0);
+        else if (e.tx_type === 'bill_sent') mo.billed += (e.amount || 0);
+      });
+      const maxVal = Math.max(...months.map(m => Math.max(m.invoiced, m.billed)), 1);
+      return months.some(m => m.invoiced > 0 || m.billed > 0) ? `
+      <div class="card" style="padding:18px;margin-bottom:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div style="font-size:14px;font-weight:700;">Monthly Trend</div>
+          <div style="display:flex;gap:12px;font-size:11px;">
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:2px;background:var(--green,#7fe0d0);"></span> Invoiced</span>
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:2px;background:var(--red,#d07878);"></span> Billed</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:6px;height:100px;">
+          ${months.map(m => {
+            const invH = Math.max(2, Math.round((m.invoiced / maxVal) * 90));
+            const bilH = Math.max(2, Math.round((m.billed / maxVal) * 90));
+            return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">
+              <div style="display:flex;gap:2px;align-items:flex-end;height:90px;">
+                <div style="width:12px;height:${invH}px;background:var(--green,#7fe0d0);border-radius:3px 3px 0 0;" title="Invoiced: ${fmtMoney(m.invoiced, cur)}"></div>
+                <div style="width:12px;height:${bilH}px;background:var(--red,#d07878);border-radius:3px 3px 0 0;" title="Billed: ${fmtMoney(m.billed, cur)}"></div>
+              </div>
+              <div style="font-size:10px;color:var(--muted);white-space:nowrap;">${m.label}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>` : '';
+    })()}
+
     <h3 style="font-size:16px;font-weight:700;margin-bottom:12px;">Recent Business Activity</h3>
     ${biz.length === 0
       ? `<div class="card" style="text-align:center;padding:40px;">
@@ -356,12 +463,14 @@ window._bsQuickAction = function(type) {
 async function _bsRenderInvoices(el) {
   const user = getCurrentUser();
   const cur = getCurrentProfile()?.default_currency || 'USD';
+  const bizId = _getBizId();
 
   const { data } = await supabase
     .from('entries')
     .select('*')
     .eq('user_id', user.id)
     .eq('tx_type', 'invoice_sent')
+    .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false });
 
@@ -442,12 +551,14 @@ window._bsViewEntry = function(entryId) {
 async function _bsRenderBills(el) {
   const user = getCurrentUser();
   const cur = getCurrentProfile()?.default_currency || 'USD';
+  const bizId = _getBizId();
 
   const { data } = await supabase
     .from('entries')
     .select('*')
     .eq('user_id', user.id)
     .eq('tx_type', 'bill_sent')
+    .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false });
 
@@ -518,6 +629,7 @@ async function _bsRenderBills(el) {
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderClients(el) {
   const user = getCurrentUser();
+  const bizId = _getBizId();
   const contacts = await listContacts(user.id);
   _bsContacts = contacts;
 
@@ -526,6 +638,7 @@ async function _bsRenderClients(el) {
     .select('contact_id, contact_name, amount, currency, status, created_at')
     .eq('user_id', user.id)
     .eq('tx_type', 'invoice_sent')
+    .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false });
 
@@ -614,12 +727,14 @@ async function _bsRenderSuppliers(el) {
   const contacts = _bsContacts.length ? _bsContacts : await listContacts(user.id);
   _bsContacts = contacts;
 
-  // Fetch ALL supplier bills (received bills, bills you owe)
+  // Fetch ALL supplier bills (received bills, bills you owe) — business only
+  const bizId = _getBizId();
   const { data: bills } = await supabase
     .from('entries')
     .select('*')
     .eq('user_id', user.id)
     .in('tx_type', ['bill_sent','i_owe'])
+    .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false });
 
@@ -698,6 +813,36 @@ async function _bsRenderSuppliers(el) {
         <div style="font-size:11px;color:var(--muted);">active vendors</div>
       </div>
     </div>
+
+    <!-- Expense Category Breakdown -->
+    ${(() => {
+      const catMap = {};
+      allBills.filter(e => (e.currency||'USD') === cur).forEach(e => {
+        const cat = e.metadata?.expense_category || 'Uncategorized';
+        if (!catMap[cat]) catMap[cat] = { total: 0, count: 0 };
+        catMap[cat].total += (e.amount || 0);
+        catMap[cat].count++;
+      });
+      const cats = Object.entries(catMap).sort((a,b) => b[1].total - a[1].total);
+      const maxTotal = cats.length > 0 ? cats[0][1].total : 1;
+      if (cats.length === 0) return '';
+      return `<div class="card" style="padding:16px;margin-bottom:16px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:10px;">Expense Breakdown</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          ${cats.slice(0,8).map(([cat, data]) => {
+            const pct = Math.round((data.total / maxTotal) * 100);
+            return `<div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:130px;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${cat}">${cat}</div>
+              <div style="flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;">
+                <div style="width:${pct}%;height:100%;background:var(--accent,#6366F1);border-radius:4px;transition:width .3s;"></div>
+              </div>
+              <div style="width:90px;text-align:right;font-size:12px;font-weight:600;">${fmtMoney(data.total, cur)}</div>
+              <div style="width:30px;text-align:right;font-size:11px;color:var(--muted);">${data.count}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    })()}
 
     <!-- Tabs: Bills Log vs Supplier Directory -->
     <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
@@ -970,9 +1115,11 @@ async function _bsRenderRecurring(el) {
   const cur = getCurrentProfile()?.default_currency || 'USD';
   const rules = await listRecurring(user.id);
 
-  // Filter to business-relevant types
+  // Filter to business-relevant types AND only those tracked in business context
   const bizTypes = new Set(['invoice_sent','bill_sent']);
-  const bizRules = rules.filter(r => bizTypes.has(r.tx_type));
+  const bsItems = _getBsItems();
+  const bsRecurringIds = new Set(bsItems.recurring || []);
+  const bizRules = rules.filter(r => bizTypes.has(r.tx_type) && bsRecurringIds.has(r.id));
   const activeRules = bizRules.filter(r => r.active);
   const pausedRules = bizRules.filter(r => !r.active);
   const totalRecurring = activeRules.reduce((s,r) => s + (r.amount||0), 0);
@@ -987,7 +1134,7 @@ async function _bsRenderRecurring(el) {
         <h2 style="font-size:20px;font-weight:800;margin:0;">Recurring Billing</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${bizRules.length} rule${bizRules.length!==1?'s':''} · ${activeRules.length} active · ${fmtMoney(totalRecurring, cur)} recurring revenue</p>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="if(window.openNewRecurringModal)window.openNewRecurringModal()">+ New Rule</button>
+      <button class="btn btn-primary btn-sm" onclick="window._bsCreateRecurring()">+ New Rule</button>
     </div>
 
     <!-- Summary cards -->
@@ -1019,7 +1166,7 @@ async function _bsRenderRecurring(el) {
       ? `<div class="card" style="text-align:center;padding:40px;">
           <div style="font-size:36px;margin-bottom:10px;">🔁</div>
           <p style="color:var(--muted);margin-bottom:12px;">${bizRules.length === 0 ? 'No recurring billing rules yet. Set up automatic invoices or bills on a schedule.' : 'No rules match this filter.'}</p>
-          ${bizRules.length === 0 ? '<button class="btn btn-primary btn-sm" onclick="if(window.openNewRecurringModal)window.openNewRecurringModal()">Create First Rule</button>' : ''}
+          ${bizRules.length === 0 ? '<button class="btn btn-primary btn-sm" onclick="window._bsCreateRecurring()">Create First Rule</button>' : ''}
         </div>`
       : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Contact</th><th>Type</th><th>Amount</th><th>Frequency</th><th>Next Run</th><th>Status</th></tr></thead><tbody>
           ${displayRules.map(r => `<tr>
@@ -1040,7 +1187,10 @@ async function _bsRenderRecurring(el) {
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderPanels(el) {
   const user = getCurrentUser();
-  const panels = await listPanels(user.id);
+  const allPanels = await listPanels(user.id);
+  // Only show panels tracked in the business context
+  const bsPanelIds = new Set(_getBsItems().panels || []);
+  const panels = allPanels.filter(p => bsPanelIds.has(p.id));
 
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
@@ -1049,12 +1199,20 @@ async function _bsRenderPanels(el) {
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${panels.length} panel${panels.length!==1?'s':''} · ${panels.filter(p=>p.is_public).length} published</p>
       </div>
       <div style="display:flex;gap:8px;">
-        <button class="btn btn-primary btn-sm" onclick="if(window._bpEngine?.openCreateModal)window._bpEngine.openCreateModal();else toast('Panel engine not loaded','error');">+ New Panel</button>
+        <button class="btn btn-primary btn-sm" onclick="window._bsCreatePanel()">+ New Panel</button>
         <button class="btn btn-secondary btn-sm" onclick="window._bsNavigate('bs-panel-db')">Browse Public DB</button>
       </div>
     </div>
     ${panels.length === 0
-      ? '<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No business panels yet. Create a custom panel to track structured business data, or import one from the Public DB.</p></div>'
+      ? `<div class="card" style="text-align:center;padding:40px;">
+          <div style="font-size:36px;margin-bottom:10px;">📋</div>
+          <p style="font-weight:700;font-size:15px;margin-bottom:6px;">No business panels yet</p>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Your business starts fresh. Create a new panel or import one from the Public DB.</p>
+          <div style="display:flex;gap:8px;justify-content:center;">
+            <button class="btn btn-primary btn-sm" onclick="window._bsCreatePanel()">Create Panel</button>
+            <button class="btn btn-secondary btn-sm" onclick="window._bsNavigate('bs-panel-db')">Browse Public DB</button>
+          </div>
+        </div>`
       : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
           ${panels.map(p => `
             <div class="card" style="padding:18px;">
@@ -1099,7 +1257,7 @@ async function _bsRenderTemplates(el) {
           <h2 style="font-size:20px;font-weight:800;margin:0;">Template Public DB</h2>
           <p style="color:var(--muted);font-size:13px;margin-top:2px;">${publicTemplates.length} public template${publicTemplates.length!==1?'s':''} available</p>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="if(window.openNewTemplateModal)window.openNewTemplateModal()">+ New Template</button>
+        <button class="btn btn-primary btn-sm" onclick="window._bsCreateTemplate()">+ New Template</button>
       </div>
 
       <!-- Tabs -->
@@ -1152,8 +1310,10 @@ async function _bsRenderTemplates(el) {
     return;
   }
 
-  // ── My Templates tab ──────────────────────────────────
-  const templates = await listTemplates(user.id);
+  // ── My Templates tab — only show business-tracked templates ──
+  const allTemplates = await listTemplates(user.id);
+  const bsTmplIds = new Set(_getBsItems().templates || []);
+  const templates = allTemplates.filter(t => bsTmplIds.has(t.id));
   const display = tq ? templates.filter(t => (t.name||'').toLowerCase().includes(tq) || (t.description||'').toLowerCase().includes(tq)) : templates;
 
   el.innerHTML = `
@@ -1162,7 +1322,7 @@ async function _bsRenderTemplates(el) {
         <h2 style="font-size:20px;font-weight:800;margin:0;">Templates</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${templates.length} template${templates.length!==1?'s':''} · Reusable invoice and form layouts</p>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="if(window.openNewTemplateModal)window.openNewTemplateModal()">+ New Template</button>
+      <button class="btn btn-primary btn-sm" onclick="window._bsCreateTemplate()">+ New Template</button>
     </div>
 
     <!-- Tabs -->
@@ -1187,7 +1347,7 @@ async function _bsRenderTemplates(el) {
           <p style="font-weight:700;font-size:15px;margin-bottom:6px;">${tq ? 'No templates match your search' : 'No templates yet'}</p>
           <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Create your own or install one from the Public DB.</p>
           <div style="display:flex;gap:8px;justify-content:center;">
-            ${!tq ? '<button class="btn btn-primary btn-sm" onclick="if(window.openNewTemplateModal)window.openNewTemplateModal()">Create Template</button>' : ''}
+            ${!tq ? '<button class="btn btn-primary btn-sm" onclick="window._bsCreateTemplate()">Create Template</button>' : ''}
             <button class="btn btn-secondary btn-sm" onclick="window._bsTmplTab=\'public\';window._bsNavigate(\'bs-templates\')">Browse Public DB</button>
           </div>
         </div>`
@@ -1211,11 +1371,68 @@ async function _bsRenderTemplates(el) {
   `;
 }
 
+// ── Business context creation hooks ──────────────────────────────
+// When creating panels/templates from BS, set a flag so the creation
+// flow tags the new item into the business context tracker.
+window._bsCreatePanel = function() {
+  window._bsCreatingPanel = true;
+  if (window._bpEngine?.openCreateModal) window._bpEngine.openCreateModal();
+  else toast('Panel engine not loaded', 'error');
+};
+
+window._bsCreateTemplate = function() {
+  window._bsCreatingTemplate = true;
+  if (window.openNewTemplateModal) window.openNewTemplateModal();
+  else toast('Template builder not loaded', 'error');
+};
+
+window._bsCreateRecurring = function() {
+  window._bsCreatingRecurring = true;
+  if (window.openNewRecurringModal) window.openNewRecurringModal();
+  else toast('Recurring module not loaded', 'error');
+};
+
+// After panel save, check flag and track
+const _origBpAfterSave = window._bpAfterSave;
+window._bpAfterSave = function(panelId) {
+  if (window._bsCreatingPanel && panelId) {
+    _addBsItem('panels', panelId);
+    window._bsCreatingPanel = false;
+    // Navigate back to BS panels
+    setTimeout(() => window._bsNavigate('bs-panels'), 100);
+  }
+  if (typeof _origBpAfterSave === 'function') _origBpAfterSave(panelId);
+};
+
+// After template save, check flag and track
+const _origTmplAfterSave = window._tmplAfterSave;
+window._tmplAfterSave = function(templateId) {
+  if (window._bsCreatingTemplate && templateId) {
+    _addBsItem('templates', templateId);
+    window._bsCreatingTemplate = false;
+    setTimeout(() => window._bsNavigate('bs-templates'), 100);
+  }
+  if (typeof _origTmplAfterSave === 'function') _origTmplAfterSave(templateId);
+};
+
+// After recurring rule save, check flag and track
+const _origRecAfterSave = window._recAfterSave;
+window._recAfterSave = function(ruleId) {
+  if (window._bsCreatingRecurring && ruleId) {
+    _addBsItem('recurring', ruleId);
+    window._bsCreatingRecurring = false;
+    setTimeout(() => window._bsNavigate('bs-recurring'), 100);
+  }
+  if (typeof _origRecAfterSave === 'function') _origRecAfterSave(ruleId);
+};
+
 // Copy/install a public template
 window._bsCopyTemplate = async function(templateId) {
   const user = getCurrentUser();
-  await copyPublicTemplate(user.id, templateId);
-  toast('Template installed to your library', 'success');
+  const newTmpl = await copyPublicTemplate(user.id, templateId);
+  // Track the newly installed template in business context
+  if (newTmpl?.id) _addBsItem('templates', newTmpl.id);
+  toast('Template installed to your business library', 'success');
   window._bsTmplTab = 'mine';
   window._bsNavigate('bs-templates');
 };
@@ -1434,6 +1651,8 @@ window._bsCopyPanel = async function(panelId) {
     .single();
 
   if (error) { toast('Failed to copy: ' + error.message, 'error'); return; }
+  // Track the newly imported panel in business context
+  if (data?.id) _addBsItem('panels', data.id);
   toast('Panel copied to your Business Panels', 'success');
   window._bsNavigate('bs-panels');
 };
@@ -1684,6 +1903,7 @@ async function _bsRenderOperatives(el) {
               <div style="font-size:12px;color:var(--muted);">${esc(op.email || 'No email')}</div>
             </div>
             <span class="badge ${role.badge}" style="font-size:11px;">${role.label}</span>
+            <span class="badge ${op.status === 'active' ? 'badge-blue' : op.status === 'invited' ? 'badge-yellow' : 'badge-gray'}" style="font-size:10px;">${op.status === 'active' ? 'Active' : op.status === 'invited' ? 'Invited' : op.status || 'Active'}</span>
             ${currentUserIsAdmin && !op.is_self ? `
               <div style="display:flex;gap:4px;">
                 <button class="bs sm" onclick="window._bsEditOperative('${op.id}')" title="Edit role">✏️</button>
@@ -2003,6 +2223,28 @@ function _bsRenderSettings(el) {
       </div>
     </div>
 
+    <!-- Danger Zone -->
+    <div class="card" style="padding:18px;margin-bottom:16px;border:1px solid var(--red,#d07878);">
+      <div style="font-size:14px;font-weight:700;margin-bottom:4px;color:var(--red,#d07878);">Danger Zone</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">These actions are irreversible. Proceed with caution.</p>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:rgba(208,120,120,.06);border-radius:8px;border:1px solid rgba(208,120,120,.2);">
+          <div>
+            <div style="font-weight:600;font-size:13px;">Clear Business Tracker</div>
+            <div style="font-size:11px;color:var(--muted);">Remove all business panel/template/recurring associations (data remains, just unlinked from BS)</div>
+          </div>
+          <button class="btn btn-sm" style="background:var(--red,#d07878);color:#fff;border:none;" onclick="window._bsClearTracker()">Clear</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:rgba(208,120,120,.06);border-radius:8px;border:1px solid rgba(208,120,120,.2);">
+          <div>
+            <div style="font-weight:600;font-size:13px;">Reset Operatives</div>
+            <div style="font-size:11px;color:var(--muted);">Remove all team members except yourself (Owner)</div>
+          </div>
+          <button class="btn btn-sm" style="background:var(--red,#d07878);color:#fff;border:none;" onclick="window._bsResetOperatives()">Reset</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Legal Notice -->
     <div style="padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);font-size:11px;color:var(--muted);line-height:1.5;">
       <strong>Legal Disclaimer:</strong> Money IntX is a financial tracking and information system. It does not hold, transfer, or process money. It is not a bank, payment processor, escrow service, or estate planning tool. All financial data is user-defined and for recordkeeping purposes only.
@@ -2013,12 +2255,14 @@ function _bsRenderSettings(el) {
 // Export business data as CSV
 window._bsExportData = async function() {
   const user = getCurrentUser();
+  const bizId = _getBizId();
   toast('Preparing export…', 'info');
   const { data: entries } = await supabase
     .from('entries')
     .select('*')
     .eq('user_id', user.id)
     .in('tx_type', ['invoice_sent','bill_sent'])
+    .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false });
   if (!entries || entries.length === 0) { toast('No business data to export', 'info'); return; }
@@ -2041,6 +2285,21 @@ window._bsExportData = async function() {
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
   toast('Export downloaded', 'success');
+};
+
+window._bsClearTracker = function() {
+  if (!confirm('Clear all business panel, template, and recurring associations? Your data remains — items are just unlinked from the Business Suite.')) return;
+  _saveBsItems({ templates: [], panels: [], recurring: [] });
+  toast('Business tracker cleared', 'success');
+  window._bsNavigate('bs-settings');
+};
+
+window._bsResetOperatives = function() {
+  if (!confirm('Remove all operatives except yourself? This cannot be undone.')) return;
+  const ops = _getOperatives().filter(o => o.is_self);
+  _saveOperatives(ops);
+  toast('Operatives reset — only you remain', 'success');
+  window._bsNavigate('bs-settings');
 };
 
 window._bsToggleTool = function(id, enabled) {

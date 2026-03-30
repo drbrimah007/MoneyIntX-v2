@@ -755,7 +755,14 @@ async function enterApp(user) {
 
   // ── Sync modules from DB (cross-device) ────────────────────────
   if (currentProfile?.enabled_modules && typeof currentProfile.enabled_modules === 'object') {
-    localStorage.setItem(_modsKey(), JSON.stringify(currentProfile.enabled_modules));
+    // Merge: DB modules with local overrides (preserve locally-enabled modules)
+    const _localMods = (() => { try { const r = localStorage.getItem(_modsKey()); return r ? JSON.parse(r) : {}; } catch(_) { return {}; } })();
+    const _merged = { ...currentProfile.enabled_modules };
+    // If a module was enabled locally but not in DB, keep it enabled
+    for (const k of Object.keys(_localMods)) {
+      if (_localMods[k] === true && _merged[k] !== true) _merged[k] = true;
+    }
+    localStorage.setItem(_modsKey(), JSON.stringify(_merged));
   }
 
   // ── Cross-user login linking (SECURITY DEFINER RPC) ─────────────
@@ -956,6 +963,8 @@ function navTo(page) {
   if (window._navHistory.length > 20) window._navHistory.shift();
   window._currentPage = page;
   localStorage.setItem('mxi_last_page', page);
+  // Update URL hash for refresh persistence (don't trigger popstate)
+  try { history.replaceState(null, '', '#' + page); } catch(_) {}
 
   // Reset Business Suite layout override when leaving
   if (page !== 'business-suite') {
@@ -982,7 +991,7 @@ function navTo(page) {
     case 'business':    if (!_modEnabled('business'))    { navTo('dash'); return; } renderBusinessPage(content); break;
     case 'business-suite':
       if (!_modEnabled('business-suite')) {
-        // Auto-enable if user explicitly navigated here (hash or last_page)
+        // Auto-enable + persist to DB so cross-device sync doesn't revert it
         const _m = _getModules(); _m['business-suite'] = true; _saveModules(_m);
       }
       renderBusinessSuite(content); break;
