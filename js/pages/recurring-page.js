@@ -392,6 +392,11 @@ window.doSaveRecurring = async function() {
         notifyMessage: notifyMessage || null,
         note: note || null
       });
+      if (!newRule) {
+        closeModal();
+        toast('Failed to create recurring rule.', 'error');
+        return;
+      }
       closeModal();
       toast('Recurring rule created!', 'success');
       // If created from Business Suite context, add to BS tracker

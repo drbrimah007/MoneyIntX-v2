@@ -1420,7 +1420,7 @@ async function _bsRenderPanels(el) {
                 </div>
                 <div style="font-size:11px;color:var(--muted);margin-top:6px;">Published ${fmtRelative(p.created_at)}</div>
                 <div style="margin-top:10px;display:flex;gap:6px;">
-                  ${!isOwn ? `<button class="btn btn-primary btn-sm" onclick="window._bsCopyPanel('${p.id}')">📋 Copy</button>` : `<button class="btn btn-secondary btn-sm" onclick="if(window._bpEngine?.openPanel)window._bpEngine.openPanel('${p.id}');">Open</button>`}
+                  <button class="btn btn-primary btn-sm" onclick="window._bsCopyPanel('${p.id}')">📋 Install</button>
                   <button class="bs sm" onclick="window._bsPreviewPanel('${p.id}')" style="font-size:12px;">👁 Preview</button>
                 </div>
               </div>`;
