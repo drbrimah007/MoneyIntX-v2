@@ -51,9 +51,11 @@ async function loadRecord() {
   const token = params.get('t');
   if (!token) { card.innerHTML = '<p style="text-align:center;color:var(--red);padding:20px;">No token provided.</p>'; return; }
 
+  // Query share_tokens only — no JOIN to entries/contacts
+  // This allows anonymous (not-logged-in) users to view the record via entry_snapshot
   const { data: share, error } = await supabase
     .from('share_tokens')
-    .select('*, entry:entries(*, contact:contacts(name,email))')
+    .select('*')
     .eq('token', token)
     .single();
 
@@ -64,18 +66,18 @@ async function loadRecord() {
     await supabase.from('share_tokens').update({ status:'viewed', viewed_at:new Date().toISOString() }).eq('id', share.id);
   }
 
-  const e = share.entry || {};
+  // All display data comes from the snapshot stored at share-time
   const snap = share.entry_snapshot || {};
-  const amount = e.amount || snap.amount || 0;
-  const currency = e.currency || snap.currency || 'USD';
-  const txType = e.tx_type || snap.tx_type || 'they_owe_you';
+  const amount = snap.amount || 0;
+  const currency = snap.currency || 'USD';
+  const txType = snap.tx_type || 'they_owe_you';
   const flippedType = FLIP[txType] || txType;
-  const fromName = snap.from_name || e.from_name || 'Someone';
-  const date = e.date || snap.date || '';
-  const note = e.note || snap.note || '';
-  const invNum = e.invoice_number || snap.invoice_number || '';
-  const status = e.status || snap.status || 'posted';
-  const settled = e.settled_amount || 0;
+  const fromName = snap.from_name || 'Someone';
+  const date = snap.date || '';
+  const note = snap.note || '';
+  const invNum = snap.invoice_number || '';
+  const status = snap.status || 'posted';
+  const settled = snap.settled_amount || 0;
   const remaining = amount - settled;
 
   const recipientLabel = TX_LABELS[flippedType] || flippedType;
