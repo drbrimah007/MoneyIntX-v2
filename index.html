@@ -980,7 +980,7 @@ function navTo(page) {
     case 'groups':      if (!_modEnabled('groups'))      { navTo('dash'); return; } renderGroups(content); break;
     case 'investments': if (!_modEnabled('investments')) { navTo('dash'); return; } renderInvestments(content); break;
     case 'business':    if (!_modEnabled('business'))    { navTo('dash'); return; } renderBusinessPage(content); break;
-    case 'business-suite': renderBusinessSuite(content); break;
+    case 'business-suite': if (!_modEnabled('business-suite')) { navTo('dash'); return; } renderBusinessSuite(content); break;
     case 'templates': renderTemplatesPage(content); break;
     case 'recurring': renderRecurringPage(content); break;
     case 'notifications': renderNotifications(content); break;
@@ -1015,10 +1015,11 @@ window.goBack = function() {
 
 // ── Optional modules ──────────────────────────────────────────────
 window.OPTIONAL_MODULES = [
-  { id:'groups',      label:'Groups',         icon:'👥', desc:'Group rounds, contributions and shared expenses.' },
-  { id:'investments', label:'Investments',    icon:'📈', desc:'Track investment pools and member returns.' },
-  { id:'business',    label:'Business Panel', icon:'📊', desc:'Structured table tool with sessions and P&L tracking.' },
-  { id:'nok',         label:'Trusted Access', icon:'🔐', desc:'Designate trusted contacts to receive your records.' },
+  { id:'groups',          label:'Groups',          icon:'👥', desc:'Group rounds, contributions and shared expenses.' },
+  { id:'investments',     label:'Investments',     icon:'📈', desc:'Track investment pools and member returns.' },
+  { id:'business',        label:'Business Panel',  icon:'📊', desc:'Structured table tool with sessions and P&L tracking.' },
+  { id:'business-suite',  label:'Business Suite',  icon:'💼', desc:'Full business environment — invoices, bills, clients, suppliers, recurring and more.' },
+  { id:'nok',             label:'Trusted Access',  icon:'🔐', desc:'Designate trusted contacts to receive your records.' },
 ];
 const OPTIONAL_MODULES = window.OPTIONAL_MODULES;
 

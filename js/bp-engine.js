@@ -331,7 +331,7 @@ export async function renderBusinessPage(el) {
   const _panelCard = (p, badge) => `<div class="card" style="cursor:pointer;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;"
     onclick="window._bpEngine.openPanel('${p.id}')">
     <div>
-      <div style="font-size:16px;font-weight:700;margin-bottom:4px;">${esc(p.title)}${badge ? ` <span style="font-size:11px;background:rgba(99,102,241,.15);color:var(--accent);padding:1px 7px;border-radius:10px;font-weight:600;margin-left:6px;">${badge}</span>` : ''}</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:4px;">${esc(p.title)}${badge ? ` <span style="font-size:11px;background:rgba(99,102,241,.15);color:var(--accent);padding:1px 7px;border-radius:10px;font-weight:600;margin-left:6px;">${badge}</span>` : ''}${p.is_public ? ' <span style="font-size:10px;background:rgba(99,214,154,.15);color:var(--green,#7fe0d0);padding:1px 7px;border-radius:10px;font-weight:600;">Public</span>' : ''}</div>
       <div style="font-size:12px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;">
         <span>${p.currency}</span><span>·</span>
         <span>${p.session_type === 'weekly' ? '📅 Weekly' : '📆 Monthly'}</span><span>·</span>
@@ -471,6 +471,7 @@ function renderPanelView(el) {
       ${isOwner ? `<button class="bs sm" onclick="window._bpEngine.openFieldBuilder()">⚙ Fields</button>
       <button class="bs sm" onclick="window._bpEngine.openMembersModal()">👥 Members</button>
       <button class="bs sm" onclick="window._bpEngine.openArchiveView('${p.id}')">🗂 Archive</button>
+      <button class="bs sm" onclick="window._bpEngine.togglePublicPanel('${p.id}',${!p.is_public})">${p.is_public ? '🔒 Unpublish' : '🌐 Publish to Public DB'}</button>
       <button class="bs sm" style="color:var(--red);" onclick="window._bpEngine._bpDeletePanel('${p.id}')">🗑 Delete</button>` : ''}
       ${canAdd ? `<button class="btn btn-primary btn-sm" onclick="window._bpEngine.openAddRowModal('${todayKey}')">+ Add Row</button>` : ''}
     </div>
@@ -1709,6 +1710,18 @@ async function _bpmSaveAll() {
   document.getElementById('bpMembersBg')?.remove();
 }
 
+// ── Publish / Unpublish panel to Public DB ────────────────────────
+async function togglePublicPanel(panelId, makePublic) {
+  const ok = await updatePanel(panelId, { is_public: makePublic });
+  if (ok) {
+    toast(makePublic ? 'Panel published to Public DB' : 'Panel unpublished', 'success');
+    // Refresh view
+    openPanel(panelId);
+  } else {
+    toast('Failed to update panel visibility', 'error');
+  }
+}
+
 // ── Expose to window ──────────────────────────────────────────────
 export function exposeBpEngine() {
   window._bpEngine = {
@@ -1723,6 +1736,7 @@ export function exposeBpEngine() {
     toggleFoldedSession, archiveSession,
     openArchiveView,
     openMembersModal, _bpmAdd, _bpmAddByUserId, _bpmRemove, _bpmSaveAll,
-    _bpDeletePanel
+    _bpDeletePanel,
+    togglePublicPanel
   };
 }

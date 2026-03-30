@@ -1777,9 +1777,7 @@ const NE_TABS = [
     id: 'i-owe', emoji: '+', label: 'I Owe Them', color: 'var(--owe-color, #8D8CFF)',
     borderActive: 'rgba(141,140,255,.3)', bgActive: 'rgba(141,140,255,.1)',
     actions: [
-      { category: 'i_owe',             label: 'I owe them',         icon: '💸', extra: [] },
-      { category: 'bill_received',     label: 'Receive a bill',     icon: '📬', extra: ['due_date','ref_number'] },
-      { category: 'invoice_received',  label: 'Receive an invoice', icon: '📩', extra: ['inv_number','due_date'] }
+      { category: 'i_owe',             label: 'I owe them',         icon: '💸', extra: [] }
     ]
   },
   {
@@ -1802,12 +1800,15 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
 
   // Determine initial tab from legacy defaultDirection arg
   const isInvoice = defaultDirection === 'invoice';
+  const isBill = defaultDirection === 'bill';
   const initTabId = (defaultDirection === 'you_owe_them' || defaultDirection === 'i-owe') ? 'i-owe'
                   : defaultDirection === 'advance'      ? 'advance'
                   : 'owe-me';
   window._neTab      = initTabId;
-  // If invoice shortcut, pre-select invoice_sent; otherwise first action in tab
-  window._neCategory = isInvoice ? 'invoice_sent' : NE_TABS.find(t => t.id === initTabId).actions[0].category;
+  // If invoice/bill shortcut, pre-select that category; otherwise first action in tab
+  window._neCategory = isInvoice ? 'invoice_sent'
+                     : isBill    ? 'bill_sent'
+                     : NE_TABS.find(t => t.id === initTabId).actions[0].category;
 
   const selectedContact = window._neSelectedContactId ? contacts.find(c => c.id === window._neSelectedContactId) : null;
   const contactDisplayVal = selectedContact ? selectedContact.name : '';
@@ -1930,6 +1931,10 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
   `, { maxWidth: '500px' });
 
   window._entryDirection = initTabId;
+
+  // Render extra fields + toggle items visibility for the initial category
+  const _initAction = initTab.actions.find(a => a.category === window._neCategory) || initTab.actions[0];
+  _neRenderExtraFields(_initAction); // also calls _neToggleItems()
 
   setTimeout(() => {
     document.addEventListener('click', function _cls(e) {
@@ -2130,7 +2135,7 @@ function _neToggleItems() {
   const itemsSection = document.getElementById('ne-items-section');
   const amtHint = document.getElementById('ne-amount-hint');
   if (!itemsSection) return;
-  const showItems = ['invoice_sent','invoice_received','bill_sent','bill_received'].includes(window._neCategory);
+  const showItems = ['invoice_sent','bill_sent'].includes(window._neCategory);
   itemsSection.style.display = showItems ? '' : 'none';
   if (amtHint) amtHint.style.display = showItems ? '' : 'none';
   if (showItems && document.querySelectorAll('#ne-items-rows > div').length === 0) {

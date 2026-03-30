@@ -11,7 +11,7 @@ import { listRecurring, createRecurring, updateRecurring, toggleRecurring, delet
 // ── Type system: grouped by direction ──────────────────────────────
 const RECURRING_TYPES = [
   { group: 'Owed to Me', types: ['owed_to_me', 'invoice_sent', 'bill_sent', 'advance_received'] },
-  { group: 'I Owe', types: ['i_owe', 'invoice_received', 'bill_received', 'advance_paid'] },
+  { group: 'I Owe', types: ['i_owe', 'advance_paid'] },
   { group: 'Other', types: [] }
 ];
 

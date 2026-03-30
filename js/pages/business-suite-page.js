@@ -33,6 +33,7 @@ const BS_TOOLS = [
   { id: 'bs-templates',  icon: '📑', label: 'Templates',        always: true },
   { id: 'bs-investments',icon: '📈', label: 'Investments',      always: true },
   { id: 'bs-panel-db',   icon: '🌐', label: 'Panel Public DB',  always: true },
+  { id: 'bs-operatives', icon: '🔑', label: 'Operatives',       always: true },
   { id: 'bs-settings',   icon: '⚙️', label: 'Suite Settings',   always: true },
 ];
 
@@ -167,6 +168,7 @@ async function _bsRenderSection(section) {
     case 'bs-templates':   await _bsRenderTemplates(el); break;
     case 'bs-investments': await _bsRenderInvestments(el); break;
     case 'bs-panel-db':    await _bsRenderPanelDB(el); break;
+    case 'bs-operatives':  await _bsRenderOperatives(el); break;
     case 'bs-settings':    _bsRenderSettings(el); break;
     default:               await _bsRenderDash(el); break;
   }
@@ -185,7 +187,7 @@ async function _bsRenderDash(el) {
     .from('entries')
     .select('*')
     .eq('user_id', user.id)
-    .in('tx_type', ['invoice_sent','bill_sent','bill_received','invoice_received'])
+    .in('tx_type', ['invoice_sent','bill_sent'])
     .is('archived_at', null)
     .order('created_at', { ascending: false })
     .limit(50);
@@ -253,8 +255,6 @@ function _bsTxLabel(type) {
   const map = {
     invoice_sent: 'Invoice',
     bill_sent: 'Bill',
-    invoice_received: 'Invoice Received',
-    bill_received: 'Bill Received',
     owed_to_me: 'Receivable',
     i_owe: 'Payable',
     advance_paid: 'Advance Out',
@@ -269,7 +269,7 @@ window._bsQuickAction = function(type) {
   if (type === 'invoice') {
     if (window.openNewEntryModal) window.openNewEntryModal('invoice');
   } else if (type === 'bill') {
-    if (window.openNewEntryModal) window.openNewEntryModal('you_owe_them');
+    if (window.openNewEntryModal) window.openNewEntryModal('bill');
   }
 };
 
@@ -480,7 +480,7 @@ async function _bsRenderRecurring(el) {
   const rules = await listRecurring(user.id);
 
   // Filter to business-relevant types
-  const bizTypes = new Set(['invoice_sent','bill_sent','invoice_received','bill_received']);
+  const bizTypes = new Set(['invoice_sent','bill_sent']);
   const bizRules = rules.filter(r => bizTypes.has(r.tx_type));
 
   el.innerHTML = `
@@ -685,6 +685,232 @@ window._bsCopyPanel = async function(panelId) {
   if (error) { toast('Failed to copy: ' + error.message, 'error'); return; }
   toast('Panel copied to your Business Panels', 'success');
   window._bsNavigate('bs-panels');
+};
+
+// ══════════════════════════════════════════════════════════════════
+// SECTION: Operatives — Team roles & permissions
+// ══════════════════════════════════════════════════════════════════
+
+const BS_ROLES = [
+  { id: 'owner',   label: 'Owner',   badge: 'badge-purple', desc: 'Full control — manage team, settings, all tools' },
+  { id: 'admin',   label: 'Admin',   badge: 'badge-blue',   desc: 'Manage entries, clients, panels — cannot delete suite' },
+  { id: 'manager', label: 'Manager', badge: 'badge-gray',   desc: 'Create entries, view clients, limited editing' },
+  { id: 'viewer',  label: 'Viewer',  badge: 'badge-yellow', desc: 'Read-only access to all data' }
+];
+
+const BS_ROLE_PERMS = {
+  owner:   { canManageTeam: true,  canManageTools: true,  canCreateEntries: true, canEditEntries: true, canDeleteEntries: true, canManagePanels: true, canViewAll: true, canExport: true },
+  admin:   { canManageTeam: true,  canManageTools: false, canCreateEntries: true, canEditEntries: true, canDeleteEntries: true, canManagePanels: true, canViewAll: true, canExport: true },
+  manager: { canManageTeam: false, canManageTools: false, canCreateEntries: true, canEditEntries: false,canDeleteEntries: false,canManagePanels: false,canViewAll: true, canExport: false },
+  viewer:  { canManageTeam: false, canManageTools: false, canCreateEntries: false,canEditEntries: false,canDeleteEntries: false,canManagePanels: false,canViewAll: true, canExport: false }
+};
+
+function _bsOpKey() { return 'mxi_bs_operatives_' + (getCurrentUser()?.id || 'def'); }
+
+function _getOperatives() {
+  try {
+    const raw = localStorage.getItem(_bsOpKey());
+    if (raw) return JSON.parse(raw);
+  } catch(_) {}
+  // Default: current user is Owner
+  const u = getCurrentUser();
+  const p = getCurrentProfile();
+  const defaults = [{
+    id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36),
+    name: p?.display_name || u?.email || 'You',
+    email: u?.email || '',
+    role: 'owner',
+    status: 'active',
+    added_at: new Date().toISOString(),
+    is_self: true
+  }];
+  try { localStorage.setItem(_bsOpKey(), JSON.stringify(defaults)); } catch(_) {}
+  return defaults;
+}
+
+function _saveOperatives(ops) {
+  try { localStorage.setItem(_bsOpKey(), JSON.stringify(ops)); } catch(_) {}
+}
+
+async function _bsRenderOperatives(el) {
+  const operatives = _getOperatives();
+  const currentUserIsOwner = operatives.some(o => o.is_self && o.role === 'owner');
+  const currentUserIsAdmin = operatives.some(o => o.is_self && (o.role === 'owner' || o.role === 'admin'));
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h2 style="font-size:20px;font-weight:800;margin:0;">Operatives</h2>
+        <p style="color:var(--muted);font-size:13px;margin-top:2px;">Manage team members and their roles within your business</p>
+      </div>
+      ${currentUserIsAdmin ? `<button class="btn btn-primary sm" onclick="window._bsAddOperative()">+ Add Operative</button>` : ''}
+    </div>
+
+    <!-- Role legend -->
+    <div class="card" style="padding:16px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;">Role Permissions</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">
+        ${BS_ROLES.map(r => `
+          <div style="padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);">
+            <span class="badge ${r.badge}" style="font-size:11px;">${r.label}</span>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">${r.desc}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <!-- Operatives list -->
+    <div class="card" style="padding:0;overflow:hidden;">
+      ${operatives.length === 0 ? `
+        <div style="padding:40px;text-align:center;color:var(--muted);">No operatives yet</div>
+      ` : operatives.map(op => {
+        const role = BS_ROLES.find(r => r.id === op.role) || BS_ROLES[3];
+        const perms = BS_ROLE_PERMS[op.role] || BS_ROLE_PERMS.viewer;
+        return `
+          <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid var(--border);">
+            <div style="width:38px;height:38px;border-radius:50%;background:${op.is_self ? 'var(--accent,#6366F1)' : 'var(--bg3)'};display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0;border:2px solid var(--border);">
+              ${esc((op.name||'?').charAt(0).toUpperCase())}
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:14px;">${esc(op.name)} ${op.is_self ? '<span style="font-size:11px;color:var(--muted);">(You)</span>' : ''}</div>
+              <div style="font-size:12px;color:var(--muted);">${esc(op.email || 'No email')}</div>
+            </div>
+            <span class="badge ${role.badge}" style="font-size:11px;">${role.label}</span>
+            ${currentUserIsAdmin && !op.is_self ? `
+              <div style="display:flex;gap:4px;">
+                <button class="bs sm" onclick="window._bsEditOperative('${op.id}')" title="Edit role">✏️</button>
+                <button class="bs sm" onclick="window._bsRemoveOperative('${op.id}')" title="Remove" style="color:var(--red,#e57373);">✕</button>
+              </div>
+            ` : ''}
+          </div>`;
+      }).join('')}
+    </div>
+
+    <!-- Permissions matrix -->
+    <div class="card" style="padding:16px;margin-top:16px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;">Permissions Matrix</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border);">
+              <th style="text-align:left;padding:8px 10px;color:var(--muted);font-weight:600;">Permission</th>
+              ${BS_ROLES.map(r => `<th style="text-align:center;padding:8px 6px;font-weight:600;">${r.label}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${Object.keys(BS_ROLE_PERMS.owner).map(perm => {
+              const label = perm.replace(/^can/, '').replace(/([A-Z])/g, ' $1').trim();
+              return `<tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:8px 10px;color:var(--text);font-weight:500;">${label}</td>
+                ${BS_ROLES.map(r => {
+                  const has = BS_ROLE_PERMS[r.id]?.[perm];
+                  return `<td style="text-align:center;padding:8px 6px;">${has ? '<span style="color:var(--green,#5fd39a);">✓</span>' : '<span style="color:var(--muted);">—</span>'}</td>`;
+                }).join('')}
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+window._bsAddOperative = function() {
+  openModal(`
+    <div class="modal-title">Add Operative</div>
+    <div class="form-group">
+      <label>Name *</label>
+      <input type="text" id="bs-op-name" placeholder="Full name" style="width:100%;">
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="bs-op-email" placeholder="email@example.com" style="width:100%;">
+    </div>
+    <div class="form-group">
+      <label>Role *</label>
+      <select id="bs-op-role" style="width:100%;">
+        ${BS_ROLES.filter(r => r.id !== 'owner').map(r => `<option value="${r.id}">${r.label} — ${r.desc}</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="bs sm" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary sm" onclick="window._bsSaveNewOperative()">Add Operative</button>
+    </div>
+  `, { maxWidth: '440px' });
+};
+
+window._bsSaveNewOperative = function() {
+  const name = (document.getElementById('bs-op-name')?.value || '').trim();
+  const email = (document.getElementById('bs-op-email')?.value || '').trim();
+  const role = document.getElementById('bs-op-role')?.value || 'viewer';
+  if (!name) { toast('Name is required', 'error'); return; }
+
+  const ops = _getOperatives();
+  ops.push({
+    id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36),
+    name, email, role,
+    status: 'active',
+    added_at: new Date().toISOString(),
+    is_self: false
+  });
+  _saveOperatives(ops);
+  closeModal();
+  toast('Operative added', 'success');
+  _bsRenderOperatives(document.getElementById('bs-content'));
+};
+
+window._bsEditOperative = function(opId) {
+  const ops = _getOperatives();
+  const op = ops.find(o => o.id === opId);
+  if (!op) return;
+
+  openModal(`
+    <div class="modal-title">Edit Operative</div>
+    <div class="form-group">
+      <label>Name</label>
+      <input type="text" id="bs-op-name" value="${esc(op.name)}" style="width:100%;">
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="bs-op-email" value="${esc(op.email||'')}" style="width:100%;">
+    </div>
+    <div class="form-group">
+      <label>Role</label>
+      <select id="bs-op-role" style="width:100%;">
+        ${BS_ROLES.filter(r => r.id !== 'owner').map(r => `<option value="${r.id}" ${r.id===op.role?'selected':''}>${r.label} — ${r.desc}</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="bs sm" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary sm" onclick="window._bsSaveEditOperative('${opId}')">Save</button>
+    </div>
+  `, { maxWidth: '440px' });
+};
+
+window._bsSaveEditOperative = function(opId) {
+  const name = (document.getElementById('bs-op-name')?.value || '').trim();
+  const email = (document.getElementById('bs-op-email')?.value || '').trim();
+  const role = document.getElementById('bs-op-role')?.value || 'viewer';
+  if (!name) { toast('Name is required', 'error'); return; }
+
+  const ops = _getOperatives();
+  const idx = ops.findIndex(o => o.id === opId);
+  if (idx < 0) return;
+  ops[idx].name = name;
+  ops[idx].email = email;
+  ops[idx].role = role;
+  _saveOperatives(ops);
+  closeModal();
+  toast('Operative updated', 'success');
+  _bsRenderOperatives(document.getElementById('bs-content'));
+};
+
+window._bsRemoveOperative = function(opId) {
+  if (!confirm('Remove this operative?')) return;
+  const ops = _getOperatives().filter(o => o.id !== opId);
+  _saveOperatives(ops);
+  toast('Operative removed', 'success');
+  _bsRenderOperatives(document.getElementById('bs-content'));
 };
 
 // ══════════════════════════════════════════════════════════════════
