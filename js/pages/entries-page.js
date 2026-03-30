@@ -17,6 +17,18 @@ let _pendingSharesAll = null; // null = not yet loaded; [] = loaded but empty
 let _entriesPage = 1;
 let _entriesFilter = '';
 
+// Helper: navigate back after entry action — stays in BS if inside Business Suite
+function _navAfterAction() {
+  _invalidateEntries();
+  const insideBS = document.getElementById('bs-content') && window._bsNavigate;
+  if (insideBS) {
+    const section = localStorage.getItem('mxi_bs_section') || 'bs-invoices';
+    window._bsNavigate(section);
+  } else {
+    navTo('entries');
+  }
+}
+
 // Reset cache — called from navTo before renderEntries
 export function resetEntriesCache() { _entriesAll = []; _pendingSharesAll = null; }
 
@@ -611,7 +623,7 @@ window.saveEditEntry = async function(id) {
   });
   closeModal();
   toast('Entry updated.', 'success');
-  _invalidateEntries(); navTo('entries');
+  _navAfterAction();
 };
 
 window.saveEditTemplateEntry = async function(entryId, templateId) {
@@ -662,7 +674,7 @@ window.saveEditTemplateEntry = async function(entryId, templateId) {
   });
   closeModal();
   toast('Entry updated.', 'success');
-  _invalidateEntries(); navTo('entries');
+  _navAfterAction();
 };
 
 // ── Settle Modal ──────────────────────────────────────────────────
@@ -747,7 +759,7 @@ window.saveSettlement = async function(entryId) {
   });
   closeModal();
   toast('Settlement recorded.', 'success');
-  _invalidateEntries(); navTo('entries');
+  _navAfterAction();
 };
 
 // ── Mark as Paid Modal (spec section 6) ──────────────────────────
@@ -940,7 +952,7 @@ window.saveMarkPaid = async function(entryId, currency) {
 
     closeModal();
     toast('Payment recorded ✓', 'success');
-    _invalidateEntries(); navTo('entries');
+    _navAfterAction();
   } catch (err) {
     toast('Error: ' + (err?.message || err), 'error');
     if (btn) { btn.disabled = false; btn.textContent = '💳 Save'; }
@@ -1047,7 +1059,7 @@ window.saveRecordFulfillment = async function(entryId) {
 
     closeModal();
     toast('Advance marked as fulfilled ✓', 'success');
-    _invalidateEntries(); navTo('entries');
+    _navAfterAction();
   } catch (err) {
     toast('Error: ' + (err?.message || err), 'error');
     if (btn) { btn.disabled = false; btn.textContent = '✅ Mark Fulfilled'; }
@@ -1234,7 +1246,7 @@ window.sendInvoiceNotification = async function(entryId) {
 
   closeModal();
   toast('Email sent.' + (sendEmail && cEmail ? ' Queued for delivery.' : ''), 'success');
-  _invalidateEntries(); navTo('entries');
+  _navAfterAction();
 };
 
 // ── Void / Archive handlers ───────────────────────────────────────
@@ -1242,14 +1254,14 @@ window.handleVoidEntry = async function(id) {
   if (!confirm('Void this entry? This cannot be undone.')) return;
   await voidEntry(id);
   toast('Entry voided.', 'success');
-  _invalidateEntries(); navTo('entries');
+  _navAfterAction();
 };
 
 window.handleArchiveEntry = async function(id, action) {
   if (action === 'archive') await archiveEntry(id);
   else await unarchiveEntry(id);
   toast(action === 'archive' ? 'Entry archived.' : 'Entry unarchived.', 'success');
-  _invalidateEntries(); navTo('entries');
+  _navAfterAction();
 };
 
 // ── Share Entry — 1-step flow (generate link + show share options immediately) ──
@@ -1744,7 +1756,7 @@ window.doSendReminder = async function(entryId) {
     closeModal();
     toast(`Reminder scheduled for ${new Date(schedDate).toLocaleDateString()}${repeatDays > 0 ? ', repeating every ' + repeatDays + ' days' : ''}`, 'success');
   }
-  _invalidateEntries(); navTo('entries');
+  _navAfterAction();
 };
 
 // ── Tab definitions for new entry modal ───────────────────────────────────────
@@ -1861,15 +1873,15 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
       <label>Amount * <span id="ne-amount-hint" style="display:none;font-size:10px;font-weight:400;color:var(--accent);">(auto from items)</span></label>
       <div class="inline-row">
         <input type="number" id="ne-amount" min="0" step="0.01" placeholder="0.00" style="flex:1;min-width:0;">
-        <select id="ne-currency" style="flex:0 0 90px;">
+        <select id="ne-currency" style="flex:0 0 68px;font-size:12px;">
           ${['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'].map(c => `<option value="${c}" ${(getCurrentProfile()?.default_currency||'USD')===c?'selected':''}>${c}</option>`).join('')}
         </select>
       </div>
     </div>
     <div id="ne-extra-fields"></div>
-    <div class="inline-row" style="gap:12px;margin-bottom:16px;">
-      <div class="fg" style="flex:1;"><label>Issue Date</label><input type="date" id="ne-date" value="${new Date().toISOString().slice(0,10)}"></div>
-      <div class="fg" style="flex:1;"><label>Due Date <span style="font-weight:400;color:var(--muted);">(optional)</span></label><input type="date" id="ne-due-date"></div>
+    <div class="inline-row" style="gap:8px;margin-bottom:16px;">
+      <div class="fg" style="flex:0 0 auto;"><label>Issue Date</label><input type="date" id="ne-date" value="${new Date().toISOString().slice(0,10)}"></div>
+      <div class="fg" style="flex:0 0 auto;"><label>Due Date <span style="font-weight:400;color:var(--muted);">(optional)</span></label><input type="date" id="ne-due-date"></div>
     </div>
     <!-- EMAIL section with ON/OFF toggle -->
     <div style="margin-bottom:12px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
@@ -2485,14 +2497,19 @@ window.confirmDeleteEntry = async function(id) {
   if (!confirm('Delete this entry?')) return;
   await deleteEntry(id);
   toast('Entry deleted.', 'success');
-  _invalidateEntries(); navTo('entries');
+  _navAfterAction();
 };
 
 // ── Selection / Bulk Actions ─────────────────────────────────────
 window.toggleSelectMode = function() {
   window._selectMode = !window._selectMode;
   if (!window._selectMode) window._selectedEntries.clear();
-  navTo('entries');
+  if (document.getElementById('bs-content') && window._bsNavigate) {
+    const section = localStorage.getItem('mxi_bs_section') || 'bs-invoices';
+    window._bsNavigate(section);
+  } else {
+    navTo('entries');
+  }
 };
 
 window.selectAllEntries = function(checked) {
@@ -2502,7 +2519,12 @@ window.selectAllEntries = function(checked) {
   } else {
     window._selectedEntries.clear();
   }
-  navTo('entries');
+  if (document.getElementById('bs-content') && window._bsNavigate) {
+    const section = localStorage.getItem('mxi_bs_section') || 'bs-invoices';
+    window._bsNavigate(section);
+  } else {
+    navTo('entries');
+  }
 };
 
 window.toggleEntrySelect = function(id, checked) {
@@ -2542,6 +2564,11 @@ window.bulkAction = async function(action) {
   window._selectedEntries.clear();
   window._selectMode = false;
   _invalidateEntries();
-  navTo('entries');
+  if (document.getElementById('bs-content') && window._bsNavigate) {
+    const section = localStorage.getItem('mxi_bs_section') || 'bs-invoices';
+    window._bsNavigate(section);
+  } else {
+    navTo('entries');
+  }
 };
 

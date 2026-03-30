@@ -206,7 +206,7 @@ export async function renderBusinessSuite(el) {
           <button class="bs-mobile-nav-btn" onclick="window._bsNavigate('bs-bills')" title="Bills">📄</button>
           <button class="bs-mobile-nav-btn bs-mobile-nav-plus" onclick="openModal(\`<div style='text-align:center;padding:20px;'><p style='font-weight:700;margin-bottom:16px;'>Quick Actions</p><div style='display:flex;flex-direction:column;gap:8px;'><button class='btn btn-primary' onclick='closeModal();window._bsNavigate(&quot;bs-clients&quot;)'>New Client</button><button class='btn btn-primary' onclick='closeModal();window._bsNavigate(&quot;bs-suppliers&quot;)'>New Supplier</button></div></div>\`)" title="Add">+</button>
           <button class="bs-mobile-nav-btn" onclick="window._bsNavigate('bs-clients')" title="Clients">👥</button>
-          <button class="bs-mobile-nav-btn" onclick="document.getElementById('bs-sidebar').classList.toggle('bs-sidebar-open')" title="Menu">⋯</button>
+          <button class="bs-mobile-nav-btn" onclick="window._bsNavigate('bs-back')" title="Back to Personal">←</button>
         </nav>
       </div>
     </div>
@@ -679,11 +679,12 @@ async function _bsRenderClients(el) {
   const contacts = await listContacts(user.id);
   _bsContacts = contacts;
 
+  // Include ALL business transaction types so any interacted contact appears as a client
   const { data: invoices } = await supabase
     .from('entries')
-    .select('contact_id, contact_name, amount, currency, status, created_at')
+    .select('contact_id, contact_name, amount, currency, status, tx_type, created_at')
     .eq('user_id', user.id)
-    .in('tx_type', BS_INVOICE_TYPES)
+    .in('tx_type', [...BS_INVOICE_TYPES, ...BS_BILL_TYPES, 'owed_to_me', 'i_owe', 'they_owe_you', 'you_owe_them'])
     .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false });

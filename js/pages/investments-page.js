@@ -182,15 +182,6 @@ window.openNewInvestmentModal = async function() {
       </div>
     </div>
 
-    <!-- Access mode -->
-    <div class="form-group" style="margin-top:12px;">
-      <label>Access Mode</label>
-      <select id="ni-access">
-        <option value="private">Private — only you</option>
-        <option value="shared">Shared — partners can view</option>
-        <option value="open">Open — any linked contact</option>
-      </select>
-    </div>
 
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="bs sm" onclick="closeModal()">Cancel</button>
@@ -228,7 +219,7 @@ window.doCreateInvestment = async function() {
     status: document.getElementById('ni-status').value,
     currency: document.getElementById('ni-currency').value || 'USD',
     ventureType,
-    accessMode: document.getElementById('ni-access').value,
+    accessMode: ventureType === 'shared' ? 'shared' : 'private',
     initialAmount: parseFloat(document.getElementById('ni-amount').value) || 0,
     expectedReturn: parseFloat(document.getElementById('ni-return').value) || null
   });

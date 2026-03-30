@@ -458,10 +458,7 @@ function _renderPublicPanelList(panels) {
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
-          ${isOwn
-            ? `<button class="btn btn-primary btn-sm" onclick="window._bpEngine.copyPublicPanel('${p.id}')">📋 Copy</button>
-               <button class="btn btn-secondary btn-sm" onclick="window._bpEngine.openPanel('${p.id}')">Open</button>`
-            : `<button class="btn btn-primary btn-sm" onclick="window._bpEngine.copyPublicPanel('${p.id}')">📋 Copy</button>`}
+          <button class="btn btn-primary btn-sm" onclick="window._bpEngine.copyPublicPanel('${p.id}')">📋 Install</button>
           <button class="btn btn-secondary btn-sm" onclick="window._bpEngine.previewPublicPanel('${p.id}')">👁 Preview</button>
         </div>
       </div>
@@ -506,7 +503,7 @@ function previewPublicPanel(panelId) {
       <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">${esc(p.session_type === 'weekly' ? 'Weekly' : 'Monthly')} · ${esc(p.currency || 'USD')} · ${fields.length} field${fields.length !== 1 ? 's' : ''}</div>
       ${fieldHtml}
       <div style="display:flex;gap:8px;margin-top:16px;">
-        <button class="btn btn-primary btn-sm" onclick="window._bpEngine.copyPublicPanel('${panelId}');if(window.closeModal)closeModal();">📋 Copy to My Ledgers</button>
+        <button class="btn btn-primary btn-sm" onclick="window._bpEngine.copyPublicPanel('${panelId}');if(window.closeModal)closeModal();">📋 Install to My Ledgers</button>
         <button class="bs sm" onclick="if(window.closeModal)closeModal();">Close</button>
       </div>
     </div>`;
