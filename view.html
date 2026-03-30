@@ -20,7 +20,7 @@ input,textarea { background:var(--bg3); color:var(--text); border:1px solid var(
 <body>
 <div class="card" id="view-card">
   <div style="text-align:center;padding:20px 0;">
-    <div style="font-size:32px;margin-bottom:8px;">💰</div>
+    <img src="https://moneyinteractions.com/money.png" style="height:40px;margin-bottom:8px;" alt="Money IntX">
     <p style="color:var(--muted);font-size:14px;">Loading shared record...</p>
   </div>
 </div>
@@ -31,12 +31,20 @@ import { supabase } from './js/supabase.js';
 const TX_LABELS = {
   they_owe_you:'They Owe Me', you_owe_them:'I Owe Them',
   they_paid_you:'They Settled Me', you_paid_them:'I Settled Them',
-  invoice:'Invoice', bill:'Bill'
+  invoice:'Invoice', bill:'Bill',
+  owed_to_me:'Owed to Me', i_owe:'I Owe',
+  invoice_sent:'Invoice Sent', invoice_received:'Invoice Received',
+  bill_sent:'Bill Sent', bill_received:'Bill Received',
+  advance_paid:'Advance Paid', advance_received:'Advance Received'
 };
 const FLIP = {
   they_owe_you:'you_owe_them', you_owe_them:'they_owe_you',
   they_paid_you:'you_paid_them', you_paid_them:'they_paid_you',
-  invoice:'invoice', bill:'bill'
+  invoice:'bill', bill:'invoice',
+  owed_to_me:'i_owe', i_owe:'owed_to_me',
+  invoice_sent:'invoice_received', invoice_received:'invoice_sent',
+  bill_sent:'bill_received', bill_received:'bill_sent',
+  advance_paid:'advance_received', advance_received:'advance_paid'
 };
 
 function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
@@ -81,11 +89,12 @@ async function loadRecord() {
   const remaining = amount - settled;
 
   const recipientLabel = TX_LABELS[flippedType] || flippedType;
+  const recipientLabelClean = recipientLabel.includes('_') ? recipientLabel.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : recipientLabel;
   const isOwe = flippedType === 'you_owe_them' || flippedType === 'bill';
 
   card.innerHTML = `
     <div style="text-align:center;margin-bottom:20px;">
-      <div style="font-size:28px;margin-bottom:6px;">💰</div>
+      <img src="https://moneyinteractions.com/money.png" style="height:36px;margin-bottom:6px;" alt="Money IntX">
       <p style="font-size:13px;color:var(--accent);font-weight:600;">Money IntX — Shared Record</p>
     </div>
 
@@ -95,7 +104,7 @@ async function loadRecord() {
     </div>
 
     <div style="background:var(--bg3);border-radius:12px;padding:20px;text-align:center;margin-bottom:20px;">
-      <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">${esc(recipientLabel)}</div>
+      <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">${esc(recipientLabelClean)}</div>
       <div style="font-size:36px;font-weight:900;margin:8px 0;color:${isOwe ? 'var(--red)' : 'var(--green)'};">${fmtMoney(remaining > 0 ? remaining : amount, currency)}</div>
       ${settled > 0 ? `<div style="font-size:13px;color:var(--muted);">Original: ${fmtMoney(amount,currency)} · Settled: ${fmtMoney(settled,currency)}</div>` : ''}
       <div style="margin-top:8px;">
@@ -113,7 +122,7 @@ async function loadRecord() {
         <div style="font-weight:600;margin-top:4px;">${esc(invNum)}</div>
       </div>` : `<div style="background:var(--bg3);border-radius:10px;padding:12px;">
         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Type</div>
-        <div style="font-weight:600;margin-top:4px;">${esc(recipientLabel)}</div>
+        <div style="font-weight:600;margin-top:4px;">${esc(recipientLabelClean)}</div>
       </div>`}
     </div>
 

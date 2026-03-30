@@ -26,8 +26,11 @@ export async function createRecurring(userId, { contactId, templateId, frequency
     notify_self: notifySelf,
     notify_email: notifyEmail
   }).select().single();
-  if (error) console.error('[createRecurring]', error.message);
-  return data;
+  if (error) {
+    console.error('[createRecurring]', error.message);
+    return null;
+  }
+  return data || null;
 }
 
 export async function updateRecurring(id, updates) {

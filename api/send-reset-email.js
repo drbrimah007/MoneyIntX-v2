@@ -78,7 +78,7 @@ export default async function handler(req, res) {
     <tr><td align="center">
       <table width="480" cellpadding="0" cellspacing="0" style="background:#0d1b2e;border-radius:16px;padding:36px 32px;max-width:480px;width:100%;">
         <tr><td align="center" style="padding-bottom:24px;">
-          <div style="font-size:38px;margin-bottom:8px;">🔐</div>
+          <img src="https://moneyinteractions.com/money.png" alt="Money IntX" style="height:44px;margin-bottom:10px;" />
           <h1 style="margin:0 0 6px;font-size:22px;font-weight:800;color:#eef4ff;">Reset Your Password</h1>
           <p style="margin:0;font-size:14px;color:#8892a4;">We received a request to reset the password for your Money IntX account.</p>
         </td></tr>

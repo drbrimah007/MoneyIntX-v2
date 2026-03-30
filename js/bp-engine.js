@@ -458,7 +458,10 @@ function _renderPublicPanelList(panels) {
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
-          ${!isOwn ? `<button class="btn btn-primary btn-sm" onclick="window._bpEngine.copyPublicPanel('${p.id}')">📋 Copy</button>` : `<button class="btn btn-secondary btn-sm" onclick="window._bpEngine.openPanel('${p.id}')">Open</button>`}
+          ${isOwn
+            ? `<button class="btn btn-primary btn-sm" onclick="window._bpEngine.copyPublicPanel('${p.id}')">📋 Copy</button>
+               <button class="btn btn-secondary btn-sm" onclick="window._bpEngine.openPanel('${p.id}')">Open</button>`
+            : `<button class="btn btn-primary btn-sm" onclick="window._bpEngine.copyPublicPanel('${p.id}')">📋 Copy</button>`}
           <button class="btn btn-secondary btn-sm" onclick="window._bpEngine.previewPublicPanel('${p.id}')">👁 Preview</button>
         </div>
       </div>
@@ -503,7 +506,7 @@ function previewPublicPanel(panelId) {
       <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">${esc(p.session_type === 'weekly' ? 'Weekly' : 'Monthly')} · ${esc(p.currency || 'USD')} · ${fields.length} field${fields.length !== 1 ? 's' : ''}</div>
       ${fieldHtml}
       <div style="display:flex;gap:8px;margin-top:16px;">
-        ${!isOwn ? `<button class="btn btn-primary btn-sm" onclick="window._bpEngine.copyPublicPanel('${panelId}');if(window.closeModal)closeModal();">📋 Copy to My Ledgers</button>` : ''}
+        <button class="btn btn-primary btn-sm" onclick="window._bpEngine.copyPublicPanel('${panelId}');if(window.closeModal)closeModal();">📋 Copy to My Ledgers</button>
         <button class="bs sm" onclick="if(window.closeModal)closeModal();">Close</button>
       </div>
     </div>`;
@@ -531,9 +534,16 @@ async function copyPublicPanel(panelId) {
     session_type: srcPanel.session_type
   });
   if (error || !newPanel) { toast('Failed to copy ledger', 'error'); return; }
-  // Copy fields to the new panel
+  // Copy fields to the new panel, stripping any instance data
   if (srcPanel.fields && srcPanel.fields.length) {
-    await updatePanel(newPanel.id, { fields: srcPanel.fields });
+    const cleanFields = srcPanel.fields.map(f => {
+      const clean = { ...f };
+      delete clean.value;
+      delete clean.defaultValue;
+      delete clean.lastValue;
+      return clean;
+    });
+    await updatePanel(newPanel.id, { fields: cleanFields });
   }
   toast('Ledger copied to My Ledgers!', 'success');
   // If inside BS context, add to BS tracker
@@ -776,10 +786,8 @@ function renderOpenSession(p, rows, colFields, rowFields, sessionKey, label) {
       <button class="btn btn-primary btn-sm" onclick="window._bpEngine.openAddRowModal('${sessionKey}')">+ Add Row</button>
     </div>`;
 
-  if (!rows.length) {
-    html += `<div style="text-align:center;padding:32px;color:var(--muted);font-size:14px;">No entries yet. Add your first row above.</div>`;
-  } else {
-    // Table
+  // Always show table headers so users understand the ledger structure
+  {
     html += `<div class="tbl-wrap"><table><thead><tr>
       <th style="width:80px;">Date</th>`;
     colFields.forEach(f => {
@@ -791,6 +799,11 @@ function renderOpenSession(p, rows, colFields, rowFields, sessionKey, label) {
       html += `<th style="color:var(--accent);">${esc(f.label)}</th>`;
     });
     html += `<th style="width:52px;"></th></tr></thead><tbody>`;
+  }
+
+  if (!rows.length) {
+    html += `<tr><td colspan="${1 + colFields.length + rowFields.length + 1}" style="text-align:center;padding:28px;color:var(--muted);font-size:14px;">No entries yet. Add your first row above.</td></tr>`;
+  } else {
 
     rows.forEach(row => {
       const allColVals = computeColFields(p.fields, row.values || {});
@@ -845,6 +858,9 @@ function renderOpenSession(p, rows, colFields, rowFields, sessionKey, label) {
       }
       html += `</div>`;
     }
+  } else {
+    // Close table for empty state (headers were already rendered above)
+    html += `</tbody></table></div>`;
   }
 
   html += `</div>`;

@@ -86,6 +86,8 @@ export async function renderNotifications(el) {
         actionBtn = `<button onclick="navTo('entries')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View</button>`;
       } else if (n.entry_id && (n.type === 'settlement_pending' || n.type === 'payment_received')) {
         actionBtn = `<button onclick="openEntryDetail('${n.entry_id}', { reviewMode: true })" style="background:var(--amber,#D5BA78);color:#000;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:700;margin-right:4px;">Review</button>`;
+      } else if (!n.entry_id && n.type === 'settlement_pending') {
+        actionBtn = `<button onclick="navTo('entries')" style="background:var(--amber,#D5BA78);color:#000;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View Entries</button>`;
       } else if (n.entry_id) {
         actionBtn = `<button onclick="openEntryDetail('${n.entry_id}')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View</button>`;
       }

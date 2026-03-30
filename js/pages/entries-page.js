@@ -920,7 +920,7 @@ window.saveMarkPaid = async function(entryId, currency) {
         user_id: linkedUserId, type: contactType,
         message: `${fromName} recorded a payment of ${fmtAmt}${note ? ' — ' + note : ''}`,
         amount: amountCents, currency: cur,
-        contact_name: fromName, entry_id: mirrorEntryId || entryId, read: false
+        contact_name: fromName, entry_id: mirrorEntryId || null, read: false
       });
     }
 

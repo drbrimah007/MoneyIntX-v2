@@ -366,7 +366,7 @@
     <button class="nav-btn" data-page="entries" onclick="app.navigate('entries')">Entries</button>
     <button class="nav-btn" id="nav-groups" data-page="groups" onclick="app.navigate('groups')">Groups</button>
     <button class="nav-btn" id="nav-investments" data-page="investments" onclick="app.navigate('investments')">Investments</button>
-    <button class="nav-btn" id="nav-business" data-page="business" onclick="app.navigate('business')">Business</button>
+    <button class="nav-btn" id="nav-business" data-page="business" onclick="app.navigate('business')">Ledgers</button>
     <button class="nav-btn" id="nav-business-suite" data-page="business-suite" onclick="app.navigate('business-suite')" style="font-weight:700;">Business Suite</button>
     <button class="nav-btn" data-page="templates" onclick="app.navigate('templates')">Templates</button>
     <button class="nav-btn" data-page="recurring" onclick="app.navigate('recurring')">Recurring</button>
@@ -406,7 +406,7 @@
         <span style="font-size:20px;width:28px;text-align:center;">📈</span> Investments
       </button>
       <button id="mob-business" onclick="closeMobileMore();app.navigate('business')" style="display:flex;align-items:center;gap:14px;padding:14px 24px;font-size:15px;font-weight:500;cursor:pointer;color:var(--text);background:none;border:none;width:100%;text-align:left;">
-        <span style="font-size:20px;width:28px;text-align:center;">📊</span> Business
+        <span style="font-size:20px;width:28px;text-align:center;">📊</span> Ledgers
       </button>
       <button id="mob-business-suite" onclick="closeMobileMore();app.navigate('business-suite')" style="display:flex;align-items:center;gap:14px;padding:14px 24px;font-size:15px;font-weight:700;cursor:pointer;color:var(--text);background:none;border:none;width:100%;text-align:left;">
         <span style="font-size:20px;width:28px;text-align:center;">💼</span> Business Suite
@@ -1059,7 +1059,7 @@ window.goBack = function() {
 window.OPTIONAL_MODULES = [
   { id:'groups',          label:'Groups',          icon:'👥', desc:'Group rounds, contributions and shared expenses.' },
   { id:'investments',     label:'Investments',     icon:'📈', desc:'Track investment pools and member returns.' },
-  { id:'business',        label:'Business Ledger',  icon:'📊', desc:'Structured ledger with sessions and P&L tracking.' },
+  { id:'business',        label:'Ledger',  icon:'📊', desc:'Structured ledger with sessions and P&L tracking.' },
   { id:'business-suite',  label:'Business Suite',  icon:'💼', desc:'Full business environment — invoices, bills, clients, suppliers, recurring and more.' },
   { id:'nok',             label:'Trusted Access',  icon:'🔐', desc:'Designate trusted contacts to receive your records.' },
 ];

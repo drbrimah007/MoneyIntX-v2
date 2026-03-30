@@ -20,14 +20,15 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_token       record;
-  v_entry       record;
-  v_from_name   text;
-  v_from_email  text;
-  v_contact_id  uuid;
-  v_new_entry_id uuid;
-  v_flipped_type text;
-  v_entry_number bigint;
+  v_token           record;
+  v_entry           record;
+  v_from_name       text;
+  v_from_email      text;
+  v_contact_id      uuid;
+  v_new_entry_id    uuid;
+  v_flipped_type    text;
+  v_entry_number    bigint;
+  v_recipient_name  text;
 
   v_flip        jsonb := '{
     "they_owe_you":     "you_owe_them",
@@ -70,6 +71,12 @@ BEGIN
     NULLIF(v_token.entry_snapshot->>'from_name', ''),
     (SELECT display_name FROM users WHERE id = v_token.sender_id LIMIT 1),
     'Someone'
+  );
+
+  -- 3b. Resolve recipient's display name for contact_name in notification
+  v_recipient_name := COALESCE(
+    (SELECT display_name FROM users WHERE id = p_recipient_id LIMIT 1),
+    'Contact'
   );
 
   -- 4. Resolve from_email
@@ -150,14 +157,15 @@ BEGIN
 
   -- 9. Notify sender
   IF v_token.sender_id IS NOT NULL THEN
-    INSERT INTO notifications (user_id, type, message, entry_id, amount, currency, read)
+    INSERT INTO notifications (user_id, type, message, entry_id, amount, currency, contact_name, read)
     VALUES (
       v_token.sender_id,
       'shared_record',
-      v_from_name || '''s shared record was confirmed.',
+      v_recipient_name || '''s shared record was confirmed.',
       v_token.entry_id,
       v_entry.amount,
       v_entry.currency,
+      v_recipient_name,
       false
     );
   END IF;
