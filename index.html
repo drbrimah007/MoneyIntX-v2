@@ -949,9 +949,9 @@ async function enterApp(user) {
     }, 600);
   }
   // Process scheduled reminders + recurring rules every 60s
-  setInterval(() => { processDueReminders(user.id, { emailFn: sendNotificationEmail }); processDueRecurring(user.id); }, 60000);
+  setInterval(() => { processDueReminders(user.id, { emailFn: sendNotificationEmail }); processDueRecurring(user.id, { emailFn: sendNotificationEmail }); }, 60000);
   processDueReminders(user.id, { emailFn: sendNotificationEmail });
-  processDueRecurring(user.id);
+  processDueRecurring(user.id, { emailFn: sendNotificationEmail });
 
   // Realtime: live updates across devices
   subscribeToEntries(user.id,

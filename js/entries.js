@@ -87,7 +87,7 @@ export async function getEntry(id) {
 export async function createEntry(userId, {
   contactId, txType, amount, currency = 'USD', note = '',
   date, invoiceNumber = '', templateId = null, templateData = {},
-  status = 'posted', metadata = null
+  status = 'posted', metadata = null, source = 'manual', recurringRuleId = null
 }) {
   // Atomically increment counter via RPC (1 round-trip instead of 2)
   let nextNum = 1;
@@ -114,8 +114,9 @@ export async function createEntry(userId, {
     invoice_number: invoiceNumber,
     entry_number: nextNum,
     status,
-    source: 'manual'
+    source: source || 'manual'
   };
+  if (recurringRuleId) insertPayload.recurring_rule_id = recurringRuleId;
   if (templateId) insertPayload.template_id = templateId;
   if (templateId && templateData && Object.keys(templateData).length > 0) insertPayload.template_data = templateData;
   if (metadata) insertPayload.metadata = metadata;

@@ -5,7 +5,7 @@ import { toCents, createEntry } from './entries.js';
 export async function listRecurring(userId) {
   const { data, error } = await supabase
     .from('recurring_rules')
-    .select('*, contact:contacts(id, name), template:templates(id, name)')
+    .select('*, contact:contacts(id, name, email, linked_user_id), template:templates(id, name)')
     .eq('user_id', userId)
     .order('next_run_at');
   if (error) console.error('[listRecurring]', error.message);
@@ -60,7 +60,6 @@ export async function processDueRecurring(userId, { emailFn } = {}) {
     .lte('next_run_at', now);
   if (!due?.length) return [];
 
-  // Resolve sender name once
   let senderName = 'Someone';
   try {
     const { data: profile } = await supabase.from('users').select('display_name, email').eq('id', userId).single();
@@ -70,37 +69,28 @@ export async function processDueRecurring(userId, { emailFn } = {}) {
   const processed = [];
   for (const rule of due) {
     try {
-      // Check max_runs limit
       if (rule.max_runs && rule.run_count >= rule.max_runs) {
         await supabase.from('recurring_rules').update({ active: false }).eq('id', rule.id);
         continue;
       }
 
-      // Create the entry — tagged as recurring with rule link
       const entry = await createEntry(userId, {
-        contactId: rule.contact_id,
-        txType: rule.tx_type,
-        amount: rule.amount / 100,
-        currency: rule.currency,
-        note: rule.note || '',
-        templateId: rule.template_id,
-        source: 'recurring',
-        recurringRuleId: rule.id
+        contactId: rule.contact_id, txType: rule.tx_type,
+        amount: rule.amount / 100, currency: rule.currency,
+        note: rule.note || '', templateId: rule.template_id,
+        source: 'recurring', recurringRuleId: rule.id
       });
 
       if (!entry) {
         console.error('[processDueRecurring] createEntry returned null for rule', rule.id);
-        continue; // Don't update run_count if entry wasn't created
+        continue;
       }
 
-      // ── Notifications (mirrors reminders.js pattern) ──────────
       const contactName = rule.contact?.name || 'contact';
       const linkedUserId = rule.contact?.linked_user_id;
       const contactEmail = rule.contact?.email;
       const amtLabel = (rule.amount / 100).toLocaleString('en-US', { style: 'currency', currency: rule.currency || 'USD' });
-      const msg = rule.notify_message || `Recurring entry created: ${amtLabel}`;
 
-      // Notify linked contact (in-app)
       if (rule.auto_notify && linkedUserId && (rule.notify_contact !== false)) {
         await supabase.from('notifications').insert({
           user_id: linkedUserId, type: 'notification',
@@ -110,7 +100,6 @@ export async function processDueRecurring(userId, { emailFn } = {}) {
         }).then(r => { if (r.error) console.warn('[recurring notif contact]', r.error.message); });
       }
 
-      // Notify self (in-app)
       if (rule.notify_self !== false) {
         await supabase.from('notifications').insert({
           user_id: userId, type: 'notification',
@@ -120,20 +109,18 @@ export async function processDueRecurring(userId, { emailFn } = {}) {
         }).then(r => { if (r.error) console.warn('[recurring notif self]', r.error.message); });
       }
 
-      // Email to contact (if enabled and email function provided)
       if (rule.auto_notify && rule.notify_email && contactEmail && emailFn) {
         try {
           await emailFn(userId, {
             to: contactEmail, fromName: senderName,
             txType: rule.tx_type, amount: rule.amount,
             currency: rule.currency || 'USD',
-            message: msg, entryId: entry.id,
+            message: rule.notify_message || '', entryId: entry.id,
             isReminder: false, siteUrl: 'https://moneyinteractions.com'
           });
         } catch (e) { console.warn('[recurring email]', e); }
       }
 
-      // ── Calculate next run ────────────────────────────────────
       const freq = { daily: 1, weekly: 7, biweekly: 14, monthly: 30, quarterly: 90, yearly: 365, custom: rule.custom_days || 30 };
       const days = freq[rule.frequency] || 30;
       const nextRun = new Date(Date.now() + days * 86400000).toISOString();
@@ -145,7 +132,6 @@ export async function processDueRecurring(userId, { emailFn } = {}) {
       processed.push(rule);
     } catch (err) {
       console.error('[processDueRecurring] Failed for rule', rule.id, err?.message || err);
-      // Don't update run_count — will retry next interval
     }
   }
   return processed;
