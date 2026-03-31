@@ -38,7 +38,7 @@ export async function listEntries(userId, { status, txType, contactId, limit, of
 
   let query = supabase
     .from('entries')
-    .select('*, contact:contacts(id, name, email)')
+    .select('*, contact:contacts(id, name, email, linked_user_id)')
     .eq('user_id', userId)
     .is('archived_at', null)
     .order(orderBy, { ascending });
@@ -63,7 +63,7 @@ export async function recentEntries(userId, limit = 15) {
   if (all) return all.slice(0, limit);
   const { data, error } = await supabase
     .from('entries')
-    .select('*, contact:contacts(id, name, email)')
+    .select('*, contact:contacts(id, name, email, linked_user_id)')
     .eq('user_id', userId)
     .is('archived_at', null)
     .order('created_at', { ascending: false })
@@ -113,7 +113,8 @@ export async function createEntry(userId, {
     date: date || new Date().toISOString().slice(0, 10),
     invoice_number: invoiceNumber,
     entry_number: nextNum,
-    status
+    status,
+    source: 'manual'
   };
   if (templateId) insertPayload.template_id = templateId;
   if (templateId && templateData && Object.keys(templateData).length > 0) insertPayload.template_data = templateData;
@@ -122,7 +123,7 @@ export async function createEntry(userId, {
   const { data, error } = await supabase
     .from('entries')
     .insert(insertPayload)
-    .select('*, contact:contacts(id, name, email)')
+    .select('*, contact:contacts(id, name, email, linked_user_id)')
     .single();
   if (error) {
     console.error('[createEntry]', error.message, error.details, error.hint);

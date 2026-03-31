@@ -9,7 +9,6 @@ import { listTemplates } from '../templates.js';
 import { createScheduledReminder } from '../reminders.js';
 import { esc, statusBadge, TX_LABELS, TX_COLORS, DIRECTION_SIGN, fmtDate, toast, openModal, closeModal } from '../ui.js';
 import { supabase } from '../supabase.js';
-import { createSettlement, reviewSettlement, deleteSettlement } from '../settlements.js';
 import { sendNotificationEmail } from '../email.js';
 import { renderDash } from './dashboard.js';
 
@@ -17,6 +16,22 @@ let _entriesAll = [];
 let _pendingSharesAll = null; // null = not yet loaded; [] = loaded but empty
 let _entriesPage = 1;
 let _entriesFilter = '';
+
+// ── Double-click prevention: global processing lock ──────────────
+let _isProcessing = false;
+function _lockAction() {
+  if (_isProcessing) return false; // already locked
+  _isProcessing = true;
+  return true; // lock acquired
+}
+function _unlockAction() { _isProcessing = false; }
+
+// ── ID-based dedup safety net ────────────────────────────────────
+function _dedupById(arr) {
+  const map = new Map();
+  arr.forEach(x => map.set(x.id, x));
+  return Array.from(map.values());
+}
 
 // Helper: navigate back after entry action — stays in BS if inside Business Suite
 function _navAfterAction() {
@@ -43,7 +58,7 @@ export async function renderEntries(el, page, forceRefresh) {
   // Parallelise entries + pending shares to avoid sequential waterfall
   {
     const needEntries = _entriesAll.length === 0 || forceRefresh;
-    const needShares  = _pendingSharesAll === null || forceRefresh;
+    const needShares  = true;  // Always re-fetch pending shares (they change externally via notifications)
     if (needEntries || needShares) {
       if (window._impersonatedData) {
         if (needEntries) _entriesAll = window._impersonatedData.entries || [];
@@ -53,8 +68,8 @@ export async function renderEntries(el, page, forceRefresh) {
         promises.push(needEntries ? listEntries(getCurrentUser().id) : Promise.resolve(null));
         promises.push(needShares  ? listReceivedShares(getCurrentUser().id).catch(() => []) : Promise.resolve(null));
         const [entriesResult, sharesResult] = await Promise.all(promises);
-        if (entriesResult !== null) _entriesAll = entriesResult;
-        if (sharesResult !== null) _pendingSharesAll = (sharesResult || []).filter(s => s.status !== 'confirmed' && s.status !== 'dismissed');
+        if (entriesResult !== null) _entriesAll = _dedupById(entriesResult);
+        if (sharesResult !== null) _pendingSharesAll = _dedupById((sharesResult || []).filter(s => s.status !== 'confirmed' && s.status !== 'dismissed'));
       }
     }
   }
@@ -222,7 +237,7 @@ window.openEntryDetail = async function(id, options) {
     }
   }
   if (!entry) return toast('Entry not found.', 'error');
-  const cName = entry.contact?.name || '—';
+  const cName = entry.contact?.name || entry.from_name || '—';
   const _ecat    = entry.category || entry.tx_type;
   const txLabel  = TX_LABELS[_ecat] || _ecat;
   const txColor  = TX_COLORS[_ecat] || 'var(--text)';
@@ -385,90 +400,52 @@ window.openEntryDetail = async function(id, options) {
 
 // ── Confirm / Reject Settlement ──────────────────────────────────
 window.confirmSettlement = async function(settlementId, entryId, reviewMode) {
+  if (!_lockAction()) return; // prevent double-click
   try {
-    const result = await reviewSettlement(settlementId, {
-      status: 'confirmed',
-      reviewedBy: getCurrentUser().id
+    // Atomic RPC: confirms settlement, trigger recalcs, notifies recorder
+    const { data: rpcResult, error } = await supabase.rpc('confirm_mirror_settlement', {
+      p_settlement_id: settlementId,
+      p_reviewed_by:   getCurrentUser().id
     });
-    if (!result) {
-      toast('Failed to confirm settlement.', 'error');
+    if (error) throw error;
+    if (!rpcResult?.ok) {
+      toast(rpcResult?.error || 'Failed to confirm settlement.', 'error');
       return;
     }
     toast('Settlement confirmed.', 'success');
-    invalidateEntryCache(getCurrentUser().id);
-
-    // Notify the recorder that their payment was confirmed
-    try {
-      const entry = await getEntry(entryId);
-      if (entry?.linked_entry_id) {
-        const { data: linkedEntry } = await supabase
-          .from('entries').select('user_id').eq('id', entry.linked_entry_id).maybeSingle();
-        if (linkedEntry?.user_id && linkedEntry.user_id !== getCurrentUser().id) {
-          const myName = getCurrentProfile()?.display_name || 'Someone';
-          await supabase.from('notifications').insert({
-            user_id: linkedEntry.user_id, type: 'settlement_confirmed',
-            message: `${myName} confirmed your payment of ${fmtMoney(result.amount, entry.currency || 'USD')}`,
-            amount: result.amount, currency: entry.currency || 'USD',
-            contact_name: myName, entry_id: entry.linked_entry_id, read: false
-          });
-        }
-      }
-    } catch (_) { /* notification is non-critical */ }
-
+    // DB is truth — clear ALL caches, then re-fetch fresh
+    _invalidateEntries();
     closeModal();
     await window.openEntryDetail(entryId, { reviewMode: reviewMode || false });
   } catch (err) {
     console.error('[confirmSettlement]', err);
     toast('Error confirming settlement: ' + (err?.message || err), 'error');
-  }
+  } finally { _unlockAction(); }
 };
 
 window.rejectSettlement = async function(settlementId, entryId, reviewMode) {
   if (!confirm('Reject this settlement? It will be removed.')) return;
+  if (!_lockAction()) return;
   try {
-    // Get settlement details before deleting (for notification)
-    const { data: settlement } = await supabase.from('settlements').select('*').eq('id', settlementId).maybeSingle();
-
-    const ok = await deleteSettlement(settlementId);
-    if (!ok) {
-      toast('Failed to reject settlement.', 'error');
+    // Atomic RPC: deletes both settlements in pair, trigger recalcs, notifies recorder
+    const { data: rpcResult, error } = await supabase.rpc('reject_mirror_settlement', {
+      p_settlement_id: settlementId,
+      p_rejected_by:   getCurrentUser().id
+    });
+    if (error) throw error;
+    if (!rpcResult?.ok) {
+      toast(rpcResult?.error || 'Failed to reject settlement.', 'error');
       return;
     }
     toast('Settlement rejected and removed.', 'success');
-    invalidateEntryCache(getCurrentUser().id);
-
-    // Notify the recorder that their payment was rejected
-    try {
-      const entry = await getEntry(entryId);
-      if (entry?.linked_entry_id) {
-        const { data: linkedEntry } = await supabase
-          .from('entries').select('user_id').eq('id', entry.linked_entry_id).maybeSingle();
-        if (linkedEntry?.user_id && linkedEntry.user_id !== getCurrentUser().id) {
-          const myName = getCurrentProfile()?.display_name || 'Someone';
-          const amt = settlement?.amount || 0;
-          await supabase.from('notifications').insert({
-            user_id: linkedEntry.user_id, type: 'settlement_rejected',
-            message: `${myName} rejected your payment of ${fmtMoney(amt, entry.currency || 'USD')}`,
-            amount: amt, currency: entry.currency || 'USD',
-            contact_name: myName, entry_id: entry.linked_entry_id, read: false
-          });
-          // Also delete the mirror settlement on the recorder's side
-          if (settlement?.mirror_of) {
-            await supabase.from('settlements').delete().eq('id', settlement.mirror_of).catch(() => {});
-          } else {
-            // This settlement might be the original — find and delete its mirror
-            await supabase.from('settlements').delete().eq('mirror_of', settlementId).catch(() => {});
-          }
-        }
-      }
-    } catch (_) { /* notification is non-critical */ }
-
+    // DB is truth — clear ALL caches, then re-fetch fresh
+    _invalidateEntries();
     closeModal();
     await window.openEntryDetail(entryId, { reviewMode: reviewMode || false });
   } catch (err) {
     console.error('[rejectSettlement]', err);
     toast('Error rejecting settlement: ' + (err?.message || err), 'error');
-  }
+  } finally { _unlockAction(); }
 };
 
 // ── Edit & Adjust Settlement Amount ────────────────────────────────
@@ -504,11 +481,14 @@ window.confirmAdjustedSettlement = async function(settlementId, entryId, reviewM
     return;
   }
 
+  if (!_lockAction()) return;
   try {
-    // Update settlement with new amount (convert to cents)
+    const newCents = Math.round(newAmount * 100);
+
+    // Update this settlement's amount
     const result = await supabase
       .from('settlements')
-      .update({ amount: Math.round(newAmount * 100) })
+      .update({ amount: newCents })
       .eq('id', settlementId);
 
     if (result.error) {
@@ -516,25 +496,34 @@ window.confirmAdjustedSettlement = async function(settlementId, entryId, reviewM
       return;
     }
 
-    // Now confirm the settlement
-    const reviewResult = await reviewSettlement(settlementId, {
-      status: 'confirmed',
-      reviewedBy: getCurrentUser().id
+    // Also update the mirror settlement amount (if any)
+    const { data: thisSettlement } = await supabase
+      .from('settlements').select('mirror_of').eq('id', settlementId).single();
+    if (thisSettlement?.mirror_of) {
+      await supabase.from('settlements')
+        .update({ amount: newCents })
+        .eq('id', thisSettlement.mirror_of);
+    }
+
+    // Now confirm via atomic RPC (handles notification to recorder + trigger recalc)
+    const { data: rpcResult, error: rpcErr } = await supabase.rpc('confirm_mirror_settlement', {
+      p_settlement_id: settlementId,
+      p_reviewed_by:   getCurrentUser().id
     });
 
-    if (!reviewResult) {
-      toast('Failed to confirm settlement.', 'error');
+    if (rpcErr || !rpcResult?.ok) {
+      toast(rpcResult?.error || rpcErr?.message || 'Failed to confirm settlement.', 'error');
       return;
     }
 
     toast('Settlement amount adjusted and confirmed.', 'success');
-    invalidateEntryCache(getCurrentUser().id);
+    _invalidateEntries();
     closeModal();
     await window.openEntryDetail(entryId, { reviewMode: reviewMode || false });
   } catch (err) {
     console.error('[confirmAdjustedSettlement]', err);
     toast('Error: ' + (err?.message || err), 'error');
-  }
+  } finally { _unlockAction(); }
 };
 
 // ── Edit Entry Modal ──────────────────────────────────────────────
@@ -790,38 +779,49 @@ window._settleFileSelected = function(input) {
 };
 
 window.saveSettlement = async function(entryId) {
+  if (!_lockAction()) return; // prevent double-click
   const amount = parseFloat(document.getElementById('settle-amount').value);
-  if (!amount || amount <= 0) return toast('Enter a valid amount.', 'error');
+  if (!amount || amount <= 0) { _unlockAction(); return toast('Enter a valid amount.', 'error'); }
+  const amountCents = Math.round(amount * 100);
   const btn = document.getElementById('settle-save-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
 
-  let proofUrl = null;
-  if (window._settleFile) {
-    try {
-      const ext = window._settleFile.name.split('.').pop();
-      const path = `settlements/${getCurrentUser().id}/${Date.now()}.${ext}`;
-      const { data: upData, error: upErr } = await supabase.storage
-        .from('attachments')
-        .upload(path, window._settleFile, { upsert: false });
-      if (!upErr && upData) {
-        const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(path);
-        proofUrl = urlData?.publicUrl || null;
-      }
-    } catch(e) { console.warn('[settle file upload]', e); }
-    window._settleFile = null;
-  }
+  try {
+    let proofUrl = '';
+    if (window._settleFile) {
+      try {
+        const ext = window._settleFile.name.split('.').pop();
+        const path = `settlements/${getCurrentUser().id}/${Date.now()}.${ext}`;
+        const { data: upData, error: upErr } = await supabase.storage
+          .from('attachments')
+          .upload(path, window._settleFile, { upsert: false });
+        if (!upErr && upData) {
+          const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(path);
+          proofUrl = urlData?.publicUrl || '';
+        }
+      } catch(e) { console.warn('[settle file upload]', e); }
+      window._settleFile = null;
+    }
 
-  await createSettlement(entryId, {
-    amount,
-    currency: document.getElementById('settle-currency')?.value || 'USD',
-    method: document.getElementById('settle-method').value,
-    note: document.getElementById('settle-note').value.trim(),
-    proof_url: proofUrl,
-    recordedBy: getCurrentUser().id
-  });
-  closeModal();
-  toast('Settlement recorded.', 'success');
-  _navAfterAction();
+    // Atomic RPC: creates settlement + mirror + notifications
+    const { data: rpcResult, error } = await supabase.rpc('create_settlement_with_mirror', {
+      p_entry_id:    entryId,
+      p_amount:      amountCents,
+      p_method:      document.getElementById('settle-method').value || '',
+      p_note:        document.getElementById('settle-note').value.trim() || '',
+      p_proof_url:   proofUrl,
+      p_recorded_by: getCurrentUser().id
+    });
+    if (error) throw error;
+    if (!rpcResult?.ok) throw new Error(rpcResult?.error || 'Settlement RPC failed');
+
+    closeModal();
+    toast('Settlement recorded ✓', 'success');
+    _navAfterAction();
+  } catch (err) {
+    toast('Error: ' + (err?.message || err), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Record Settlement'; }
+  } finally { _unlockAction(); }
 };
 
 // ── Mark as Paid Modal (spec section 6) ──────────────────────────
@@ -836,7 +836,7 @@ window.openMarkPaidModal = async function(id) {
   const outstanding = Math.max(0, (entry.amount || 0) - paidSoFar);
   const outstandingDollars = (outstanding / 100).toFixed(2);
   const currency   = entry.currency || 'USD';
-  const cName      = entry.contact?.name || '—';
+  const cName      = entry.contact?.name || entry.from_name || '—';
   const label      = TX_LABELS[cat] || cat;
 
   openModal(`
@@ -903,8 +903,9 @@ window.openMarkPaidModal = async function(id) {
 };
 
 window.saveMarkPaid = async function(entryId, currency) {
+  if (!_lockAction()) return; // prevent double-click
   const amountDollars = parseFloat(document.getElementById('mp-amount').value);
-  if (!amountDollars || amountDollars <= 0) return toast('Enter a valid amount.', 'error');
+  if (!amountDollars || amountDollars <= 0) { _unlockAction(); return toast('Enter a valid amount.', 'error'); }
   const amountCents = Math.round(amountDollars * 100);
   const note      = document.getElementById('mp-note')?.value.trim() || '';
   const method    = document.getElementById('mp-method')?.value || '';
@@ -932,79 +933,23 @@ window.saveMarkPaid = async function(entryId, currency) {
       }
     }
 
-    // 2. Insert into settlements table — DB trigger auto-updates entry.settled_amount + status
-    const { data: settlement, error } = await supabase
-      .from('settlements')
-      .insert({
-        entry_id:    entryId,
-        amount:      amountCents,
-        method:      method,
-        note:        note,
-        proof_url:   proofUrl,
-        recorded_by: getCurrentUser().id,
-        status:      'confirmed'
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    const cur = currency || entry?.currency || 'USD';
-    const fmtAmt = fmtMoney(amountCents, cur);
-    const fromName = getCurrentProfile()?.display_name || getCurrentProfile()?.full_name || 'Someone';
-
-    // 3. Determine direction — if user who owes records, contact must verify
-    const iOwe = ['i_owe','bill_received','invoice_received','you_owe_them','advance_received'].includes(entry.category || entry.tx_type);
-
-    // 4. Self-notification
-    await supabase.from('notifications').insert({
-      user_id: getCurrentUser().id, type: 'payment_sent',
-      message: `Payment of ${fmtAmt} recorded for ${contactName}${note ? ' — ' + note : ''}`,
-      amount: amountCents, currency: cur,
-      contact_name: contactName, entry_id: entryId, read: false
+    // 2. Atomic RPC: creates settlement + mirror + notifications in one transaction
+    const { data: rpcResult, error } = await supabase.rpc('create_settlement_with_mirror', {
+      p_entry_id:    entryId,
+      p_amount:      amountCents,
+      p_method:      method,
+      p_note:        note,
+      p_proof_url:   proofUrl,
+      p_recorded_by: getCurrentUser().id
     });
 
-    // 5. Mirror settlement to linked user's entry FIRST (so we have mirror entry ID for notification)
-    let mirrorEntryId = null;
-    if (linkedUserId) {
-      const { data: mirrorEntry } = await supabase
-        .from('entries')
-        .select('id')
-        .eq('user_id', linkedUserId)
-        .eq('linked_entry_id', entryId)
-        .maybeSingle();
-      if (mirrorEntry?.id) {
-        mirrorEntryId = mirrorEntry.id;
-        const { data: mirrorSettlement } = await supabase.from('settlements').insert({
-          entry_id:    mirrorEntry.id,
-          amount:      amountCents,
-          method:      method,
-          note:        note,
-          proof_url:   proofUrl,
-          recorded_by: getCurrentUser().id,
-          status:      'pending',   // ALWAYS pending — other party must confirm (double-confirm)
-          mirror_of:   settlement.id  // link back to original settlement
-        }).select('id').single();
-        // Cross-link: point original settlement to mirror
-        if (mirrorSettlement?.id && settlement?.id) {
-          await supabase.from('settlements').update({ mirror_of: mirrorSettlement.id })
-            .eq('id', settlement.id).catch(() => {});
-        }
-      }
-    }
+    if (error) throw error;
+    if (!rpcResult?.ok) throw new Error(rpcResult?.error || 'Settlement RPC failed');
 
-    // 6. In-app notification to linked contact — use THEIR mirror entry ID so they can open it
-    if (linkedUserId) {
-      const contactType = 'settlement_pending';  // always pending for double-confirm
-      await supabase.from('notifications').insert({
-        user_id: linkedUserId, type: contactType,
-        message: `${fromName} recorded a payment of ${fmtAmt}${note ? ' — ' + note : ''}`,
-        amount: amountCents, currency: cur,
-        contact_name: fromName, entry_id: mirrorEntryId || null, read: false
-      });
-    }
+    const cur = currency || entry?.currency || 'USD';
+    const fromName = getCurrentProfile()?.display_name || getCurrentProfile()?.full_name || 'Someone';
 
-    // 5. Email to contact (non-blocking)
+    // 3. Email to contact (non-blocking)
     if (contactEmail) {
       try {
         await sendNotificationEmail(getCurrentUser().id, {
@@ -1024,7 +969,7 @@ window.saveMarkPaid = async function(entryId, currency) {
   } catch (err) {
     toast('Error: ' + (err?.message || err), 'error');
     if (btn) { btn.disabled = false; btn.textContent = '💳 Save'; }
-  }
+  } finally { _unlockAction(); }
 };
 
 // ── Record Fulfillment (Advance) ──────────────────────────────────
@@ -1189,8 +1134,9 @@ window.copyNotifLink = async function(entryId) {
         from_email: getCurrentUser().email
       };
       const contactEmail = entry.contact?.email || '';
+      const linkedUid = entry.contact?.linked_user_id || null;
       const res = await createShareToken(getCurrentUser().id, entryId, {
-        recipientEmail: contactEmail, entrySnapshot: snapshot
+        recipientEmail: contactEmail, recipientId: linkedUid, entrySnapshot: snapshot
       });
       if (res?.token) shareUrl = window.location.origin + '/view?t=' + res.token;
     }
@@ -1216,8 +1162,9 @@ window.copyNotifMessage = async function(entryId) {
         from_email: getCurrentUser().email
       };
       const contactEmail = entry.contact?.email || '';
+      const linkedUid = entry.contact?.linked_user_id || null;
       const res = await createShareToken(getCurrentUser().id, entryId, {
-        recipientEmail: contactEmail, entrySnapshot: snapshot
+        recipientEmail: contactEmail, recipientId: linkedUid, entrySnapshot: snapshot
       });
       if (res?.token) shareUrl = window.location.origin + '/view?t=' + res.token;
     }
@@ -1338,6 +1285,7 @@ window.openShareModal = async function(id) {
   if (!entry) return;
   const cName = entry.contact?.name || 'Contact';
   const cEmail = entry.contact?.email || '';
+  const linkedUserId = entry.contact?.linked_user_id || null;  // ← PRIMARY ID
   const txLabel = TX_LABELS[entry.tx_type] || entry.tx_type;
   const amtStr = fmtMoney(entry.amount, entry.currency);
 
@@ -1361,27 +1309,50 @@ window.openShareModal = async function(id) {
   let url = '';
   let tokenObj = null;
   try {
-    const { data: existing } = await supabase.from('share_tokens').select('id, token').eq('entry_id', id).maybeSingle();
+    const { data: existing } = await supabase.from('share_tokens').select('id, token, recipient_id').eq('entry_id', id).maybeSingle();
     if (existing?.token) {
       url = window.location.origin + '/view?t=' + existing.token;
       tokenObj = existing;
+      // If existing token has no recipient_id but contact now has linked_user_id, patch it
+      if (!existing.recipient_id && linkedUserId) {
+        await supabase.from('share_tokens').update({ recipient_id: linkedUserId, status: 'sent' }).eq('id', existing.id);
+        tokenObj.recipient_id = linkedUserId;
+      }
     } else {
+      // Create new token with recipient_id set from linked_user_id (ID-centric, not email)
       tokenObj = await createShareToken(getCurrentUser().id, id, {
-        recipientEmail: cEmail, entrySnapshot: snapshot
+        recipientEmail: cEmail,
+        recipientId: linkedUserId,      // ← set at creation time
+        entrySnapshot: snapshot
       });
       if (tokenObj?.token) url = getShareUrl(tokenObj.token);
     }
   } catch(_) {}
   if (!url) { closeModal(); return toast('Could not generate share link.', 'error'); }
 
-  // Notify linked recipient if contact has email
-  if (cEmail && tokenObj) {
+  // Notify linked recipient — use linked_user_id (primary), fallback to email lookup
+  const recipientUserId = linkedUserId || tokenObj?.recipient_id;
+  if (recipientUserId && tokenObj) {
     try {
-      const { data: recipientId } = await supabase.rpc('find_user_id_by_email', { p_email: cEmail });
-      if (recipientId) {
-        await supabase.from('share_tokens').update({ recipient_id: recipientId, status: 'sent' }).eq('id', tokenObj.id);
+      // Ensure token has recipient_id + sent status
+      if (!tokenObj.recipient_id) {
+        await supabase.from('share_tokens').update({ recipient_id: recipientUserId, status: 'sent' }).eq('id', tokenObj.id);
+      }
+      await supabase.from('notifications').insert({
+        user_id: recipientUserId, type: 'shared_record',
+        message: `${_shareSenderName || 'Someone'} shared a record with you: ${fmtMoney(entry.amount, entry.currency)}`,
+        entry_id: id, contact_name: _shareSenderName || '',
+        amount: entry.amount, currency: entry.currency, read: false
+      });
+    } catch(_) {}
+  } else if (cEmail && tokenObj) {
+    // Fallback: resolve by email only if no linked_user_id
+    try {
+      const { data: resolvedId } = await supabase.rpc('find_user_id_by_email', { p_email: cEmail });
+      if (resolvedId) {
+        await supabase.from('share_tokens').update({ recipient_id: resolvedId, status: 'sent' }).eq('id', tokenObj.id);
         await supabase.from('notifications').insert({
-          user_id: recipientId, type: 'shared_record',
+          user_id: resolvedId, type: 'shared_record',
           message: `${_shareSenderName || 'Someone'} shared a record with you: ${fmtMoney(entry.amount, entry.currency)}`,
           entry_id: id, contact_name: _shareSenderName || '',
           amount: entry.amount, currency: entry.currency, read: false
@@ -1591,16 +1562,17 @@ window.openSendReminderModal = async function(id) {
       <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Record</div>
       <div style="font-weight:700;margin-top:4px;">${esc(cName)} — ${fmtMoney(remaining, entry.currency)}</div>
     </div>
-    <div class="form-group"><label>Message</label><textarea id="rem-msg" rows="3" placeholder="Add a message (optional)..."></textarea></div>
+    <div class="form-group"><label>Message <span style="font-size:11px;color:var(--muted);font-weight:400;">(optional)</span></label><textarea id="rem-msg" rows="3" placeholder="Add a message (optional)..."></textarea></div>
     <div class="form-group">
-      <label>Email</label>
+      <label>Also send email? <span style="font-size:11px;color:var(--muted);font-weight:400;">(optional)</span></label>
       <div style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-        <button type="button" id="rem-nwho-them" onclick="setReminderNwho('them')" style="padding:8px 18px;font-size:13px;font-weight:600;background:var(--accent);color:#fff;border:none;cursor:pointer;">Contact</button>
+        <button type="button" id="rem-nwho-none" onclick="setReminderNwho('none')" style="padding:8px 18px;font-size:13px;font-weight:600;background:var(--accent);color:#fff;border:none;cursor:pointer;">No</button>
+        <button type="button" id="rem-nwho-them" onclick="setReminderNwho('them')" style="padding:8px 18px;font-size:13px;background:var(--bg3);color:var(--text);border:none;border-left:1px solid var(--border);cursor:pointer;">Contact</button>
         <button type="button" id="rem-nwho-you" onclick="setReminderNwho('you')" style="padding:8px 18px;font-size:13px;background:var(--bg3);color:var(--text);border:none;border-left:1px solid var(--border);cursor:pointer;">You</button>
         <button type="button" id="rem-nwho-both" onclick="setReminderNwho('both')" style="padding:8px 18px;font-size:13px;background:var(--bg3);color:var(--text);border:none;border-left:1px solid var(--border);cursor:pointer;">Both</button>
       </div>
     </div>
-    <div id="rem-no-email-wrap" data-has-email="${hasEmail ? '1' : '0'}" style="${hasEmail ? 'display:none;' : ''}margin-bottom:12px;">
+    <div id="rem-no-email-wrap" data-has-email="${hasEmail ? '1' : '0'}" style="display:none;margin-bottom:12px;">
       <div style="background:rgba(213,186,120,.1);border:1px solid rgba(213,186,120,.3);border-radius:8px;padding:10px 14px;">
         <div style="font-size:13px;color:var(--gold, #D5BA78);margin-bottom:8px;">⚠️ <strong>${esc(cName)}</strong> has no email on file.</div>
         <input type="email" id="rem-contact-email" placeholder="Enter email to send reminder"
@@ -1646,7 +1618,7 @@ window.openSendReminderModal = async function(id) {
   `, { maxWidth: '440px' });
 
   window._reminderWhen = 'now';
-  window._reminderNwho = 'them';
+  window._reminderNwho = 'none';
 
   // Async: generate share link
   (async () => {
@@ -1691,7 +1663,7 @@ window.openSendReminderModal = async function(id) {
 
 window.setReminderNwho = function(val) {
   window._reminderNwho = val;
-  ['them','you','both'].forEach(k => {
+  ['none','them','you','both'].forEach(k => {
     const btn = document.getElementById('rem-nwho-' + k);
     if (!btn) return;
     const active = k === val;
@@ -1719,10 +1691,9 @@ window.setReminderWhen = function(val) {
 };
 
 window.doSendReminder = async function(entryId) {
-  const message = document.getElementById('rem-msg').value.trim();
-  if (!message) return toast('Message required.', 'error');
+  const message = document.getElementById('rem-msg')?.value?.trim() || '';
 
-  const notifyWho = window._reminderNwho || 'them';
+  const notifyWho = window._reminderNwho || 'none';
   const notifyContact = notifyWho === 'them' || notifyWho === 'both';
   const notifySelf    = notifyWho === 'you'  || notifyWho === 'both';
 
@@ -1732,6 +1703,9 @@ window.doSendReminder = async function(entryId) {
     const cName = entry?.contact?.name || 'Someone';
     let cEmail = entry?.contact?.email || '';
     const linkedUserId = entry?.contact?.linked_user_id;
+    const fromName = getCurrentProfile()?.display_name || getCurrentProfile()?.company_name || 'Money IntX';
+    const defaultMsg = `Payment reminder for ${fmtMoney(entry.amount - entry.settled_amount, entry.currency || 'USD')}`;
+    const displayMsg = message || defaultMsg;
 
     // If contact has no email, check for inline-entered email
     if (!cEmail && notifyContact) {
@@ -1745,51 +1719,49 @@ window.doSendReminder = async function(entryId) {
       }
     }
 
-    if (notifyContact) {
-      if (linkedUserId) {
-        await supabase.from('notifications').insert({
-          user_id: linkedUserId, type: 'reminder',
-          message: `Reminder from ${getCurrentProfile()?.display_name || 'Someone'}: ${message}`,
-          entry_id: entryId, contact_name: getCurrentProfile()?.display_name || '',
-          amount: entry.amount, currency: entry.currency,
-          read: false
-        });
-      }
-      if (cEmail) {
-        try {
-          const fromName = getCurrentProfile()?.display_name || getCurrentProfile()?.company_name || 'Money IntX';
-          const result = await sendNotificationEmail(getCurrentUser().id, {
-            to: cEmail, fromName, txType: entry.category || entry.tx_type,
-            amount: entry.amount,
-            currency: entry.currency, message, entryId, isReminder: true,
-            logoUrl: getCurrentProfile()?.logo_url,
-            fromEmail: getCurrentProfile()?.company_email || getCurrentUser()?.email,
-            siteUrl: 'https://moneyinteractions.com'
-          });
-          if (!result?.ok) toast('Reminder sent (email failed: ' + (result?.error || 'check Settings → Email Diagnostics') + ')', 'info');
-        } catch(e) { console.warn('Email reminder failed:', e); toast('Reminder email failed: ' + e.message, 'error'); }
-      }
+    // ── ALWAYS: in-app notification to linked contact (flag the item) ──
+    if (linkedUserId) {
+      await supabase.from('notifications').insert({
+        user_id: linkedUserId, type: 'reminder',
+        message: message ? `Reminder from ${fromName}: ${message}` : `${fromName} sent a payment reminder`,
+        entry_id: entryId, contact_name: fromName,
+        amount: entry.amount, currency: entry.currency,
+        read: false
+      });
     }
 
-    // Self-email copy when user wants their own notification
+    // ── OPTIONAL: email to contact (only if email toggle selected) ──
+    if (notifyContact && cEmail) {
+      try {
+        const result = await sendNotificationEmail(getCurrentUser().id, {
+          to: cEmail, fromName, txType: entry.category || entry.tx_type,
+          amount: entry.amount,
+          currency: entry.currency, message: displayMsg, entryId, isReminder: true,
+          logoUrl: getCurrentProfile()?.logo_url,
+          fromEmail: getCurrentProfile()?.company_email || getCurrentUser()?.email,
+          siteUrl: 'https://moneyinteractions.com'
+        });
+        if (!result?.ok) toast('Reminder flagged (email failed: ' + (result?.error || 'check Settings → Email Diagnostics') + ')', 'info');
+      } catch(e) { console.warn('Email reminder failed:', e); toast('Reminder email failed: ' + e.message, 'error'); }
+    }
+
+    // ── OPTIONAL: self-email copy ──
     if (notifySelf && getCurrentUser()?.email) {
-      const fromNameSelf = getCurrentProfile()?.display_name || getCurrentProfile()?.company_name || 'Money IntX';
       try {
         await sendNotificationEmail(getCurrentUser().id, {
-          to: getCurrentUser().email, fromName: fromNameSelf, txType: entry.category || entry.tx_type,
-          amount: entry.amount, currency: entry.currency, message, entryId, isReminder: true,
+          to: getCurrentUser().email, fromName, txType: entry.category || entry.tx_type,
+          amount: entry.amount, currency: entry.currency, message: displayMsg, entryId, isReminder: true,
           logoUrl: getCurrentProfile()?.logo_url, siteUrl: 'https://moneyinteractions.com',
           isSelf: true, contactName: cName
         });
       } catch(e) { console.warn('[self-email reminder]', e); }
     }
 
-    // Log + self-notify in one insert (no double-insert)
-    const selfMsg = notifyContact && notifySelf
-      ? `Reminder sent to ${cName} (& self): ${message}`
-      : notifyContact
-        ? `Reminder sent to ${cName}: ${message}`
-        : `Reminder noted (self): ${message}`;
+    // ── ALWAYS: self-notification + flag the entry ──
+    const emailSent = notifyContact && cEmail;
+    const selfMsg = emailSent
+      ? `Reminder sent to ${cName}${message ? ': ' + message : ''}`
+      : `Reminder flagged for ${cName}${message ? ': ' + message : ''}`;
     await supabase.from('notifications').insert({
       user_id: getCurrentUser().id, type: 'reminder',
       message: selfMsg,
@@ -1798,19 +1770,17 @@ window.doSendReminder = async function(entryId) {
       read: false
     });
 
-    // Direct update — bypass updateEntry to avoid amount conversion
+    // ── ALWAYS: flip the reminder flag (moves item to top) ──
     await supabase.from('entries').update({
       reminder_count: (entry?.reminder_count || 0) + 1,
       last_reminder_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }).eq('id', entryId);
     closeModal();
-    if (notifyContact && !cEmail) {
-      toast('Reminder logged — no email sent (contact has no email address).', 'info');
-    } else {
-      const emailNote = notifyContact && cEmail ? ' Email queued.' : '';
-      toast('Reminder sent.' + emailNote, 'success');
-    }
+    const parts = ['Reminder flagged'];
+    if (linkedUserId) parts.push('notification sent');
+    if (emailSent) parts.push('email queued');
+    toast(parts.join(' + ') + '.', 'success');
   } else {
     // Schedule
     const schedDate = document.getElementById('rem-date').value;

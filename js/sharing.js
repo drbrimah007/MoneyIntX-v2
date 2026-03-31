@@ -4,15 +4,16 @@ import { toCents } from './entries.js';
 import { getCurrentProfile } from './pages/state.js';
 
 // ── Create share token ────────────────────────────────────────────
-export async function createShareToken(senderId, entryId, { recipientEmail = '', entrySnapshot = {} } = {}) {
+export async function createShareToken(senderId, entryId, { recipientEmail = '', recipientId = null, entrySnapshot = {} } = {}) {
   const { data, error } = await supabase
     .from('share_tokens')
     .insert({
       sender_id: senderId,
       entry_id: entryId,
       recipient_email: recipientEmail,
+      recipient_id: recipientId || null,
       entry_snapshot: entrySnapshot,
-      status: 'created'
+      status: recipientId ? 'sent' : 'created'   // auto-sent if recipient known
     })
     .select()
     .single();
@@ -165,38 +166,58 @@ export async function confirmShare(tokenId, recipientId) {
     }
   }
 
-  // Get next entry_number for recipient
-  let entryNumber = null;
-  try {
-    const { data: counterData } = await supabase.rpc('increment_entry_counter', { p_user_id: recipientId });
-    if (counterData) entryNumber = counterData;
-  } catch (_) { /* RPC not deployed yet — entry_number stays null */ }
-
-  // Create entry in recipient's records
-  const { data: newEntry, error } = await supabase
+  // ── CHECK: Does a mirror already exist? (auto-mirror trigger may have created one) ──
+  let newEntry = null;
+  const { data: existingMirror } = await supabase
     .from('entries')
-    .insert({
-      user_id:          recipientId,
-      contact_id:       contactId,           // ← linked to sender contact if found
-      tx_type:          flippedType,
-      sender_tx_type:   token.entry.tx_type,
-      amount:           token.entry.amount,
-      currency:         token.entry.currency,
-      date:             token.entry.date,
-      note:             token.entry.note || '',
-      invoice_number:   token.entry.invoice_number || '',
-      entry_number:     entryNumber,
-      is_shared:        true,
-      share_token:      token.token,
-      from_name:        fromName,
-      from_email:       fromEmail,
-      linked_entry_id:  token.entry_id,     // ← link back to original entry
-      status:           'posted',
-      settled_amount:   0
-    })
-    .select()
-    .single();
-  if (error) console.error('[confirmShare]', error.message);
+    .select('*')
+    .eq('user_id', recipientId)
+    .eq('linked_entry_id', token.entry_id)
+    .maybeSingle();
+
+  if (existingMirror) {
+    // Mirror already exists (auto-mirror trigger beat us) — reuse it
+    newEntry = existingMirror;
+    console.log('[confirmShare] Mirror already exists, reusing:', existingMirror.id);
+    // Update contact_id if it was auto-created with a different one
+    if (contactId && existingMirror.contact_id !== contactId) {
+      await supabase.from('entries').update({ contact_id: contactId }).eq('id', existingMirror.id);
+    }
+  } else {
+    // No mirror exists — create one
+    let entryNumber = null;
+    try {
+      const { data: counterData } = await supabase.rpc('increment_entry_counter', { p_user_id: recipientId });
+      if (counterData) entryNumber = counterData;
+    } catch (_) { /* RPC not deployed yet — entry_number stays null */ }
+
+    const { data: created, error } = await supabase
+      .from('entries')
+      .insert({
+        user_id:          recipientId,
+        contact_id:       contactId,
+        tx_type:          flippedType,
+        sender_tx_type:   token.entry.tx_type,
+        amount:           token.entry.amount,
+        currency:         token.entry.currency,
+        date:             token.entry.date,
+        note:             token.entry.note || '',
+        invoice_number:   token.entry.invoice_number || '',
+        entry_number:     entryNumber,
+        is_shared:        true,
+        share_token:      token.token,
+        from_name:        fromName,
+        from_email:       fromEmail,
+        linked_entry_id:  token.entry_id,     // ← set at insert time so trigger skips
+        source:           'share_accept',     // ← trigger MUST skip for this source
+        status:           'posted',
+        settled_amount:   0
+      })
+      .select()
+      .single();
+    if (error) console.error('[confirmShare]', error.message);
+    newEntry = created;
+  }
 
   // Bidirectionally link both entries via SECURITY DEFINER RPC (bypasses RLS)
   if (newEntry && token.entry_id) {

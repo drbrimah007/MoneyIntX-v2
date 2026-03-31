@@ -19,7 +19,7 @@ export async function renderDash(el) {
   const currentUser = getCurrentUser();
   const currentProfile = getCurrentProfile();
 
-  let totals, recent, contacts, unread, ledger, currencyRows;
+  let totals, recent, contacts, unread, ledger, currencyRows, pendingShares = [];
 
   if (window._impersonatedData) {
     const snap = window._impersonatedData;
@@ -45,11 +45,13 @@ export async function renderDash(el) {
   } else {
     // Run critical queries first (top 4), then non-critical (ledger + currency) in parallel
     // This paints the hero card faster even if ledger is slow
-    [totals, recent, contacts, unread] = await Promise.all([
+    let pendingShares;
+    [totals, recent, contacts, unread, pendingShares] = await Promise.all([
       getDashboardTotals(currentUser.id),
       recentEntries(currentUser.id, 15),
       listContacts(currentUser.id),
-      getUnreadCount(currentUser.id)
+      getUnreadCount(currentUser.id),
+      listReceivedShares(currentUser.id).catch(() => [])
     ]);
     // Cache contacts for entry modal
     window._allContacts = contacts;
@@ -168,7 +170,10 @@ export async function renderDash(el) {
   // Tip is now shown in the persistent topbar strip (loaded in enterApp, random per refresh)
 
   // Stat cards row
-  const pendingCount = recent.filter(e => !['settled','voided','cancelled','fulfilled'].includes(e.status)).length;
+  // Count pending entries + pending shares (not yet confirmed/dismissed)
+  const pendingEntryCount = recent.filter(e => !['settled','voided','cancelled','fulfilled'].includes(e.status)).length;
+  const pendingShareCount = (typeof pendingShares !== 'undefined' ? pendingShares : []).filter(s => s.status !== 'confirmed' && s.status !== 'dismissed').length;
+  const pendingCount = pendingEntryCount + pendingShareCount;
   html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin-bottom:14px;">
     <div class="stat-card" style="cursor:pointer;border-color:var(--line-2,var(--border));" onclick="navTo('contacts')">
       <div class="stat-lbl">Contacts</div><div class="stat-val" style="color:var(--blue);">${contacts.length}</div>

@@ -27,11 +27,14 @@ export async function renderNotifications(el) {
       notification:       { bg:'rgba(96,165,250,.15)',  color:'var(--accent)', label:'📬 Sent' },
       payment_sent:       { bg:'rgba(96,165,250,.15)',  color:'var(--accent)', label:'📤 Sent' },
       payment_received:   { bg:'rgba(95,211,154,.15)',  color:'var(--green)',  label:'📩 Received' },
-      settlement_pending: { bg:'rgba(251,191,36,.15)',  color:'var(--amber)',  label:'⏳ Review' },
-      viewed:             { bg:'rgba(108,99,255,.12)',  color:'var(--accent)', label:'👁 Viewed' },
-      confirmed:          { bg:'rgba(95,211,154,.15)',  color:'var(--green)',  label:'✅ Confirmed' },
-      shared_record:      { bg:'rgba(108,99,255,.12)',  color:'var(--accent)', label:'🔗 Shared' },
-      fulfilled:          { bg:'rgba(95,211,154,.15)',  color:'var(--green)',  label:'✅ Fulfilled' },
+      settlement_pending:   { bg:'rgba(251,191,36,.15)',  color:'var(--amber)',  label:'⏳ Review' },
+      settlement_confirmed: { bg:'rgba(95,211,154,.15)',  color:'var(--green)',  label:'✅ Confirmed' },
+      settlement_rejected:  { bg:'rgba(248,113,113,.15)', color:'var(--red)',    label:'❌ Rejected' },
+      entry_received:       { bg:'rgba(108,99,255,.12)',  color:'var(--accent)', label:'📥 Received' },
+      viewed:               { bg:'rgba(108,99,255,.12)',  color:'var(--accent)', label:'👁 Viewed' },
+      confirmed:            { bg:'rgba(95,211,154,.15)',  color:'var(--green)',  label:'✅ Confirmed' },
+      shared_record:        { bg:'rgba(108,99,255,.12)',  color:'var(--accent)', label:'🔗 Shared' },
+      fulfilled:            { bg:'rgba(95,211,154,.15)',  color:'var(--green)',  label:'✅ Fulfilled' },
     };
     const m = map[t] || { bg:'var(--bg3)', color:'var(--muted)', label:t||'📤 Sent' };
     return `<span class="badge" style="background:${m.bg};color:${m.color};">${m.label}</span>`;
@@ -47,7 +50,7 @@ export async function renderNotifications(el) {
       <th>Contact</th><th>Amount</th><th class="hide-mobile">Message</th><th>Date</th><th>Event</th><th></th>
     </tr></thead><tbody>`;
     // Sort: actionable items (settlement_pending, payment_received) first, then newest
-    const ACTIONABLE = new Set(['settlement_pending','payment_received','payment_sent','shared_record']);
+    const ACTIONABLE = new Set(['settlement_pending','payment_received','payment_sent','shared_record','entry_received']);
     notifs.sort((a, b) => {
       const aAct = ACTIONABLE.has(a.type) ? 0 : 1;
       const bAct = ACTIONABLE.has(b.type) ? 0 : 1;
@@ -84,8 +87,8 @@ export async function renderNotifications(el) {
         // Always go to entries page where pending shares are shown — not openEntryDetail
         // (the entry_id here is the SENDER's entry which the recipient can't access via RLS)
         actionBtn = `<button onclick="navTo('entries')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View</button>`;
-      } else if (n.entry_id && (n.type === 'settlement_pending' || n.type === 'payment_received')) {
-        actionBtn = `<button onclick="openEntryDetail('${n.entry_id}', { reviewMode: true })" style="background:var(--amber,#D5BA78);color:#000;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:700;margin-right:4px;">Review</button>`;
+      } else if (n.entry_id && (n.type === 'settlement_pending' || n.type === 'payment_received' || n.type === 'entry_received')) {
+        actionBtn = `<button onclick="openEntryDetail('${n.entry_id}', { reviewMode: ${n.type === 'settlement_pending' ? 'true' : 'false'} })" style="background:var(--amber,#D5BA78);color:#000;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:700;margin-right:4px;">${n.type === 'settlement_pending' ? 'Review' : 'View'}</button>`;
       } else if (!n.entry_id && n.type === 'settlement_pending') {
         actionBtn = `<button onclick="navTo('entries')" style="background:var(--amber,#D5BA78);color:#000;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View Entries</button>`;
       } else if (n.entry_id) {
@@ -106,8 +109,17 @@ export async function renderNotifications(el) {
 }
 
 window.deleteNotif = async function(id) {
+  // Remove from DOM immediately (no page refresh)
+  const btn = event?.target;
+  const row = btn?.closest('tr');
+  if (row) {
+    row.style.transition = 'opacity 0.2s';
+    row.style.opacity = '0';
+    setTimeout(() => row.remove(), 200);
+  }
   await supabase.from('notifications').delete().eq('id', id);
-  window.navTo('notifications');
+  // Update badge count
+  if (window.updateNotifBadge) window.updateNotifBadge();
 };
 
 window.clearAllNotifs = async function() {
@@ -115,5 +127,8 @@ window.clearAllNotifs = async function() {
   if (!confirm('Clear all notifications?')) return;
   await supabase.from('notifications').delete().eq('user_id', currentUser.id);
   toast('Cleared.', 'success');
-  window.navTo('notifications');
+  // Re-render in place instead of full navigation
+  const el = document.getElementById('content');
+  if (el) renderNotifications(el);
+  if (window.updateNotifBadge) window.updateNotifBadge();
 };
