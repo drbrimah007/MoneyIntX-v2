@@ -116,7 +116,7 @@ export async function renderEntries(el, page, forceRefresh) {
       const amtCents = snap.amount !== undefined ? snap.amount : toCents(amt);
       const cur = snap.currency || 'USD';
       // Flip tx_type to show recipient's perspective
-      const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'bill','bill':'invoice' };
+      const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'bill','bill':'invoice','advance_paid':'advance_received','advance_received':'advance_paid' };
       const flippedCat = SNAP_FLIP[snap.tx_type] || snap.tx_type;
       const txLabel = TX_LABELS[flippedCat] || snap.tx_type || '—';
       // Color: green-ish if they owe you, purple-ish if you owe them
@@ -1476,7 +1476,7 @@ window.doConfirmShare = async function(tokenId) {
 // Inline confirm/reject from entries list — updates IN PLACE, no page jump
 window.doPendingConfirm = async function(tokenId) {
   // Look up share details for the toast message
-  const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'bill','bill':'invoice' };
+  const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'bill','bill':'invoice','advance_paid':'advance_received','advance_received':'advance_paid' };
   const share = (_pendingSharesAll || []).find(s => s.id === tokenId);
   const snap = share?.entry_snapshot || {};
   const fromName = snap.from_name || share?.sender_name || 'Contact';

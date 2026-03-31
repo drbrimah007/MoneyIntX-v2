@@ -304,7 +304,7 @@ export async function renderDash(el) {
       const amtCents = snap.amount !== undefined ? snap.amount : toCents(amt);
       const cur = snap.currency || 'USD';
       // Flip tx_type to show recipient's perspective (sender's "Owed to me" → recipient's "I Owe")
-      const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'bill','bill':'invoice' };
+      const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'bill','bill':'invoice','advance_paid':'advance_received','advance_received':'advance_paid' };
       const flippedCat = SNAP_FLIP[snap.tx_type] || snap.tx_type;
       const txLabel = TX_LABELS[flippedCat] || snap.tx_type || '—';
       const isOwedToMe = ['you_owe_them','owed_to_me','bill_received','invoice_received','advance_received'].includes(flippedCat);

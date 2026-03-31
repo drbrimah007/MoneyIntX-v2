@@ -115,7 +115,9 @@ export async function confirmShare(tokenId, recipientId) {
     'bill_sent':       'bill_received',
     'bill_received':   'bill_sent',
     'invoice':         'bill',
-    'bill':            'invoice'
+    'bill':            'invoice',
+    'advance_paid':    'advance_received',
+    'advance_received':'advance_paid'
   };
   const flippedType = FLIP[token.entry.tx_type] || token.entry.tx_type;
 
