@@ -195,23 +195,11 @@ export async function voidEntry(id) {
   return updateEntry(id, { status: 'voided' });
 }
 
-// ── Record settlement ─────────────────────────────────────────────
+// ── Record settlement (MUST go through RPC) ──────────────────────
+// Direct inserts are blocked by RLS. Use create_settlement_with_mirror RPC.
 export async function recordSettlement(entryId, { amount, method = '', note = '', proofUrl = '', recordedBy }) {
-  const { data, error } = await supabase
-    .from('settlements')
-    .insert({
-      entry_id: entryId,
-      amount: toCents(amount),
-      method,
-      note,
-      proof_url: proofUrl,
-      recorded_by: recordedBy
-    })
-    .select()
-    .single();
-  if (error) console.error('[recordSettlement]', error.message);
-  // The DB trigger auto-updates entry.settled_amount and status
-  return data;
+  console.error('[recordSettlement] BLOCKED — direct insert removed. Use create_settlement_with_mirror RPC instead.');
+  throw new Error('Direct settlement recording is disabled. All settlements must go through create_settlement_with_mirror RPC.');
 }
 
 // ── Get settlements for entry ─────────────────────────────────────

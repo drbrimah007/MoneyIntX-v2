@@ -14,16 +14,14 @@ export async function listSettlements(entryId) {
 }
 
 // ── Record a settlement (MUST go through RPC) ────────────────────
-// Direct inserts are blocked by RLS. Use create_settlement_with_mirror RPC.
 export async function createSettlement(entryId, { amount, method = '', note = '', proofUrl = '', recordedBy, status = 'confirmed' }) {
   console.error('[createSettlement] BLOCKED — direct insert removed. Use create_settlement_with_mirror RPC instead.');
   throw new Error('Direct settlement creation is disabled. All settlements must go through create_settlement_with_mirror RPC.');
 }
 
 // ── Approve/reject a pending settlement (MUST go through RPC) ────
-// Use confirm_mirror_settlement or reject_mirror_settlement RPCs.
 export async function reviewSettlement(id, { status, reviewedBy }) {
-  console.error('[reviewSettlement] BLOCKED — direct update removed. Use confirm_mirror_settlement / reject_mirror_settlement RPCs.');
+  console.error('[reviewSettlement] BLOCKED — direct update removed. Use confirm/reject RPCs.');
   throw new Error('Direct settlement review is disabled. Use confirm_mirror_settlement or reject_mirror_settlement RPCs.');
 }
 
