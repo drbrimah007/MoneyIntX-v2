@@ -88,7 +88,10 @@ export async function renderNotifications(el) {
         // (the entry_id here is the SENDER's entry which the recipient can't access via RLS)
         actionBtn = `<button onclick="navTo('entries')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View</button>`;
       } else if (n.entry_id && (n.type === 'settlement_pending' || n.type === 'payment_received' || n.type === 'entry_received')) {
-        actionBtn = `<button onclick="openEntryDetail('${n.entry_id}', { reviewMode: ${n.type === 'settlement_pending' ? 'true' : 'false'} })" style="background:var(--amber,#D5BA78);color:#000;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:700;margin-right:4px;">${n.type === 'settlement_pending' ? 'Review' : 'View'}</button>`;
+        // Both settlement_pending AND payment_received should show Review (Confirm/Reject)
+        // payment_received was created by old code — treat it the same as settlement_pending
+        const isSettlement = n.type === 'settlement_pending' || n.type === 'payment_received';
+        actionBtn = `<button onclick="openEntryDetail('${n.entry_id}', { reviewMode: ${isSettlement ? 'true' : 'false'} })" style="background:var(--amber,#D5BA78);color:#000;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:700;margin-right:4px;">${isSettlement ? 'Review' : 'View'}</button>`;
       } else if (!n.entry_id && n.type === 'settlement_pending') {
         actionBtn = `<button onclick="navTo('entries')" style="background:var(--amber,#D5BA78);color:#000;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View Entries</button>`;
       } else if (n.entry_id) {
