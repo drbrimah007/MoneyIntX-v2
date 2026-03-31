@@ -25,11 +25,10 @@ export async function reviewSettlement(id, { status, reviewedBy }) {
   throw new Error('Direct settlement review is disabled. Use confirm_mirror_settlement or reject_mirror_settlement RPCs.');
 }
 
-// ── Delete a settlement ───────────────────────────────────────────
+// ── Delete a settlement (BLOCKED — must go through RPC) ──────────
 export async function deleteSettlement(id) {
-  const { error } = await supabase.from('settlements').delete().eq('id', id);
-  if (error) console.error('[deleteSettlement]', error.message);
-  return !error;
+  console.error('[deleteSettlement] BLOCKED — direct delete removed.');
+  throw new Error('Direct settlement deletion is disabled.');
 }
 
 // ── Upload proof of payment ───────────────────────────────────────

@@ -19,7 +19,7 @@ export function fmtMoney(cents, currency = 'USD') {
 export async function listEntries(userId, { status, txType, contactId, limit = 50, offset = 0, orderBy = 'created_at', ascending = false } = {}) {
   let query = supabase
     .from('entries')
-    .select('*, contact:contacts(id, name, email)')
+    .select('*, contact:contacts(id, name, email, linked_user_id)')
     .eq('user_id', userId)
     .is('archived_at', null)
     .order(orderBy, { ascending })
@@ -38,7 +38,7 @@ export async function listEntries(userId, { status, txType, contactId, limit = 5
 export async function recentEntries(userId, limit = 10) {
   const { data, error } = await supabase
     .from('entries')
-    .select('*, contact:contacts(id, name, email)')
+    .select('*, contact:contacts(id, name, email, linked_user_id)')
     .eq('user_id', userId)
     .is('archived_at', null)
     .order('created_at', { ascending: false })
@@ -51,7 +51,7 @@ export async function recentEntries(userId, limit = 10) {
 export async function getEntry(id) {
   const { data, error } = await supabase
     .from('entries')
-    .select('*, contact:contacts(id, name, email), settlements(*)')
+    .select('*, contact:contacts(id, name, email, linked_user_id), settlements(*)')
     .eq('id', id)
     .single();
   if (error) console.error('[getEntry]', error.message);
@@ -64,14 +64,18 @@ export async function createEntry(userId, {
   date, invoiceNumber = '', templateId = null, templateData = {},
   status = 'posted'
 }) {
-  // Increment entry counter
-  const { data: user } = await supabase
-    .from('users')
-    .select('entry_counter')
-    .eq('id', userId)
-    .single();
-  const nextNum = (user?.entry_counter || 0) + 1;
-  await supabase.from('users').update({ entry_counter: nextNum }).eq('id', userId);
+  // Increment entry counter atomically via RPC
+  let nextNum = 1;
+  const { data: counterData, error: counterErr } = await supabase
+    .rpc('increment_entry_counter', { p_user_id: userId });
+  if (!counterErr && counterData) {
+    nextNum = counterData;
+  } else {
+    // Fallback: read + increment (race-prone but works as safety net)
+    const { data: user } = await supabase.from('users').select('entry_counter').eq('id', userId).single();
+    nextNum = (user?.entry_counter || 0) + 1;
+    await supabase.from('users').update({ entry_counter: nextNum }).eq('id', userId);
+  }
 
   const { data, error } = await supabase
     .from('entries')
@@ -89,7 +93,7 @@ export async function createEntry(userId, {
       template_data: templateData,
       status
     })
-    .select('*, contact:contacts(id, name, email)')
+    .select('*, contact:contacts(id, name, email, linked_user_id)')
     .single();
   if (error) console.error('[createEntry]', error.message);
   return data;
@@ -103,15 +107,19 @@ export async function updateEntry(id, updates) {
     .from('entries')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
-    .select('*, contact:contacts(id, name, email)')
+    .select('*, contact:contacts(id, name, email, linked_user_id)')
     .single();
   if (error) console.error('[updateEntry]', error.message);
   return data;
 }
 
-// ── Delete entry ──────────────────────────────────────────────────
+// ── Delete entry (soft archive — never hard-delete) ──────────────
 export async function deleteEntry(id) {
-  const { error } = await supabase.from('entries').delete().eq('id', id);
+  const { data, error } = await supabase.from('entries')
+    .update({ archived_at: new Date().toISOString(), status: 'voided', updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
   if (error) console.error('[deleteEntry]', error.message);
   return !error;
 }
@@ -133,7 +141,6 @@ export async function voidEntry(id) {
 export async function recordSettlement(entryId, { amount, method = '', note = '', proofUrl = '', recordedBy }) {
   console.error('[recordSettlement] BLOCKED — direct insert removed. Use create_settlement_with_mirror RPC instead.');
   throw new Error('Direct settlement recording is disabled. All settlements must go through create_settlement_with_mirror RPC.');
-  return data;
 }
 
 // ── Get settlements for entry ─────────────────────────────────────

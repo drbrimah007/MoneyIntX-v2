@@ -151,11 +151,15 @@ export async function updateEntry(id, updates) {
   return data;
 }
 
-// ── Delete entry (soft delete — archives it, never truly removed) ─
+// ── Delete entry (soft archive — never hard-delete) ──────────────
+// Hard-deleting entries would orphan mirrors and break audit trail.
+// Instead, archive the entry so it's hidden but recoverable.
 export async function deleteEntry(id) {
-  // Delete linked settlements first to avoid FK constraint errors
-  await supabase.from('settlements').delete().eq('entry_id', id);
-  const { error } = await supabase.from('entries').delete().eq('id', id);
+  const { data, error } = await supabase.from('entries')
+    .update({ archived_at: new Date().toISOString(), status: 'voided', updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
   if (error) console.error('[deleteEntry]', error.message);
   return !error;
 }

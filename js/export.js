@@ -11,7 +11,16 @@ export async function exportEntriesToCSV(userId) {
   if (!data?.length) return null;
 
   const headers = ['Date','Contact','Type','Amount','Currency','Status','Invoice #','Note'];
-  const TX = { they_owe_you:'They Owe Me', you_owe_them:'I Owe Them', they_paid_you:'They Settled Me', you_paid_them:'I Settled Them', invoice:'Invoice', bill:'Bill' };
+  const TX = {
+    they_owe_you:'They Owe Me', you_owe_them:'I Owe Them',
+    they_paid_you:'They Settled Me', you_paid_them:'I Settled Them',
+    invoice:'Invoice', bill:'Bill',
+    owed_to_me:'Owed to Me', i_owe:'I Owe',
+    bill_sent:'Bill Sent', bill_received:'Bill Received',
+    invoice_sent:'Invoice Sent', invoice_received:'Invoice Received',
+    advance_paid:'Advance Out', advance_received:'Advance In',
+    payment_recorded:'Payment Recorded'
+  };
   const rows = data.map(e => [
     e.date, e.contact?.name || '', TX[e.tx_type] || e.tx_type,
     (e.amount / 100).toFixed(2), e.currency, e.status,

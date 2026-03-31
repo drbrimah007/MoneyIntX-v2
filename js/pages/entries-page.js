@@ -473,7 +473,7 @@ window.openAdjustSettlementModal = async function(settlementId, entryId, current
   `, { maxWidth: '400px' });
 };
 
-// ── Confirm Adjusted Settlement ────────────────────────────────────
+// ── Confirm Adjusted Settlement (via atomic RPC) ──────────────────
 window.confirmAdjustedSettlement = async function(settlementId, entryId, reviewMode) {
   const newAmount = parseFloat(document.getElementById('adjust-amount').value);
   if (isNaN(newAmount) || newAmount < 0) {
@@ -485,34 +485,15 @@ window.confirmAdjustedSettlement = async function(settlementId, entryId, reviewM
   try {
     const newCents = Math.round(newAmount * 100);
 
-    // Update this settlement's amount
-    const result = await supabase
-      .from('settlements')
-      .update({ amount: newCents })
-      .eq('id', settlementId);
-
-    if (result.error) {
-      toast('Failed to update amount: ' + result.error.message, 'error');
-      return;
-    }
-
-    // Also update the mirror settlement amount (if any)
-    const { data: thisSettlement } = await supabase
-      .from('settlements').select('mirror_of').eq('id', settlementId).single();
-    if (thisSettlement?.mirror_of) {
-      await supabase.from('settlements')
-        .update({ amount: newCents })
-        .eq('id', thisSettlement.mirror_of);
-    }
-
-    // Now confirm via atomic RPC (handles notification to recorder + trigger recalc)
-    const { data: rpcResult, error: rpcErr } = await supabase.rpc('confirm_mirror_settlement', {
+    // Atomic RPC: adjusts both sides + confirms + recalcs + notifies
+    const { data: rpcResult, error: rpcErr } = await supabase.rpc('adjust_and_confirm_settlement', {
       p_settlement_id: settlementId,
+      p_new_amount:    newCents,
       p_reviewed_by:   getCurrentUser().id
     });
 
     if (rpcErr || !rpcResult?.ok) {
-      toast(rpcResult?.error || rpcErr?.message || 'Failed to confirm settlement.', 'error');
+      toast(rpcResult?.error || rpcErr?.message || 'Failed to adjust settlement.', 'error');
       return;
     }
 
