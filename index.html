@@ -771,7 +771,9 @@ async function enterApp(user) {
     currentProfile = data;
   }
   setCurrentProfile(currentProfile); // Sync with state.js
-  await initSession(user, currentProfile); // Resolve workspace session — single source of truth
+  // Resolve workspace session — non-blocking: login must never hang on this
+  try { await initSession(user, currentProfile); }
+  catch(e) { console.error('[enterApp] initSession failed, continuing:', e); }
 
   // ── Sync theme from DB (cross-device) ──────────────────────────
   const dbTheme = currentProfile?.theme;
