@@ -2,18 +2,19 @@
 import { supabase } from './supabase.js';
 import { toCents, createEntry } from './entries.js';
 
-export async function listRecurring(userId) {
+export async function listRecurring(businessId) {
   const { data, error } = await supabase
     .from('recurring_rules')
     .select('*, contact:contacts(id, name), template:templates(id, name)')
-    .eq('user_id', userId)
-    .order('next_run_at');
+    .eq('business_id', businessId)
+    .order('created_at', { ascending: false });
   if (error) console.error('[listRecurring]', error.message);
   return data || [];
 }
 
-export async function createRecurring(userId, { contactId, templateId, frequency, customDays, nextRunAt, txType, amount, currency = 'USD', note = '', autoNotify = false, notifyWho = 'them', notifyMessage = '', maxRuns, description = '', customLabel = '', remindDays = 0, notifyContact = false, notifySelf = false, notifyEmail = false }) {
+export async function createRecurring(businessId, userId, { contactId, templateId, frequency, customDays, nextRunAt, txType, amount, currency = 'USD', note = '', autoNotify = false, notifyWho = 'them', notifyMessage = '', maxRuns, description = '', customLabel = '', remindDays = 0, notifyContact = false, notifySelf = false, notifyEmail = false }) {
   const { data, error } = await supabase.from('recurring_rules').insert({
+    business_id: businessId,
     user_id: userId, contact_id: contactId, template_id: templateId,
     frequency, custom_days: customDays || null,
     next_run_at: nextRunAt, tx_type: txType, amount: toCents(amount),

@@ -1,7 +1,7 @@
 // Money IntX — Groups Page Module
 // Extracted from index.html page modules
 
-import { getCurrentUser, getCurrentProfile } from './state.js';
+import { getCurrentUser, getCurrentProfile, getMyBusinessId } from './state.js';
 import { esc, toast, fmtDate, openModal, closeModal } from '../ui.js';
 import { fmtMoney } from '../entries.js';
 import { supabase } from '../supabase.js';
@@ -107,7 +107,7 @@ export async function renderGroups(el) {
 window.openNewGroupModal = async function() {
   const currentUser = getCurrentUser();
   const currentProfile = getCurrentProfile();
-  const contacts = await listContacts(currentUser.id);
+  const contacts = await listContacts(getMyBusinessId());
   const contactOpts = contacts.map(c=>`<option value="${c.id}" data-name="${esc(c.name)}">${esc(c.name)}</option>`).join('');
   window._newGroupMembers = []; // [{contactId, name}]
 
@@ -327,7 +327,7 @@ window.openGroupDetail = async function(id) {
 };
 
 window.openAddMemberModal = async function(groupId) {
-  const contacts = await listContacts(currentUser.id);
+  const contacts = await listContacts(getMyBusinessId());
   const opts = contacts.map(c=>`<option value="${c.id}" data-name="${esc(c.name)}">${esc(c.name)}</option>`).join('');
   openModal(`
     <h3 style="margin-bottom:16px;">Add Member</h3>

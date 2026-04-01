@@ -2,12 +2,12 @@
 .card { background: var(--bg2); border-radius: 18px; padding: 20px; margin-bottom: 16px; border: 1px solid var(--border); box-shadow: none; }
 .card-sm { padding: 14px; }
 .stat-card { background: var(--bg2); border-radius: 18px; padding: 18px; border: 1px solid var(--border); box-shadow: none; }
-.stat-val { font-size: 26px; font-weight: 800; margin: 4px 0; word-break: break-word; overflow-wrap: break-word; }
+.stat-val { font-size: 26px; font-weight: 600; margin: 4px 0; word-break: break-word; overflow-wrap: break-word; }
 @media(max-width:640px) { .stat-val { font-size: 20px; } }
-.stat-lbl { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; }
+.stat-lbl { font-size: 12px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
 
 /* Buttons — solid matte, no gradient, no glow */
-.btn { background: var(--accent, #6366F1); color: #fff; border: none; border-radius: 12px; padding: 12px 20px; cursor: pointer; font-size: 14px; font-weight: 600; transition: opacity .15s, transform .1s; box-shadow: none; }
+.btn { background: var(--accent, #6366F1); color: #fff; border: none; border-radius: 12px; padding: 12px 20px; cursor: pointer; font-size: 14px; font-weight: 500; transition: opacity .15s, transform .1s; box-shadow: none; }
 .btn:hover { opacity: .88; }
 .btn:active { transform: scale(0.97); }
 .btn.sm { padding: 6px 12px; font-size: 13px; border-radius: 8px; box-shadow: none; }

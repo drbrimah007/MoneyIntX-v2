@@ -2,11 +2,11 @@
 import { supabase } from './supabase.js';
 
 // ── Panels ────────────────────────────────────────────────────────
-export async function listPanels(userId) {
+export async function listPanels(businessId) {
   const { data, error } = await supabase
     .from('business_panels')
     .select('*')
-    .eq('user_id', userId)
+    .eq('business_id', businessId)
     .eq('archived', false)
     .order('created_at', { ascending: false });
   if (error) console.error('[listPanels]', error.message);
@@ -23,10 +23,10 @@ export async function getPanel(panelId) {
   return data;
 }
 
-export async function createPanel(userId, { title, currency, session_type }) {
+export async function createPanel(businessId, userId, { title, currency, session_type }) {
   const { data, error } = await supabase
     .from('business_panels')
-    .insert({ user_id: userId, title, currency, session_type, fields: [] })
+    .insert({ business_id: businessId, user_id: userId, title, currency, session_type, fields: [] })
     .select()
     .single();
   if (error) console.error('[createPanel]', error.code, error.message);
@@ -65,10 +65,10 @@ export async function listRows(panelId, { includeArchived = false } = {}) {
   return data || [];
 }
 
-export async function addRow(panelId, userId, sessionKey, rowDate, values) {
+export async function addRow(panelId, businessId, userId, sessionKey, rowDate, values) {
   const { data, error } = await supabase
     .from('business_panel_rows')
-    .insert({ panel_id: panelId, user_id: userId, session_key: sessionKey, row_date: rowDate, values })
+    .insert({ panel_id: panelId, business_id: businessId, user_id: userId, session_key: sessionKey, row_date: rowDate, values })
     .select()
     .single();
   if (error) console.error('[addRow]', error.message);

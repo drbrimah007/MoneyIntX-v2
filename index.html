@@ -12,6 +12,11 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="favicon.png">
 <link rel="apple-touch-icon" sizes="180x180" href="favicon.png">
+<!-- Inter font for smooth, clean UI (non-blocking) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"></noscript>
 <!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://moneyinteractions.com/">
@@ -355,9 +360,15 @@
       <div id="search-results" style="display:none;position:absolute;left:50%;transform:translateX(-50%);width:400px;max-width:90vw;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);z-index:200;max-height:300px;overflow-y:auto;margin-top:4px;"></div>
     </div>
     <div id="topbar-right">
-      <span id="sidebar-user-name" style="font-size:13px;font-weight:600;"></span>
-      <button class="bs sm" onclick="app.logOut()">Sign Out</button>
+      <button class="topbar-icon-btn" onclick="app.navigate('notifications')" title="Notifications" style="position:relative;background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px 6px;">🔔<span id="topbar-notif-badge" style="display:none;position:absolute;top:-2px;right:-2px;background:var(--accent,#6366F1);color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;padding:0 4px;">0</span></button>
+      <button class="topbar-icon-btn" onclick="app.navigate('settings')" title="Settings" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px 6px;">⚙</button>
+      <button class="topbar-icon-btn" onclick="app.logOut()" title="Sign Out" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px 6px;">↪</button>
     </div>
+  </div>
+  <!-- Context bar: shows when working inside an entity from My Ops -->
+  <div id="ops-context-bar" style="display:none;background:var(--accent,#6366F1);padding:4px 16px;text-align:center;font-size:12px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em;cursor:default;">
+    <span id="ops-context-label"></span>
+    <button onclick="window._opsClearContext()" style="background:rgba(255,255,255,.2);border:none;color:#fff;font-size:11px;font-weight:600;padding:2px 10px;border-radius:6px;margin-left:10px;cursor:pointer;">Exit</button>
   </div>
   <!-- Tip bar: single random tip per page load, centered between topbar and nav -->
   <div id="app-tip-bar" class="no-print" style="background:var(--bg3,#161920);border-bottom:1px solid var(--border,rgba(255,255,255,.05));padding:5px 20px;text-align:center;font-size:11.5px;color:var(--muted,#8791A2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em;cursor:default;"></div>
@@ -371,13 +382,14 @@
     <button class="nav-btn" id="nav-investments" data-page="investments" onclick="app.navigate('investments')">Investments</button>
     <button class="nav-btn" id="nav-business" data-page="business" onclick="app.navigate('business')">Ledgers</button>
     <button class="nav-btn" id="nav-business-suite" data-page="business-suite" onclick="app.navigate('business-suite')" style="font-weight:700;">Business Suite</button>
+    <button class="nav-btn" id="nav-operations" data-page="operations" onclick="app.navigate('operations')">My Ops</button>
     <button class="nav-btn" data-page="templates" onclick="app.navigate('templates')">Templates</button>
     <button class="nav-btn" data-page="recurring" onclick="app.navigate('recurring')">Recurring</button>
-    <button class="nav-btn" data-page="notifications" onclick="app.navigate('notifications')">🔔 <span id="notif-badge" class="nav-badge" style="display:none;">0</span></button>
-    <button class="nav-btn" id="nav-nok" data-page="nok" onclick="app.navigate('nok')">🔐 Trusted Access</button>
+    <button class="nav-btn" data-page="notifications" onclick="app.navigate('notifications')">Notifications <span id="notif-badge" class="nav-badge" style="display:none;">0</span></button>
+    <button class="nav-btn" id="nav-nok" data-page="nok" onclick="app.navigate('nok')">Trusted Access</button>
     <button class="nav-btn" data-page="trash" id="trash-link" onclick="app.navigate('trash')" style="display:none;">Trash</button>
     <button class="nav-btn" data-page="admin" id="admin-link" onclick="app.navigate('admin')" style="display:none;">Admin</button>
-    <button class="nav-btn" data-page="settings" onclick="app.navigate('settings')">⚙</button>
+    <button class="nav-btn" data-page="settings" onclick="app.navigate('settings')">Settings</button>
   </div>
 
   <!-- Main Content -->
@@ -414,6 +426,11 @@
       <button id="mob-business-suite" onclick="closeMobileMore();app.navigate('business-suite')" style="display:flex;align-items:center;gap:14px;padding:14px 24px;font-size:15px;font-weight:700;cursor:pointer;color:var(--text);background:none;border:none;width:100%;text-align:left;">
         <span style="font-size:20px;width:28px;text-align:center;">💼</span> Business Suite
       </button>
+      <div style="height:1px;background:var(--border);margin:6px 0;"></div>
+      <button id="mob-operations" onclick="closeMobileMore();app.navigate('operations')" style="display:flex;align-items:center;gap:14px;padding:14px 24px;font-size:15px;font-weight:700;cursor:pointer;color:var(--accent,#6366F1);background:none;border:none;width:100%;text-align:left;">
+        <span style="font-size:20px;width:28px;text-align:center;">🏢</span> My Ops
+      </button>
+      <div style="height:1px;background:var(--border);margin:6px 0;"></div>
       <button onclick="closeMobileMore();app.navigate('templates')" style="display:flex;align-items:center;gap:14px;padding:14px 24px;font-size:15px;font-weight:500;cursor:pointer;color:var(--text);background:none;border:none;width:100%;text-align:left;">
         <span style="font-size:20px;width:28px;text-align:center;">📄</span> Templates
       </button>
@@ -491,7 +508,7 @@ import { toast, esc, navigate, statusBadge, TX_LABELS, TX_COLORS, TX_CREATE_LABE
 import { sendNotificationEmail, sendInvoiceEmail, sendOtpEmail, sendInviteEmail, sendAppInviteEmail, sendNokVerificationEmail, sendNokActivationEmail, sendLockerInfoEmail, logEmail } from './js/email.js';
 
 // Page modules
-import { setCurrentUser, setCurrentProfile, setNotifChannel, contactColor, contactAvatar, PAGE_SIZE, renderPagination, _invalidateEntries, _fmtAmt, setupCurrencyPicker } from './js/pages/state.js';
+import { setCurrentUser, setCurrentProfile, setNotifChannel, contactColor, contactAvatar, PAGE_SIZE, renderPagination, _invalidateEntries, _fmtAmt, setupCurrencyPicker, initSession, getSession, getMyBusinessId, getActiveBusinessId } from './js/pages/state.js';
 import { renderDash } from './js/pages/dashboard.js';
 import { renderContacts } from './js/pages/contacts-page.js';
 import { renderEntries, resetEntriesCache } from './js/pages/entries-page.js';
@@ -505,6 +522,7 @@ import { renderTemplatesPage } from './js/pages/templates-page.js';
 import { renderRecurringPage } from './js/pages/recurring-page.js';
 import { renderSettings } from './js/pages/settings-page.js';
 import { renderBusinessSuite } from './js/pages/business-suite-page.js';
+import { renderOperations } from './js/pages/operations-page.js';
 
 let currentUser = null;
 let currentProfile = null;
@@ -514,6 +532,8 @@ let notifChannel = null;
 // contactColor, contactAvatar, PAGE_SIZE, renderPagination, _invalidateEntries, _fmtAmt
 // Currency picker functions set up later in setupCurrencyPicker()
 window.contactColor = contactColor;
+window.getSession = getSession;
+window.getActiveBusinessId = getActiveBusinessId;
 
 // ── Expose to onclick handlers ────────────────────────────────────
 window.app = { navigate: navTo, logOut: handleLogOut };
@@ -751,6 +771,7 @@ async function enterApp(user) {
     currentProfile = data;
   }
   setCurrentProfile(currentProfile); // Sync with state.js
+  await initSession(user, currentProfile); // Resolve workspace session — single source of truth
 
   // ── Sync theme from DB (cross-device) ──────────────────────────
   const dbTheme = currentProfile?.theme;
@@ -816,7 +837,8 @@ async function enterApp(user) {
   document.getElementById('landing').style.display = 'none';
   document.getElementById('shell').classList.add('active');
   // (FAB removed — topbar "+ Entry" button is used instead)
-  document.getElementById('sidebar-user-name').textContent = currentProfile?.display_name || user.email;
+  const _sidebarName = document.getElementById('sidebar-user-name');
+  if (_sidebarName) _sidebarName.textContent = currentProfile?.display_name || user.email;
   // sidebar-user-email removed in v1-style layout
   // Show admin link for admin users
   const adminLink = document.getElementById('admin-link');
@@ -914,7 +936,7 @@ async function enterApp(user) {
     || (window.location.hash || '').replace('#', '').split('?')[0]
     || '';
   delete window._mxi_preload_hash; // consumed — clean up
-  const validPages = ['dash','entries','contacts','settings','groups','investments','business','business-suite','templates','recurring','notifications','nok','trash','admin','view-all','user-entries'];
+  const validPages = ['dash','entries','contacts','settings','groups','investments','business','business-suite','operations','templates','recurring','notifications','nok','trash','admin','view-all','user-entries'];
   const pageToRestore = (!isNewUser && validPages.includes(hashPage)) ? hashPage : (localStorage.getItem('mxi_last_page') || 'dash');
   navTo(pageToRestore);
 
@@ -981,6 +1003,12 @@ async function updateNotifBadge() {
     badge.textContent = count;
     badge.style.display = count > 0 ? '' : 'none';
   }
+  // Update topbar badge
+  const topBadge = document.getElementById('topbar-notif-badge');
+  if (topBadge) {
+    topBadge.textContent = count;
+    topBadge.style.display = count > 0 ? '' : 'none';
+  }
   // Update mobile tab bar badge
   const mobileBadge = document.getElementById('mobile-notif-badge');
   if (mobileBadge) {
@@ -1000,8 +1028,25 @@ function navTo(page) {
   if (window._navHistory.length > 20) window._navHistory.shift();
   window._currentPage = page;
   localStorage.setItem('mxi_last_page', page);
-  // Update URL hash for refresh persistence
-  try { history.replaceState({ page }, '', '#' + page); } catch(_) {}
+  // Update URL hash — pushState so browser back button works within the app
+  try {
+    const prevHash = (window.location.hash || '').replace('#', '');
+    if (prevHash !== page) {
+      history.pushState({ page }, '', '#' + page);
+    } else {
+      history.replaceState({ page }, '', '#' + page);
+    }
+  } catch(_) {}
+
+  // Operations context bar: hide on hub/dash/BS, restore on all other pages
+  if (['operations', 'dash', 'business-suite'].includes(page)) {
+    const _ctxBar = document.getElementById('ops-context-bar');
+    if (_ctxBar) _ctxBar.style.display = 'none';
+    window._opsActiveContext = null;
+    try { localStorage.removeItem('mxi_ops_context'); } catch(_) {}
+  } else if (typeof window._opsRestoreContextBar === 'function') {
+    window._opsRestoreContextBar();
+  }
 
   // Business Suite: hide all top chrome (topbar, nav, tip bar, mobile tabs)
   const _isBs = page === 'business-suite';
@@ -1014,19 +1059,14 @@ function navTo(page) {
   if (_navBar) _navBar.style.display = _isBs ? 'none' : '';
   if (_mobileTab) _mobileTab.style.display = _isBs ? 'none' : '';
 
-  // Reset Business Suite layout override and context flags when leaving
+  // Reset Business Suite layout override and context flags when leaving BS namespace
   if (!_isBs) {
     const _c = document.getElementById('content');
     if (_c) { _c.style.maxWidth = ''; _c.style.margin = ''; }
     const _m = document.getElementById('main');
     if (_m) { _m.style.padding = ''; }
-    // Clear any lingering BS creation flags to prevent cross-contamination
-    window._bsActiveContext = false;
-    window._bsActiveBizId = '';
-    window._bsCreatingPanel = false;
-    window._bsCreatingTemplate = false;
-    window._bsCreatingRecurring = false;
-    window._bsCreatingInvestment = false;
+    // Centralized context clear — one function, all flags
+    if (typeof window.clearBsContext === 'function') window.clearBsContext();
   }
 
   // Update sidebar active state
@@ -1041,15 +1081,24 @@ function navTo(page) {
     case 'dash': renderDash(content); break;
     case 'contacts': renderContacts(content); break;
     case 'entries': resetEntriesCache(); renderEntries(content); break; // always fresh on navigation
-    case 'groups':      if (!_modEnabled('groups'))      { navTo('dash'); return; } renderGroups(content); break;
-    case 'investments': if (!_modEnabled('investments')) { navTo('dash'); return; } renderInvestments(content); break;
-    case 'business':    if (!_modEnabled('business'))    { navTo('dash'); return; } renderBusinessPage(content); break;
+    case 'groups':      if (!_modEnabled('groups')      && !window._opsActiveContext) { navTo('dash'); return; } renderGroups(content); break;
+    case 'investments': if (!_modEnabled('investments') && !window._opsActiveContext) { navTo('dash'); return; } renderInvestments(content); break;
+    case 'business':    if (!_modEnabled('business')    && !window._opsActiveContext) { navTo('dash'); return; } renderBusinessPage(content); break;
     case 'business-suite':
       if (!_modEnabled('business-suite')) {
         // Auto-enable + persist to DB so cross-device sync doesn't revert it
         const _m = _getModules(); _m['business-suite'] = true; _saveModules(_m);
       }
+      // If entering BS without a fresh ops routing flag, clear context
+      // so renderBusinessSuite defaults to own business.
+      if (window._bsOpsRouted) {
+        window._bsOpsRouted = false; // consume one-shot flag — keep context set by ops
+      } else {
+        // Direct nav (nav bar, sidebar) — clear any stale foreign identity
+        if (typeof window.clearBsContext === 'function') window.clearBsContext();
+      }
       renderBusinessSuite(content); break;
+    case 'operations': renderOperations(content); break;
     case 'templates': renderTemplatesPage(content); break;
     case 'recurring': renderRecurringPage(content); break;
     case 'notifications': renderNotifications(content); break;
@@ -1065,7 +1114,7 @@ function navTo(page) {
 window.addEventListener('popstate', (e) => {
   if (!currentUser) return;          // on landing page, let browser handle
   const hash = (window.location.hash || '').replace('#', '').split('?')[0] || 'dash';
-  const validPages = ['dash','entries','contacts','settings','groups','investments','business','business-suite','templates','recurring','notifications','nok','trash','admin','view-all','user-entries'];
+  const validPages = ['dash','entries','contacts','settings','groups','investments','business','business-suite','operations','templates','recurring','notifications','nok','trash','admin','view-all','user-entries'];
   if (validPages.includes(hash)) {
     navTo(hash);
   } else {
@@ -1307,7 +1356,7 @@ window.impersonateUser = async function(userId, name) {
     window._impersonating = { id: userId, profile: snap.user };
     currentUser = { id: userId, email: snap.user?.email };
     currentProfile = snap.user;
-    document.getElementById('sidebar-user-name').textContent = snap.user?.display_name || 'User';
+    const _sn1 = document.getElementById('sidebar-user-name'); if (_sn1) _sn1.textContent = snap.user?.display_name || 'User';
     resetEntriesCache();
     const ec = snap.entries?.length || 0;
     const cc = snap.contacts?.length || 0;
@@ -1327,7 +1376,7 @@ window.stopImpersonation = function() {
   if (!window._originalUser) return;
   currentUser = { id: window._originalUser.id, email: window._originalUser.profile?.email };
   currentProfile = window._originalUser.profile;
-  document.getElementById('sidebar-user-name').textContent = currentProfile?.display_name || '';
+  const _sn2 = document.getElementById('sidebar-user-name'); if (_sn2) _sn2.textContent = currentProfile?.display_name || '';
   window._originalUser = null;
   window._impersonating = null;
   window._impersonatedData = null;

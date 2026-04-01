@@ -1,7 +1,7 @@
 // Money IntX — Investments Page Module
 // Extracted from index.html page modules
 
-import { getCurrentUser, getCurrentProfile } from './state.js';
+import { getCurrentUser, getCurrentProfile, getMyBusinessId } from './state.js';
 import { esc, toast, fmtDate, openModal, closeModal } from '../ui.js';
 import { fmtMoney } from '../entries.js';
 import { supabase } from '../supabase.js';
@@ -135,7 +135,7 @@ export async function renderInvestments(el) {
 window.openNewInvestmentModal = async function() {
   const currentUser = getCurrentUser();
   const currentProfile = getCurrentProfile();
-  const contacts = await listContacts(currentUser.id);
+  const contacts = await listContacts(getMyBusinessId());
   const contactOpts = contacts.map(c => `<option value="${c.id}" data-name="${esc(c.name)}">${esc(c.name)}</option>`).join('');
   window._newInvPartners = []; // [{contactId, name}]
 
@@ -212,14 +212,20 @@ window.doCreateInvestment = async function() {
   const name = document.getElementById('ni-name').value.trim();
   if (!name) return toast('Name required.', 'error');
   const ventureType = document.querySelector('input[name="ni-venture"]:checked')?.value || 'personal';
-  const inv = await createInvestment(currentUser.id, {
+  // Use businessId from BS context if available, otherwise use userId
+  // Use BS context business when creating from Business Suite, else own business
+  const { getActiveBusinessId } = await import('./state.js');
+  const bizUuid = (window._bsCreatingInvestment && window._bsContext?.businessId)
+    ? window._bsContext.businessId
+    : getActiveBusinessId();
+  const inv = await createInvestment(bizUuid, currentUser.id, {
     name,
     description: document.getElementById('ni-desc').value.trim(),
     type: document.getElementById('ni-type').value,
     status: document.getElementById('ni-status').value,
     currency: document.getElementById('ni-currency').value || 'USD',
     ventureType,
-    accessMode: ventureType === 'shared' ? 'shared' : 'private',
+    accessMode: ventureType === 'shared' ? 'members_only' : 'private',
     initialAmount: parseFloat(document.getElementById('ni-amount').value) || 0,
     expectedReturn: parseFloat(document.getElementById('ni-return').value) || null
   });
@@ -474,7 +480,7 @@ window._removeInvMember = async function(memberId, invId) {
 
 window.openAddInvPartnerModal = async function(invId) {
   const currentUser = getCurrentUser();
-  const contacts = await listContacts(currentUser.id);
+  const contacts = await listContacts(getMyBusinessId());
 
   // Store for searchable typeahead
   window._ipmContacts = contacts;

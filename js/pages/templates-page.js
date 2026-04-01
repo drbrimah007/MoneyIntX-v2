@@ -1,7 +1,7 @@
 // Money IntX — Templates Page Module
 // Extracted from index.html page modules
 
-import { getCurrentUser, getCurrentProfile } from './state.js';
+import { getCurrentUser, getCurrentProfile, getMyBusinessId } from './state.js';
 import { esc, toast, openModal, closeModal, fmtDate, fmtRelative, TX_LABELS } from '../ui.js';
 import { supabase } from '../supabase.js';
 import { listContacts } from '../contacts.js';
@@ -16,7 +16,9 @@ async function renderTemplatesPage(el) {
   const currentUser = getCurrentUser();
   const currentProfile = getCurrentProfile();
   el.innerHTML = '<div class="page-header"><h2>Templates</h2></div><p style="color:var(--muted);">Loading...</p>';
-  const templates = await listTemplates(currentUser.id);
+  // Use businessId from BS context if available, otherwise use userId
+  const bizUuid = getMyBusinessId();
+  const templates = await listTemplates(bizUuid);
   let html = `<div class="page-header"><h2>Templates</h2>
     <div style="display:flex;gap:8px;">
       <button class="btn btn-primary btn-sm" onclick="openNewTemplateModal()">+ New Template</button>
@@ -100,6 +102,7 @@ function currencySelectHtml(selected) {
 window._tplFields = [];
 
 function _tplModalHtml(title, idPrefix, tpl = {}) {
+  const _profile = getCurrentProfile();
   return `
     <h3 style="margin-bottom:16px;">${title}</h3>
     <div class="form-group"><label>Name *</label><input type="text" id="${idPrefix}-name" value="${esc(tpl.name || '')}" placeholder="Invoice Template"></div>
@@ -113,7 +116,7 @@ function _tplModalHtml(title, idPrefix, tpl = {}) {
       <div class="form-group"><label>Starting # <span style="font-size:11px;color:var(--muted);">Next invoice number</span></label><input type="number" id="${idPrefix}-nextnum" min="1" step="1" value="${tpl.invoice_next_num || 1}"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Default Currency</label><select id="${idPrefix}-currency">${currencySelectHtml(tpl.currency || currentProfile?.default_currency)}</select></div>
+      <div class="form-group"><label>Default Currency</label><select id="${idPrefix}-currency">${currencySelectHtml(tpl.currency || _profile?.default_currency)}</select></div>
       <div class="form-group" style="display:flex;align-items:center;gap:8px;padding-top:28px;">
         <input type="checkbox" id="${idPrefix}-public" ${tpl.is_public?'checked':''} style="width:auto;accent-color:var(--accent);">
         <label for="${idPrefix}-public" style="cursor:pointer;font-size:13px;font-weight:500;">Add to Public Template DB</label>
@@ -371,7 +374,9 @@ window.doCreateTemplate = async function() {
   const fields = _collectFields();
   const name = document.getElementById('nt-name').value.trim();
   if (!name) return toast('Name required.', 'error');
-  const newTmpl = await createTemplate(currentUser.id, {
+  // Get businessId from BS context if available, otherwise use userId
+  const bizUuid = getMyBusinessId();
+  const newTmpl = await createTemplate(bizUuid, currentUser.id, {
     name, description: document.getElementById('nt-desc').value.trim(),
     txType: document.getElementById('nt-type').value || null,
     fields,
@@ -439,7 +444,7 @@ window.useTemplateForEntry = async function(templateId) {
   // Store for calculator engine
   window._activeTpl = t;
   window._activeTplCurrency = t.currency || currentProfile?.default_currency || 'USD';
-  const contacts = await listContacts(currentUser.id);
+  const contacts = await listContacts(getMyBusinessId());
   const fields = t.fields || [];
 
   // Generate invoice number
@@ -733,6 +738,12 @@ window.saveTemplateEntry = async function(templateId, invNum) {
     ? { business_id: window._bsActiveBizId } : null;
   const tfeDueDateVal = document.getElementById('tfe-due-date')?.value || null;
   if (_bsMeta && tfeDueDateVal) _bsMeta.due_date = tfeDueDateVal;
+  if (_bsMeta && invNum) _bsMeta.inv_number = invNum;
+
+  // Resolve business_id: BS context → explicit biz, else user's own
+  const { getActiveBusinessId, getMyBusinessId } = await import('./state.js');
+  const _entryBizId = (window._bsActiveContext && window._bsActiveBizId)
+    ? window._bsActiveBizId : getActiveBusinessId() || getMyBusinessId();
 
   let entry;
   try {
@@ -742,16 +753,31 @@ window.saveTemplateEntry = async function(templateId, invNum) {
       date: document.getElementById('tfe-date').value,
       note: document.getElementById('tfe-note').value.trim(),
       invoiceNumber: invNum, templateId, templateData: tplData,
-      metadata: _bsMeta
+      metadata: _bsMeta,
+      businessId: _entryBizId
     });
   } catch (err) {
     toast('Failed to create entry: ' + (err.message || 'Unknown error'), 'error');
     return;
   }
 
-  // Persist due_date if provided (only for non-BS or when metadata didn't already carry it)
-  if (entry?.id && tfeDueDateVal && !_bsMeta) {
-    await supabase.from('entries').update({ due_date: tfeDueDateVal }).eq('id', entry.id);
+  // Post-save: persist contact_name, due_date, category on entry row
+  if (entry?.id) {
+    const _postUpdates = {};
+    // Resolve contact name
+    const _cName = entry?.contact?.name || '';
+    if (_cName) _postUpdates.contact_name = _cName;
+    // Due date
+    if (tfeDueDateVal) _postUpdates.due_date = tfeDueDateVal;
+    // Category + direction for invoice types
+    const _txCat = { invoice_sent: 'invoice_sent', invoice_received: 'bill_received',
+      they_owe_you: 'invoice_sent', you_owe_them: 'bill_received' };
+    _postUpdates.category = _txCat[txType] || txType;
+    _postUpdates.direction_sign = ['they_owe_you','invoice_sent','loan_given'].includes(txType) ? 1 : -1;
+    _postUpdates.outstanding_amount = Math.round(amount * 100);
+    // BS sender name
+    if (window._bsActiveContext) _postUpdates.from_name = window._getBsSenderName?.() || '';
+    if (Object.keys(_postUpdates).length) await supabase.from('entries').update(_postUpdates).eq('id', entry.id);
   }
 
   // Increment template invoice counter
@@ -869,7 +895,9 @@ window.previewPublicTemplate = function(id) {
 
 window.doCopyTemplate = async function(id) {
   const currentUser = getCurrentUser();
-  await copyPublicTemplate(currentUser.id, id);
+  // Use businessId from BS context if available, otherwise use userId
+  const bizUuid = getMyBusinessId();
+  await copyPublicTemplate(bizUuid, currentUser.id, id);
   toast('Template copied!', 'success');
   if (document.getElementById('bs-content') && window._bsNavigate) { window._bsNavigate('bs-templates'); return; }
   navTo('templates');

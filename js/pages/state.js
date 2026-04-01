@@ -1,25 +1,99 @@
 // ────────────────────────────────────────────────────────────────────────────
 // Shared App State & Utilities
 // ────────────────────────────────────────────────────────────────────────────
-// This module provides shared state (currentUser, currentProfile, notifChannel)
-// and common utility functions needed by all page renderers.
-// State is set by the main script in index.html after authentication.
+// This module provides:
+// 1. workspaceSession — THE single source of truth for identity & scope
+// 2. Legacy user/profile getters (thin wrappers around session)
+// 3. Common UI utilities needed by all page renderers
+//
+// Architecture rule: frontend is a RENDERER, not a decider.
+// Identity, business scope, and permissions come from the backend.
 
 import { invalidateEntryCache } from '../entries.js';
 import { supabase } from '../supabase.js';
 import { toast } from '../ui.js';
 
-// ── Shared app state ────────────────────────────────────────────────────────
-let _currentUser = null;
-let _currentProfile = null;
-let _notifChannel = null;
+// ═══════════════════════════════════════════════════════════════════════════
+// WORKSPACE SESSION — single source of truth
+// ═══════════════════════════════════════════════════════════════════════════
+// Initialized ONCE after auth. Every data fetch reads from here.
+// Business Suite can override it for cross-business operation.
 
-export function setCurrentUser(u) { _currentUser = u; }
-export function getCurrentUser() { return _currentUser; }
-export function setCurrentProfile(p) { _currentProfile = p; }
-export function getCurrentProfile() { return _currentProfile; }
+const _session = {
+  userId: null,
+  userEmail: null,
+  userDisplayName: null,
+  businessId: null,       // the user's OWN business UUID
+  businessName: null,
+  role: null,             // 'owner' | 'operative' | 'member'
+  permissions: null,
+  scopes: null,
+  isOwner: false,
+  profile: null,          // full profile row from users table
+  ready: false            // true once initSession completes
+};
+
+// Public read-only accessor — everything reads from this
+export function getSession() { return _session; }
+
+// Initialize workspace session — call ONCE after auth
+export async function initSession(user, profile) {
+  _session.userId = user.id;
+  _session.userEmail = user.email;
+  _session.userDisplayName = profile?.display_name || user.email?.split('@')[0] || '';
+  _session.profile = profile;
+
+  // Resolve own business via RPC
+  try {
+    const { data: bizId } = await supabase.rpc('my_business_id');
+    if (bizId) {
+      _session.businessId = bizId;
+      // Get full workspace info
+      const { data: ws } = await supabase.rpc('resolve_workspace', { p_business_id: bizId });
+      if (ws && !ws.error) {
+        _session.businessName = ws.business_name;
+        _session.role = ws.role;
+        _session.permissions = ws.permissions;
+        _session.scopes = ws.scopes;
+        _session.isOwner = ws.is_owner;
+      }
+    }
+  } catch (err) {
+    console.error('[initSession] Failed to resolve workspace:', err);
+  }
+
+  _session.ready = true;
+  console.log('[session] Initialized:', _session.businessId, 'role:', _session.role);
+}
+
+// ── Legacy compat — pages still call these, thin wrappers ──────────────────
+export function setCurrentUser(u) { if (u) { _session.userId = u.id; _session.userEmail = u.email; } }
+export function getCurrentUser() {
+  if (!_session.userId) return null;
+  return { id: _session.userId, email: _session.userEmail };
+}
+export function setCurrentProfile(p) { _session.profile = p; }
+export function getCurrentProfile() { return _session.profile; }
+
+let _notifChannel = null;
 export function setNotifChannel(c) { _notifChannel = c; }
 export function getNotifChannel() { return _notifChannel; }
+
+// ── Business ID — always from session, never guessed ───────────────────────
+// getMyBusinessId() returns the user's OWN business. Always.
+// For BS cross-business context, use getActiveBusinessId().
+export function getMyBusinessId() { return _session.businessId; }
+
+// getActiveBusinessId() returns whichever business is "active":
+// - In BS: the BS context business (could be someone else's)
+// - Otherwise: user's own business
+export function getActiveBusinessId() {
+  return window._bsContext?.businessId || _session.businessId;
+}
+
+// Legacy compat — these just call the same thing now
+export async function initBusinessId() { return _session.businessId; }
+export async function resolveBusinessId() { return getActiveBusinessId(); }
 
 // ── Contact color: deterministic per ID, stored in localStorage ───────────
 // Cache key includes version — bump to invalidate stale colors
@@ -79,7 +153,7 @@ export function renderPagination(totalItems, currentPage, onClickFn) {
 
 // ── Invalidate all entry caches (call after any create/update/delete) ──────
 export function _invalidateEntries() {
-  invalidateEntryCache(_currentUser?.id);
+  invalidateEntryCache(_session.userId);
   window._entriesAll = [];         // force re-fetch next renderEntries call
   window._pendingSharesAll = null; // force re-fetch pending received shares
 }
@@ -94,10 +168,10 @@ export function _fmtAmt(dollarAmount, currency) {
 // ── Currency picker functions — exposed to window for onclick handlers ──────
 export function setupCurrencyPicker() {
   window.setDefaultCurrency = async function(cur) {
-    if (!_currentUser) return;
+    if (!_session.userId) return;
     // Write to 'users' table — same table getProfile() reads from
-    await supabase.from('users').update({ default_currency: cur }).eq('id', _currentUser.id);
-    if (_currentProfile) _currentProfile.default_currency = cur;
+    await supabase.from('users').update({ default_currency: cur }).eq('id', _session.userId);
+    if (_session.profile) _session.profile.default_currency = cur;
     toast('Default currency set to ' + cur, 'success');
     window.renderDash(); // re-render so hero reflects new currency immediately
   };

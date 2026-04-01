@@ -27,8 +27,9 @@ export async function getInvestment(id) {
   return data;
 }
 
-export async function createInvestment(userId, { name, description = '', type = 'general', status = 'active', ventureType = 'personal', accessMode = 'private', initialAmount = 0, currency = 'USD', expectedReturn }) {
+export async function createInvestment(businessId, userId, { name, description = '', type = 'general', status = 'active', ventureType = 'personal', accessMode = 'private', initialAmount = 0, currency = 'USD', expectedReturn }) {
   const { data, error } = await supabase.from('investments').insert({
+    business_id: businessId,
     user_id: userId, name, description, type, status,
     venture_type: ventureType, access_mode: accessMode,
     initial_amount: toCents(initialAmount),

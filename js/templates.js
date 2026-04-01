@@ -1,11 +1,11 @@
 // Money IntX v2 — Templates Module
 import { supabase } from './supabase.js';
 
-export async function listTemplates(userId) {
+export async function listTemplates(businessId) {
   const { data, error } = await supabase
     .from('templates')
     .select('*')
-    .eq('user_id', userId)
+    .eq('business_id', businessId)
     .is('archived_at', null)
     .order('created_at', { ascending: false });
   if (error) console.error('[listTemplates]', error.message);
@@ -29,8 +29,9 @@ export async function getTemplate(id) {
   return data;
 }
 
-export async function createTemplate(userId, { name, description = '', txType = null, fields = [], invoicePrefix = 'INV-', invoiceNextNum = 1, currency = 'USD', isPublic = false }) {
+export async function createTemplate(businessId, userId, { name, description = '', txType = null, fields = [], invoicePrefix = 'INV-', invoiceNextNum = 1, currency = 'USD', isPublic = false }) {
   const { data, error } = await supabase.from('templates').insert({
+    business_id: businessId,
     user_id: userId, name, description, tx_type: txType, fields,
     invoice_prefix: invoicePrefix, invoice_next_num: invoiceNextNum,
     currency, is_public: isPublic
@@ -52,7 +53,7 @@ export async function deleteTemplate(id) {
   return !error;
 }
 
-export async function copyPublicTemplate(userId, templateId) {
+export async function copyPublicTemplate(businessId, userId, templateId) {
   // Try getTemplate first (works when RLS allows public reads)
   let original = await getTemplate(templateId);
   // Fallback: if getTemplate failed due to RLS, try fetching from public list
@@ -61,7 +62,7 @@ export async function copyPublicTemplate(userId, templateId) {
     original = publicList.find(t => t.id === templateId);
   }
   if (!original) { console.error('[copyPublicTemplate] Template not found:', templateId); return null; }
-  return createTemplate(userId, {
+  return createTemplate(businessId, userId, {
     name: original.name + ' (Copy)',
     description: original.description,
     txType: original.tx_type,

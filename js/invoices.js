@@ -141,15 +141,31 @@ export function generateInvoiceHTML(entry, contact, profile, settlements = []) {
   const logoUrl = profile?.logo_url || '';
   const currency = entry.currency || 'USD';
 
-  // Build line items: template fields if available, else single note row
+  // Build line items: template fields if available, then metadata line_items, else single note row
   const tdata = entry.template_data;
   const hasTemplateData = tdata && typeof tdata === 'object' && Object.keys(tdata).length > 0;
   const { rows: templateRows, hasFinalTotal } = hasTemplateData
     ? renderTemplateRows(entry, currency)
     : { rows: '', hasFinalTotal: false };
 
-  // If template has fields, don't show the plain "note" row (avoid duplication)
-  const showNoteRow = !hasTemplateData;
+  // Check for metadata line_items (from invoice/bill item lister)
+  const metaLineItems = entry.metadata?.line_items || [];
+  const hasLineItems = metaLineItems.length > 0;
+  let lineItemRows = '';
+  if (hasLineItems && !hasTemplateData) {
+    lineItemRows = metaLineItems.map(li => {
+      const lineTotal = (li.qty || 1) * (li.price || 0);
+      return `<tr>
+        <td>${escHtml(li.description || '—')}</td>
+        <td style="text-align:center;">${li.qty || 1}</td>
+        <td style="text-align:right;">${fmtMoney(Math.round((li.price||0)*100), currency)}</td>
+        <td style="text-align:right;font-weight:700;">${fmtMoney(Math.round(lineTotal*100), currency)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // If template has fields or line items, don't show the plain "note" row (avoid duplication)
+  const showNoteRow = !hasTemplateData && !hasLineItems;
 
   // When the template itself contains a Final Total field (rendered inside templateRows),
   // suppress the bottom totals block — the template IS the total.
@@ -230,12 +246,16 @@ export function generateInvoiceHTML(entry, contact, profile, settlements = []) {
       </div>
     </div>
     <table class="inv-table">
-      <thead><tr><th>Description</th><th style="text-align:right;min-width:100px;">Amount</th></tr></thead>
+      <thead><tr>
+        <th>Description</th>
+        ${hasLineItems && !hasTemplateData ? '<th style="text-align:center;width:50px;">Qty</th><th style="text-align:right;min-width:80px;">Price</th><th style="text-align:right;min-width:90px;">Total</th>' : '<th style="text-align:right;min-width:100px;">Amount</th>'}
+      </tr></thead>
       <tbody>
         ${showNoteRow ? `<tr>
           <td>${escHtml(entry.note || (entry.invoice_number ? 'Invoice services' : 'Financial record'))}</td>
           <td style="text-align:right;font-weight:700;">${fmtMoney(amt, currency)}</td>
         </tr>` : ''}
+        ${lineItemRows}
         ${templateRows}
       </tbody>
     </table>

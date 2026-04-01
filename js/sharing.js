@@ -114,11 +114,24 @@ export async function confirmShare(tokenId, recipientId) {
     'invoice_received':'invoice_sent',
     'bill_sent':       'bill_received',
     'bill_received':   'bill_sent',
-    'invoice':         'bill',
-    'bill':            'invoice',
+    'invoice':         'invoice_received',   // legacy: sender created 'invoice' → recipient sees 'invoice_received'
+    'bill':            'bill_received',      // legacy: sender created 'bill'    → recipient sees 'bill_received'
     'advance_paid':    'advance_received',
     'advance_received':'advance_paid'
   };
+  // Also flip the v2 category (preferred) for display purposes
+  const CATEGORY_FLIP = {
+    'owed_to_me':      'i_owe',
+    'i_owe':           'owed_to_me',
+    'invoice_sent':    'invoice_received',
+    'invoice_received':'invoice_sent',
+    'bill_sent':       'bill_received',
+    'bill_received':   'bill_sent',
+    'advance_paid':    'advance_received',
+    'advance_received':'advance_paid'
+  };
+  const senderCategory = token.entry.category || token.entry.tx_type;
+  const flippedCategory = CATEGORY_FLIP[senderCategory] || FLIP[senderCategory] || senderCategory;
   const flippedType = FLIP[token.entry.tx_type] || token.entry.tx_type;
 
   // Find or AUTO-CREATE contact for sender in recipient's contact list
@@ -199,6 +212,7 @@ export async function confirmShare(tokenId, recipientId) {
         user_id:          recipientId,
         contact_id:       contactId,
         tx_type:          flippedType,
+        category:         flippedCategory,
         sender_tx_type:   token.entry.tx_type,
         amount:           token.entry.amount,
         currency:         token.entry.currency,

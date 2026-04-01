@@ -142,7 +142,7 @@ export function statusBadge(status) {
 export const TX_LABELS = {
   // ── New canonical categories (v2) ──────────────────────────────
   owed_to_me:        'Owed to Me',
-  bill_sent:         'Bill Sent',
+  bill_sent:         'Bill Entered',
   invoice_sent:      'Invoice Sent',
   i_owe:             'I Owe',
   bill_received:     'Bill Received',
@@ -156,7 +156,7 @@ export const TX_LABELS = {
   they_paid_you: 'Payment',
   you_paid_them: 'Payment',
   invoice:       'Invoice Sent',
-  bill:          'Bill Sent'
+  bill:          'Bill Entered'
 };
 
 // UI tab labels (present tense, user-facing) — create actions

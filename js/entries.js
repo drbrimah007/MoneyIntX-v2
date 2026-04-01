@@ -87,7 +87,8 @@ export async function getEntry(id) {
 export async function createEntry(userId, {
   contactId, txType, amount, currency = 'USD', note = '',
   date, invoiceNumber = '', templateId = null, templateData = {},
-  status = 'posted', metadata = null, source = 'manual', recurringRuleId = null
+  status = 'posted', metadata = null, source = 'manual', recurringRuleId = null,
+  businessId = null
 }) {
   // Atomically increment counter via RPC (1 round-trip instead of 2)
   let nextNum = 1;
@@ -116,6 +117,14 @@ export async function createEntry(userId, {
     status,
     source: source || 'manual'
   };
+  // Always resolve business_id — required NOT NULL column
+  if (businessId) {
+    insertPayload.business_id = businessId;
+  } else {
+    // Fallback: use active business (BS context or user's own)
+    const { getActiveBusinessId } = await import('./pages/state.js');
+    insertPayload.business_id = getActiveBusinessId();
+  }
   if (recurringRuleId) insertPayload.recurring_rule_id = recurringRuleId;
   if (templateId) insertPayload.template_id = templateId;
   if (templateId && templateData && Object.keys(templateData).length > 0) insertPayload.template_data = templateData;

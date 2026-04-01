@@ -16,6 +16,8 @@ const LEDGER_FX  = { '':'None (no ledger)', toy:'They Owe Me (adds)', toy_credit
 const RUN_SCHED  = { '':'None', weekly:'Run Weekly', monthly:'Run Monthly', custom:'Run Every…' };
 
 // ── Helpers ───────────────────────────────────────────────────────
+// Get the correct render target: BS content area (when inside Business Suite) or main content
+function _bpEl() { return document.getElementById('bs-content') || document.getElementById('content'); }
 function esc(s) { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; }
 function uuid() { return crypto.randomUUID ? crypto.randomUUID() : 'f' + Math.random().toString(36).slice(2, 14); }
 
@@ -168,13 +170,31 @@ const BP_BINARY_OPS = ['add','subtract','multiply','divide'];
 const BP_OP_SYMBOL   = { add:'+', subtract:'−', multiply:'×', divide:'÷' };
 
 // ── Computation ────────────────────────────────────────────────────
-function _resolveOperand(type, fieldId, constant, colValues) {
+function _resolveOperand(type, fieldId, constant, colValues, rowId) {
   if (type === 'constant') return parseFloat(constant) || 0;
+  // Handle invoice sub-value references like "fieldId.amount", "fieldId.paid", etc.
+  if (type === 'invoice_sub' && fieldId) {
+    const [fid, subKey] = fieldId.split('.');
+    if (fid && subKey && rowId) {
+      const link = _curCellLinks.find(cl => cl.row_id === rowId && cl.field_id === fid);
+      if (!link) return 0;
+      if (subKey === 'amount')      return (parseFloat(link.amount) || 0) / 100;
+      if (subKey === 'paid')        return (parseFloat(link.paid_amount) || 0) / 100;
+      if (subKey === 'outstanding') return (parseFloat(link.outstanding_amount || link.amount) || 0) / 100;
+      return 0;
+    }
+    return 0;
+  }
   const v = colValues[fieldId];
+  // If the referenced field is an invoice field, resolve its amount from cell links
+  if (v === undefined && rowId) {
+    const link = _curCellLinks.find(cl => cl.row_id === rowId && cl.field_id === fieldId);
+    if (link) return (parseFloat(link.amount) || 0) / 100; // default to amount
+  }
   return typeof v === 'object' ? (parseFloat(v?.num) || 0) : (parseFloat(v) || 0);
 }
 
-function computeRowFields(fields, rowValues) {
+function computeRowFields(fields, rowValues, rowId) {
   const result = {};
   const rowFields = fields.filter(f => f.direction === 'row');
   const colValues = { ...rowValues };
@@ -185,24 +205,24 @@ function computeRowFields(fields, rowValues) {
       if (BP_BINARY_OPS.includes(op)) {
         // New two-operand format
         if ('leftFieldId' in calc || 'leftType' in calc) {
-          const L = _resolveOperand(calc.leftType  || 'field', calc.leftFieldId,  calc.leftConstant,  colValues);
-          const R = _resolveOperand(calc.rightType || 'field', calc.rightFieldId, calc.rightConstant, colValues);
+          const L = _resolveOperand(calc.leftType  || 'field', calc.leftFieldId,  calc.leftConstant,  colValues, rowId);
+          const R = _resolveOperand(calc.rightType || 'field', calc.rightFieldId, calc.rightConstant, colValues, rowId);
           val = op === 'add'      ? L + R
               : op === 'subtract' ? L - R
               : op === 'multiply' ? L * R
               : R !== 0 ? L / R : 0;
         } else {
           // Legacy single-target format (backward compat)
-          if (op === 'multiply') val = (_resolveOperand('field', calc.targetFieldId, 0, colValues)) * (parseFloat(calc.operand) || 1);
-          else if (op === 'add')      val += _resolveOperand('field', calc.targetFieldId, 0, colValues);
-          else if (op === 'subtract') val -= _resolveOperand('field', calc.targetFieldId, 0, colValues);
+          if (op === 'multiply') val = (_resolveOperand('field', calc.targetFieldId, 0, colValues, rowId)) * (parseFloat(calc.operand) || 1);
+          else if (op === 'add')      val += _resolveOperand('field', calc.targetFieldId, 0, colValues, rowId);
+          else if (op === 'subtract') val -= _resolveOperand('field', calc.targetFieldId, 0, colValues, rowId);
         }
       } else if (op === 'aggregate') {
         val = fields.filter(ff => ff.direction !== 'row' && !ff.excludeFromAggregate && ff.id !== f.id)
-                    .reduce((s, ff) => s + _resolveOperand('field', ff.id, 0, colValues), 0);
+                    .reduce((s, ff) => s + _resolveOperand('field', ff.id, 0, colValues, rowId), 0);
       } else if (op === 'select_aggregate') {
         val = (calc.targetFieldIds || []).filter(fid => fid !== f.id)
-          .reduce((s, fid) => s + _resolveOperand('field', fid, 0, colValues), 0);
+          .reduce((s, fid) => s + _resolveOperand('field', fid, 0, colValues, rowId), 0);
       }
       if (calc.resultVisible !== false) colValues[f.id] = val;
     });
@@ -239,7 +259,7 @@ function computeSessionPnL(fields, rows) {
   if (!rowFields.length) return null;
   let total = 0;
   rows.forEach(row => {
-    const computed = computeRowFields(fields, row.values || {});
+    const computed = computeRowFields(fields, row.values || {}, row.id);
     rowFields.forEach(f => { total += computed[f.id] || 0; });
   });
   return total;
@@ -251,11 +271,26 @@ let _navFn  = null;
 let _toastFn = null;
 let _curPanel      = null;
 let _curRows       = [];
+let _curCellLinks  = [];        // invoice cell links for current panel
 let _curMembership = null; // null = owner; { can_add, can_edit } = member
+let _lastBizId     = null; // tracks which business context the panel was opened in
 let _bpFldCalcs    = [];
 let _bpFldDir      = 'column';
 let _bpRowPrefix   = 'bpr';   // 'bpr' for Add modal, 'bped' for Edit modal
 let _bpLastColVals = {};      // cached computed col values for _previewRow
+
+// Get current business UUID — reads from session, never guesses
+function _bpBusinessId() {
+  // BS context overrides (cross-business operation)
+  if (window._bsContext?.businessId) return window._bsContext.businessId;
+  // Otherwise: user's own business from session
+  if (window.getSession) {
+    const s = window.getSession();
+    if (s.businessId) return s.businessId;
+  }
+  // Legacy fallback
+  return window._bpOwnBusinessId || null;
+}
 
 export function initBpEngine(userId, navFn, toastFn) {
   _userId  = userId;
@@ -298,6 +333,11 @@ create policy "bpr_owner_all" on business_panel_rows for all using (auth.uid() =
 export async function renderBusinessPage(el) {
   el.innerHTML = '<p style="color:var(--muted);padding:24px;">Loading…</p>';
 
+  // ── Resolve user's own business (from session, no extra RPC) ──
+  if (!window._bpOwnBusinessId && window.getSession) {
+    window._bpOwnBusinessId = window.getSession().businessId;
+  }
+
   // ── Check if table exists ──────────────────────────────────────
   const { error: chkErr } = await supabase.from('business_panels').select('id').limit(1);
   const _tableOk = !chkErr || (!chkErr.message?.includes('does not exist') && !chkErr.message?.includes('Could not find') && chkErr.code !== '42P01' && chkErr.code !== 'PGRST200' && chkErr.code !== 'PGRST116' && chkErr.code !== '404');
@@ -329,17 +369,18 @@ export async function renderBusinessPage(el) {
   }
 
   // ── My Ledgers tab ──
+  const bizId = _bpBusinessId();
   const [panels, sharedPanels] = await Promise.all([
-    listPanels(_userId),
+    listPanels(bizId),
     listSharedPanels(_userId)
   ]);
 
   const _tabBar = `<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
-    <button onclick="window._bpPanelTab='mine';window._bpEngine.renderBusinessPage(document.getElementById('content'));"
+    <button onclick="window._bpPanelTab='mine';window._bpEngine.renderBusinessPage(document.getElementById('bs-content')||document.getElementById('content'));"
       style="padding:10px 20px;font-size:13px;font-weight:700;color:var(--accent);background:none;border:none;border-bottom:2px solid var(--accent);margin-bottom:-2px;cursor:pointer;">
       My Ledgers
     </button>
-    <button onclick="window._bpPanelTab='public';window._bpEngine.renderBusinessPage(document.getElementById('content'));"
+    <button onclick="window._bpPanelTab='public';window._bpEngine.renderBusinessPage(document.getElementById('bs-content')||document.getElementById('content'));"
       style="padding:10px 20px;font-size:13px;font-weight:500;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;">
       Public Ledger DB
     </button>
@@ -371,7 +412,7 @@ export async function renderBusinessPage(el) {
       <p style="color:var(--muted);margin-bottom:20px;font-size:14px;">Create a ledger to track income, expenses, and sessions.</p>
       <div style="display:flex;gap:8px;justify-content:center;">
         <button class="btn btn-primary" onclick="window._bpEngine.openCreateModal()">Create Your First Ledger</button>
-        <button class="btn btn-secondary btn-sm" onclick="window._bpPanelTab='public';window._bpEngine.renderBusinessPage(document.getElementById('content'));">Browse Public DB</button>
+        <button class="btn btn-secondary btn-sm" onclick="window._bpPanelTab='public';window._bpEngine.renderBusinessPage(document.getElementById('bs-content')||document.getElementById('content'));">Browse Public DB</button>
       </div>
     </div>`;
   } else {
@@ -395,7 +436,7 @@ async function _renderPublicPanelDB(el) {
   try {
     const { data, error } = await supabase
       .from('business_panels')
-      .select('id, title, currency, session_type, fields, user_id, created_at, updated_at')
+      .select('id, title, currency, session_type, fields, user_id, business_id, created_at, updated_at, businesses:business_id(name)')
       .eq('is_public', true)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -405,11 +446,11 @@ async function _renderPublicPanelDB(el) {
   window._publicPanelsCache = panels;
 
   const _tabBar = `<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
-    <button onclick="window._bpPanelTab='mine';window._bpEngine.renderBusinessPage(document.getElementById('content'));"
+    <button onclick="window._bpPanelTab='mine';window._bpEngine.renderBusinessPage(document.getElementById('bs-content')||document.getElementById('content'));"
       style="padding:10px 20px;font-size:13px;font-weight:500;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;">
       My Ledgers
     </button>
-    <button onclick="window._bpPanelTab='public';window._bpEngine.renderBusinessPage(document.getElementById('content'));"
+    <button onclick="window._bpPanelTab='public';window._bpEngine.renderBusinessPage(document.getElementById('bs-content')||document.getElementById('content'));"
       style="padding:10px 20px;font-size:13px;font-weight:700;color:var(--accent);background:none;border:none;border-bottom:2px solid var(--accent);margin-bottom:-2px;cursor:pointer;">
       Public Ledger DB
     </button>
@@ -452,6 +493,7 @@ function _renderPublicPanelList(panels) {
             <span class="badge badge-blue" style="font-size:11px;">${fields.length} field${fields.length !== 1 ? 's' : ''}</span>
             <span class="badge badge-gray" style="font-size:11px;">${esc(p.session_type === 'weekly' ? 'Weekly' : 'Monthly')}</span>
           </div>
+          ${p.businesses?.name ? `<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">by <strong style="color:var(--text);">${esc(p.businesses.name)}</strong></div>` : ''}
           <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">
             ${fields.slice(0,5).map(f => `<span style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:1px 7px;font-size:10px;">${esc(f.name||f.label||'Field')}</span>`).join('')}
             ${fields.length > 5 ? `<span style="font-size:10px;color:var(--muted);">+${fields.length-5} more</span>` : ''}
@@ -472,6 +514,7 @@ function filterPublicPanels(query) {
   const filtered = all.filter(p =>
     !q ||
     (p.title || '').toLowerCase().includes(q) ||
+    (p.businesses?.name || '').toLowerCase().includes(q) ||
     (p.fields || []).some(f => ((f.name||f.label)||'').toLowerCase().includes(q))
   );
   _renderPublicPanelList(filtered);
@@ -525,7 +568,7 @@ async function copyPublicPanel(panelId) {
   // Fetch the public panel, create a copy owned by current user
   const srcPanel = await getPanel(panelId);
   if (!srcPanel) { toast('Ledger not found', 'error'); return; }
-  const { data: newPanel, error } = await createPanel(_userId, {
+  const { data: newPanel, error } = await createPanel(_bpBusinessId(), _userId, {
     title: srcPanel.title + ' (Copy)',
     currency: srcPanel.currency,
     session_type: srcPanel.session_type
@@ -542,18 +585,14 @@ async function copyPublicPanel(panelId) {
     });
     await updatePanel(newPanel.id, { fields: cleanFields });
   }
-  toast('Ledger copied to My Ledgers!', 'success');
+  toast('Ledger installed — opening now!', 'success');
   // If inside BS context, add to BS tracker
   if (window._bsCreatingPanel || (window._bsActiveContext && window._bsActiveBizId)) {
     if (typeof window._bpAfterSave === 'function') window._bpAfterSave(newPanel.id);
   }
-  // Switch to My Ledgers tab
+  // Go straight into the newly installed ledger (ready-to-use zone)
   window._bpPanelTab = 'mine';
-  if (document.getElementById('bs-content') && window._bsNavigate) {
-    window._bsNavigate('bs-panels');
-  } else {
-    renderBusinessPage(document.getElementById('content'));
-  }
+  openPanel(newPanel.id);
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -601,7 +640,7 @@ async function _doCreate() {
   const is_public = document.getElementById('bp-public')?.checked || false;
   if (!title) { toast('Ledger title required.', 'error'); return; }
   document.getElementById('bpCreateBg')?.remove();
-  const { data: panel, error } = await createPanel(_userId, { title, currency, session_type });
+  const { data: panel, error } = await createPanel(_bpBusinessId(), _userId, { title, currency, session_type });
   if (error || !panel) {
     const msg = error?.message || 'Unknown error';
     toast(`Failed to create ledger: ${msg}`, 'error');
@@ -683,16 +722,30 @@ async function openPanel(panelId) {
   // If inside Business Suite, render in BS content area instead of main content
   const el = document.getElementById('bs-content') || document.getElementById('content');
   el.innerHTML = '<p style="color:var(--muted);padding:24px;">Loading…</p>';
+
+  // Check if panel has invoice fields — if so, load cell links too
   const [panel, rows, membership] = await Promise.all([
     getPanel(panelId),
     listRows(panelId),
     getMyMembership(panelId, _userId)
   ]);
   if (!panel) { toast('Ledger not found.', 'error'); return; }
+
+  // Load cell links for invoice fields
+  const hasInvoiceFields = (panel.fields || []).some(f => f.type === 'invoice');
+  if (hasInvoiceFields) {
+    const { data: linksData } = await supabase.rpc('get_panel_cell_links', { p_panel_id: panelId });
+    _curCellLinks = Array.isArray(linksData) ? linksData : (linksData ? JSON.parse(linksData) : []);
+  } else {
+    _curCellLinks = [];
+  }
+
   _curPanel      = panel;
   _curRows       = rows;
   // null = owner; { can_add, can_edit } = shared member
   _curMembership = panel.user_id === _userId ? null : (membership || { can_add: false, can_edit: false });
+  // Track which business context this panel was opened in
+  _lastBizId = panel.business_id || null;
   renderPanelView(el);
 }
 
@@ -738,7 +791,6 @@ function renderPanelView(el) {
       <button class="bs sm" onclick="window._bpEngine.openArchiveView('${p.id}')">🗂 Archive</button>
       <button class="bs sm" onclick="window._bpEngine.openEditPanelModal('${p.id}')">✏ Edit</button>
       <button class="bs sm" style="color:var(--red);" onclick="window._bpEngine._bpDeletePanel('${p.id}')">🗑 Delete</button>` : ''}
-      ${canAdd ? `<button class="btn btn-primary btn-sm" onclick="window._bpEngine.openAddRowModal('${todayKey}')">+ Add Row</button>` : ''}
     </div>
   </div>`;
 
@@ -805,17 +857,43 @@ function renderOpenSession(p, rows, colFields, rowFields, sessionKey, label) {
 
     rows.forEach(row => {
       const allColVals = computeColFields(p.fields, row.values || {});
-      const rowComputed = computeRowFields(p.fields, allColVals);
+      const rowComputed = computeRowFields(p.fields, allColVals, row.id);
       html += `<tr>
         <td style="font-size:12px;color:var(--muted);">${fmtDate(row.row_date)}</td>`;
       colFields.forEach(f => {
-        const raw = allColVals[f.id] ?? '';
-        if (f.type === 'numeric' || f.type === 'paired') {
+        if (f.type === 'invoice') {
+          // Render invoice linked record card
+          const link = _getCellLink(row.id, f.id);
+          if (link && link.entry_id && !link.deleted) {
+            const amt = (link.amount || 0) / 100;
+            const statusLabel = link.status === 'settled' ? 'Paid' : link.status === 'partial' ? 'Partial' : 'Open';
+            const statusColor = link.status === 'settled' ? '#10b981' : link.status === 'partial' ? '#f59e0b' : '#ef4444';
+            html += `<td style="cursor:pointer;padding:4px 8px;" onclick="window._bpEngine.openInvoicePicker('${f.id}','${row.id}')">
+              <div style="border:1px solid ${statusColor}30;border-radius:6px;padding:6px 8px;background:${statusColor}08;min-width:120px;">
+                <div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">${esc(link.note || link.invoice_number || 'Invoice')}</div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+                  <span style="font-weight:700;font-size:12px;">${fmtMoneyC(amt, currency)}</span>
+                  <span style="font-size:9px;font-weight:600;color:${statusColor};background:${statusColor}15;padding:1px 5px;border-radius:3px;">${statusLabel}</span>
+                </div>
+              </div>
+            </td>`;
+          } else if (link && link.deleted) {
+            html += `<td style="padding:4px 8px;">
+              <div style="border:2px dashed var(--red);border-radius:6px;padding:6px 8px;color:var(--red);font-size:11px;font-weight:600;">⚠ Deleted</div>
+            </td>`;
+          } else {
+            html += `<td style="cursor:pointer;padding:4px 8px;" onclick="window._bpEngine.openInvoicePicker('${f.id}','${row.id}')">
+              <div style="border:2px dashed var(--border);border-radius:6px;padding:8px;text-align:center;color:var(--muted);font-size:11px;">Tap to link</div>
+            </td>`;
+          }
+        } else if (f.type === 'numeric' || f.type === 'paired') {
+          const raw = allColVals[f.id] ?? '';
           const fv = fmtFieldValC(raw, f, currency);
           const isAuto = (f.calculators||[]).length > 0;
           const fClr = f.outputColor || (isAuto ? 'var(--accent)' : '');
           html += `<td style="font-weight:600;white-space:nowrap;${fClr?'color:'+fClr+';':''}">${fv !== null ? fv : '<span style="color:var(--muted);">—</span>'}</td>`;
         } else {
+          const raw = allColVals[f.id] ?? '';
           html += `<td style="font-size:13px;">${esc(raw)}</td>`;
         }
       });
@@ -855,6 +933,26 @@ function renderOpenSession(p, rows, colFields, rowFields, sessionKey, label) {
         </div>`;
       }
       html += `</div>`;
+    }
+
+    // Invoice summary footer
+    const invoiceFields = colFields.filter(f => f.type === 'invoice');
+    if (invoiceFields.length > 0 && _curCellLinks.length > 0) {
+      let totalBilled = 0, totalPaid = 0;
+      const rowIds = new Set(rows.map(r => r.id));
+      _curCellLinks.forEach(cl => {
+        if (!rowIds.has(cl.row_id) || cl.deleted || !cl.entry_id) return;
+        totalBilled += (cl.amount || 0) / 100;
+        totalPaid   += (cl.paid || 0) / 100;
+      });
+      const outstanding = totalBilled - totalPaid;
+      html += `<div style="display:flex;gap:20px;flex-wrap:wrap;padding:10px 18px 12px;border-top:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.04);">
+        <div style="font-size:12px;color:var(--muted);">Total Billed: <strong style="color:var(--text);margin-left:4px;">${fmtMoney(totalBilled, currency)}</strong></div>
+        <div style="font-size:12px;color:var(--muted);">Total Paid: <strong style="color:#10b981;margin-left:4px;">${fmtMoney(totalPaid, currency)}</strong></div>
+        <div style="font-size:12px;font-weight:700;margin-left:auto;color:${outstanding > 0 ? '#ef4444' : '#10b981'};">
+          Outstanding: ${fmtMoney(outstanding, currency)}
+        </div>
+      </div>`;
     }
   }
 
@@ -911,11 +1009,22 @@ function renderFoldedBody(p, rows, sessionKey) {
 
   rows.forEach(row => {
     const allColVals = computeColFields(p.fields, row.values || {});
-    const rowComputed = computeRowFields(p.fields, allColVals);
+    const rowComputed = computeRowFields(p.fields, allColVals, row.id);
     html += `<tr><td style="font-size:12px;color:var(--muted);">${fmtDate(row.row_date)}</td>`;
     colFields.forEach(f => {
       const raw = allColVals[f.id] ?? '';
-      if (f.type === 'numeric' || f.type === 'paired') {
+      if (f.type === 'invoice') {
+        // Invoice cell in folded view
+        const link = _getCellLink(row.id, f.id);
+        if (link && link.entry_id) {
+          const amt = (link.amount || 0) / 100;
+          const statusColor = link.status === 'settled' ? '#10b981' : link.status === 'partial' ? '#f59e0b' : '#ef4444';
+          const statusLabel = link.status === 'settled' ? 'Paid' : link.status === 'partial' ? 'Partial' : 'Open';
+          html += `<td style="font-size:12px;"><span style="font-weight:600;">${fmtMoney(amt, p.currency)}</span> <span style="color:${statusColor};font-size:10px;font-weight:600;">${statusLabel}</span></td>`;
+        } else {
+          html += `<td style="color:var(--muted);font-size:11px;">—</td>`;
+        }
+      } else if (f.type === 'numeric' || f.type === 'paired') {
         const fv = fmtFieldValC(raw, f, currency);
         const isAuto = (f.calculators||[]).length > 0;
         const fClr = f.outputColor || (isAuto ? 'var(--accent)' : '');
@@ -972,7 +1081,7 @@ async function archiveSession(panelId, sessionKey) {
 
 // ── Archive view ─────────────────────────────────────────────────
 async function openArchiveView(panelId) {
-  const el = document.getElementById('content');
+  const el = _bpEl();
   el.innerHTML = '<p style="color:var(--muted);padding:24px;">Loading archive…</p>';
   const [panel, rows] = await Promise.all([getPanel(panelId), listArchivedRows(panelId)]);
   if (!panel) return;
@@ -1059,6 +1168,17 @@ function openAddRowModal(sessionKey) {
             <input type="number" id="bpr-${f.id}-num" step="0.01" placeholder="0.00" style="flex:1;" oninput="window._bpEngine._recomputeColPreview()">
           </div></div>`;
       }
+    } else if (f.type === 'invoice') {
+      // Invoice field — show a link-picker button with display area
+      const dirLabel = f.invoiceDirection === 'invoice' ? 'Invoices' : f.invoiceDirection === 'bill' ? 'Bills' : 'Invoices / Bills';
+      fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
+        <label>${esc(f.label)} <span style="font-size:11px;color:#10b981;font-weight:600;background:rgba(16,185,129,.1);padding:1px 6px;border-radius:10px;margin-left:4px;">🔗 LINKED</span></label>
+        <input type="hidden" id="bpr-inv-${f.id}" value="">
+        <div id="bpr-inv-display-${f.id}" style="border:2px dashed rgba(16,185,129,.35);border-radius:8px;padding:14px;cursor:pointer;text-align:center;color:var(--muted);font-size:13px;background:rgba(16,185,129,.04);min-height:50px;display:flex;align-items:center;justify-content:center;"
+          onclick="window._bpEngine.openInvoicePicker('${f.id}','')">
+          Tap to link ${dirLabel}
+        </div>
+      </div>`;
     }
   });
 
@@ -1101,6 +1221,7 @@ function _recomputeColPreview() {
   const rawVals = {};
   colFields.forEach(f => {
     if ((f.calculators || []).length > 0) return; // skip auto fields — no input
+    if (f.type === 'invoice') return; // skip invoice fields — linked, not typed
     if (f.type === 'paired') {
       rawVals[f.id] = {
         text: document.getElementById(`${prefix}-${f.id}-text`)?.value.trim() || '',
@@ -1160,6 +1281,7 @@ async function _doAddRow(sessionKey) {
   const rawValues = {};
   colFields.forEach(f => {
     if ((f.calculators || []).length > 0) return; // auto field — no input
+    if (f.type === 'invoice') return; // invoice field — linked, not typed
     if (f.type === 'paired') {
       rawValues[f.id] = {
         text: document.getElementById(`bpr-${f.id}-text`)?.value.trim() || '',
@@ -1175,12 +1297,34 @@ async function _doAddRow(sessionKey) {
   // Compute auto-calc column fields and merge
   const values = computeColFields(p.fields, rawValues);
 
+  // Collect pending invoice links before closing modal
+  const pendingInvLinks = [];
+  colFields.filter(f => f.type === 'invoice').forEach(f => {
+    const entryId = document.getElementById(`bpr-inv-${f.id}`)?.value;
+    if (entryId) pendingInvLinks.push({ fieldId: f.id, entryId });
+  });
+
   document.getElementById('bpAddRowBg')?.remove();
-  const row = await addRow(p.id, _userId, sessionKey, rowDate, values);
+  const row = await addRow(p.id, _bpBusinessId(), _userId, sessionKey, rowDate, values);
   if (!row) { toast('Failed to save row.', 'error'); return; }
+
+  // Link any invoice fields to the newly created row
+  for (const link of pendingInvLinks) {
+    const { data, error } = await supabase.rpc('link_invoice_to_cell', {
+      p_business_id: _bpBusinessId(),
+      p_panel_id: p.id,
+      p_row_id: row.id,
+      p_field_id: link.fieldId,
+      p_entry_id: link.entryId
+    });
+    if (!error && data) {
+      _curCellLinks.push({ row_id: row.id, field_id: link.fieldId, entry_id: link.entryId, ...data });
+    }
+  }
+
   toast('Row added');
   _curRows.push(row);
-  renderPanelView(document.getElementById('content'));
+  renderPanelView(_bpEl());
 }
 
 // ── Edit row modal ────────────────────────────────────────────────
@@ -1232,6 +1376,34 @@ async function openEditRowModal(rowId) {
             <input type="number" id="bped-${f.id}-num" step="0.01" value="${tv.num || ''}" placeholder="0.00" style="flex:1;" oninput="window._bpEngine._recomputeColPreview()">
           </div></div>`;
       }
+    } else if (f.type === 'invoice') {
+      // Invoice field in edit mode — show linked invoice or picker
+      const link = _getCellLink(row.id, f.id);
+      const dirLabel = f.invoiceDirection === 'invoice' ? 'Invoices' : f.invoiceDirection === 'bill' ? 'Bills' : 'Invoices / Bills';
+      let invDisplay;
+      if (link && link.entry_id) {
+        const amt = (link.amount || 0) / 100;
+        const statusLabel = link.status === 'settled' ? 'Paid' : link.status === 'partial' ? 'Partial' : 'Open';
+        const statusColor = link.status === 'settled' ? '#10b981' : link.status === 'partial' ? '#f59e0b' : '#ef4444';
+        invDisplay = `<div style="border:1px solid rgba(16,185,129,.4);border-radius:8px;padding:12px;background:rgba(16,185,129,.06);cursor:pointer;"
+          onclick="window._bpEngine.openInvoicePicker('${f.id}','${row.id}')">
+          <div style="font-weight:600;font-size:13px;">${esc(link.note || link.invoice_number || 'Invoice')}</div>
+          <div style="font-size:12px;margin-top:4px;display:flex;gap:8px;align-items:center;">
+            <span>${fmtMoney(amt, p.currency)}</span>
+            <span style="color:${statusColor};font-weight:600;font-size:11px;background:${statusColor}15;padding:1px 6px;border-radius:4px;">${statusLabel}</span>
+            <span style="color:var(--muted);font-size:11px;margin-left:auto;">Tap to change</span>
+          </div>
+        </div>`;
+      } else {
+        invDisplay = `<div style="border:2px dashed rgba(16,185,129,.35);border-radius:8px;padding:14px;cursor:pointer;text-align:center;color:var(--muted);font-size:13px;background:rgba(16,185,129,.04);"
+          onclick="window._bpEngine.openInvoicePicker('${f.id}','${row.id}')">
+          Tap to link ${dirLabel}
+        </div>`;
+      }
+      fieldsHtml += `<div class="fg" style="margin-bottom:12px;">
+        <label>${esc(f.label)} <span style="font-size:11px;color:#10b981;font-weight:600;background:rgba(16,185,129,.1);padding:1px 6px;border-radius:10px;margin-left:4px;">🔗 LINKED</span></label>
+        ${invDisplay}
+      </div>`;
     }
   });
 
@@ -1266,6 +1438,7 @@ async function _doSaveRow(rowId) {
   const rawValues = {};
   colFields.forEach(f => {
     if ((f.calculators || []).length > 0) return; // auto field — no input
+    if (f.type === 'invoice') return; // invoice field — linked, not typed
     if (f.type === 'paired') {
       rawValues[f.id] = { text: document.getElementById(`bped-${f.id}-text`)?.value.trim() || '', num: parseFloat(document.getElementById(`bped-${f.id}-num`)?.value) || 0 };
     } else if (f.type === 'numeric') {
@@ -1284,7 +1457,7 @@ async function _doSaveRow(rowId) {
   const idx = _curRows.findIndex(r => r.id === rowId);
   if (idx >= 0) { _curRows[idx].values = values; _curRows[idx].row_date = newDate; }
   toast('Row updated');
-  renderPanelView(document.getElementById('content'));
+  renderPanelView(_bpEl());
 }
 
 async function _doDeleteRow(rowId) {
@@ -1294,7 +1467,7 @@ async function _doDeleteRow(rowId) {
   await deleteRow(rowId);
   _curRows = _curRows.filter(r => r.id !== rowId);
   toast('Row deleted');
-  renderPanelView(document.getElementById('content'));
+  renderPanelView(_bpEl());
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1304,7 +1477,7 @@ function openFieldBuilder() {
   const p = _curPanel;
   if (!p) return;
   const fields = p.fields || [];
-  const el = document.getElementById('content');
+  const el = document.getElementById('bs-content') || document.getElementById('content');
 
   let html = `<div class="page-header">
     <div>
@@ -1333,9 +1506,10 @@ function openFieldBuilder() {
           <div style="flex:1;">
             <div style="font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;">${dirTag} ${esc(f.label || 'Unnamed')}</div>
             <div style="font-size:12px;color:var(--muted);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;">
-              <span>Type: ${f.type === 'numeric' ? 'Number' : f.type === 'paired' ? 'Paired' : 'Text'}</span>
+              <span>Type: ${f.type === 'numeric' ? 'Number' : f.type === 'paired' ? 'Paired' : f.type === 'invoice' ? '🔗 Invoice' : 'Text'}</span>
               ${f.excludeFromAggregate ? '<span class="badge badge-yellow">Excl. Agg.</span>' : ''}
               ${f.ledgerEffect ? `<span style="color:var(--green);">Ledger: ${LEDGER_FX[f.ledgerEffect] || f.ledgerEffect}</span>` : ''}
+              ${f.type === 'invoice' ? `<span style="color:#10b981;font-weight:600;">Dir: ${f.invoiceDirection === 'invoice' ? 'Invoices' : f.invoiceDirection === 'bill' ? 'Bills' : 'Both'}</span>` : ''}
               ${f.runSchedule ? `<span>⏱ ${RUN_SCHED[f.runSchedule] || f.runSchedule}</span>` : ''}
             </div>
             ${calcs.length ? `<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px;">
@@ -1397,6 +1571,11 @@ function openAddFieldChoice() {
           <div style="font-size:15px;font-weight:700;margin-bottom:6px;color:var(--accent);">⚡ Row Field</div>
           <div style="font-size:13px;color:var(--muted);">Computed result across columns for each row. Uses calculator logic (aggregate, formula, etc.).</div>
         </button>
+        <button class="card" style="padding:20px;text-align:left;cursor:pointer;border:1px solid rgba(16,185,129,.5);background:rgba(16,185,129,.06);"
+          onclick="document.getElementById('bpFieldChoiceBg').remove();window._bpEngine._bpOpenFieldModal(null,'column','invoice')">
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;color:#10b981;">🔗 Invoice Field</div>
+          <div style="font-size:13px;color:var(--muted);">Links an invoice or bill from Invoice Generator. Exposes amount, paid, outstanding for formulas.</div>
+        </button>
       </div>
       <button class="bs" onclick="document.getElementById('bpFieldChoiceBg').remove()" style="width:100%;">Cancel</button>
     </div>
@@ -1405,7 +1584,7 @@ function openAddFieldChoice() {
 }
 
 // ── Field modal (adapted from template-engine) ────────────────────
-function _bpOpenFieldModal(fid, forceDir) {
+function _bpOpenFieldModal(fid, forceDir, forceType) {
   const p = _curPanel;
   if (!p) return;
   const f = fid ? (p.fields || []).find(x => x.id === fid) : null;
@@ -1415,11 +1594,14 @@ function _bpOpenFieldModal(fid, forceDir) {
 
   // For row fields, type is always numeric. For column, offer all.
   const isRow = _bpFldDir === 'row';
-  const ftype = isRow ? 'numeric' : (f?.type || 'numeric');
+  const ftype = forceType || (isRow ? 'numeric' : (f?.type || 'numeric'));
+  const isInvoice = ftype === 'invoice';
 
   // (calcRows removed — _bpRenderCalcList() is called after modal insertion)
 
-  const dirBanner = isRow
+  const dirBanner = isInvoice
+    ? `<div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.5);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#10b981;font-weight:600;">🔗 Invoice Field — links to an invoice/bill record</div>`
+    : isRow
     ? `<div style="background:rgba(99,102,241,.1);border:1px solid var(--accent);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--accent);font-weight:600;">⚡ Row Field — computed across columns per row</div>`
     : `<div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.35);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--muted);">📊 Column Field — user enters data per row</div>`;
 
@@ -1431,11 +1613,14 @@ function _bpOpenFieldModal(fid, forceDir) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
         <div class="fg"><label>Field Label *</label>
           <input id="bpfl-label" value="${esc(f?.label||'')}" placeholder="e.g. Revenue, Notes, Items"></div>
-        ${isRow ? '' : `<div class="fg"><label>Field Type</label>
+        ${isRow ? '' : isInvoice ? `<div class="fg"><label>Field Type</label>
+          <input value="Invoice (Linked Record)" disabled style="opacity:.7;"></div>
+          <input type="hidden" id="bpfl-type" value="invoice">` : `<div class="fg"><label>Field Type</label>
           <select id="bpfl-type" onchange="window._bpEngine._bpTypeChange(this.value)">
             <option value="numeric" ${ftype==='numeric'?'selected':''}>Number</option>
             <option value="text" ${ftype==='text'?'selected':''}>Text</option>
             <option value="paired" ${ftype==='paired'?'selected':''}>Paired (label + number)</option>
+            <option value="invoice" ${ftype==='invoice'?'selected':''}>Invoice (Linked Record)</option>
           </select></div>`}
       </div>
 
@@ -1443,6 +1628,22 @@ function _bpOpenFieldModal(fid, forceDir) {
       <div class="fg" style="margin-bottom:12px;">
         <label>Field Hint <span style="color:var(--muted);font-weight:400;">(optional — shown below the field when filling a row)</span></label>
         <input id="bpfl-hint" value="${esc(f?.hint||'')}" placeholder="e.g. Enter weight in kg, Include delivery fee, etc.">
+      </div>
+
+      <!-- INVOICE OPTIONS -->
+      <div id="bpfl-panel-invoice" style="display:${ftype==='invoice'?'block':'none'}">
+        <div style="padding:14px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.3);border-radius:8px;margin-bottom:12px;">
+          <div style="font-size:12px;font-weight:700;color:#10b981;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">🔗 Linked Record Settings</div>
+          <div class="fg" style="margin-bottom:10px;">
+            <label style="font-size:12px;">Direction Filter</label>
+            <select id="bpfl-inv-direction">
+              <option value="both" ${(f?.invoiceDirection||'both')==='both'?'selected':''}>Both (Invoices + Bills)</option>
+              <option value="invoice" ${f?.invoiceDirection==='invoice'?'selected':''}>Invoices only</option>
+              <option value="bill" ${f?.invoiceDirection==='bill'?'selected':''}>Bills only</option>
+            </select>
+          </div>
+          <p style="font-size:12px;color:var(--muted);margin:0;">This field links to existing invoices/bills from the Invoice Generator. Sub-values (<code>invoice.amount</code>, <code>invoice.paid</code>, <code>invoice.outstanding</code>) can be used in Row Field formulas.</p>
+        </div>
       </div>
 
       <!-- TEXT OPTIONS -->
@@ -1576,7 +1777,7 @@ function _bpUnitTypeChangeP(val) {
   document.getElementById('bpfl-unit-weight-p').style.display   = val === 'weight'   ? '' : 'none';
 }
 function _bpTypeChange(val) {
-  ['text','numeric','paired'].forEach(t => {
+  ['text','numeric','paired','invoice'].forEach(t => {
     const el = document.getElementById('bpfl-panel-' + t);
     if (el) el.style.display = t === val ? 'block' : 'none';
   });
@@ -1767,7 +1968,15 @@ async function _bpSaveField(fid) {
   const outputColor = document.getElementById('bpfl-color')?.value || '';
   const hint = document.getElementById('bpfl-hint')?.value.trim() || '';
 
-  if (type === 'text') {
+  if (type === 'invoice') {
+    field = {
+      id: fid || uuid(), label, type, direction: 'column',
+      invoiceDirection: document.getElementById('bpfl-inv-direction')?.value || 'both',
+      outputColor, hint,
+      excludeFromAggregate: true,  // Invoice fields don't aggregate as simple numbers
+      calculators: []
+    };
+  } else if (type === 'text') {
     field = { id: fid || uuid(), label, type, direction: 'column', outputColor, hint, calculators: [] };
   } else if (type === 'paired') {
     const { unitType, unitValue } = _readUnit('-p');
@@ -1832,6 +2041,7 @@ function backToList() {
   _curPanel      = null;
   _curRows       = [];
   _curMembership = null;
+  _lastBizId     = null;
   // If inside Business Suite, navigate back to BS panels
   if (document.getElementById('bs-content') && window._bsNavigate) {
     window._bsNavigate('bs-panels');
@@ -2006,6 +2216,146 @@ async function togglePublicPanel(panelId, makePublic) {
   }
 }
 
+// ── Invoice Picker Modal ─────────────────────────────────────────
+// Opens a modal listing invoices/bills from the Invoice Generator
+// for the user to select and link to a ledger cell.
+async function openInvoicePicker(fieldId, rowId) {
+  const p = _curPanel;
+  if (!p) return;
+  const f = (p.fields || []).find(x => x.id === fieldId);
+  if (!f || f.type !== 'invoice') return;
+
+  const bizId = _bpBusinessId();
+  const dirFilter = f.invoiceDirection || 'both';
+
+  // Build tx_type filter based on direction
+  let txTypes;
+  if (dirFilter === 'invoice') txTypes = ['invoice_sent', 'invoice'];
+  else if (dirFilter === 'bill') txTypes = ['bill_sent', 'bill'];
+  else txTypes = ['invoice_sent', 'invoice', 'bill_sent', 'bill'];
+
+  // Fetch invoices from entries
+  const { data: invoices, error } = await supabase
+    .from('entries')
+    .select('id, tx_type, amount, paid_amount, outstanding_amount, status, note, date, invoice_number, contact_name, currency')
+    .eq('business_id', bizId)
+    .in('tx_type', txTypes)
+    .is('archived_at', null)
+    .is('deleted_at', null)
+    .order('date', { ascending: false })
+    .limit(100);
+
+  if (error) { toast('Failed to load invoices', 'error'); return; }
+  const allInvoices = invoices || [];
+
+  // Mark which are already linked
+  const linkedIds = new Set(_curCellLinks.filter(cl => cl.entry_id).map(cl => cl.entry_id));
+
+  const html = `<div class="modal-bg" id="bpInvPickerBg" onclick="if(event.target===this)this.remove()">
+    <div class="modal" style="max-width:600px;max-height:85vh;overflow-y:auto;" onclick="event.stopPropagation()">
+      <div class="modal-title">Link Invoice — ${esc(f.label)}</div>
+      <input id="bpInvSearch" placeholder="Search by description, number, or contact…" style="margin-bottom:12px;width:100%;"
+        oninput="window._bpEngine._filterInvPicker(this.value)">
+      <div id="bpInvList" style="max-height:400px;overflow-y:auto;">
+        ${allInvoices.length === 0 ? '<p style="color:var(--muted);text-align:center;padding:20px;">No invoices found. Create invoices in the Invoice Generator first.</p>' :
+          allInvoices.map(inv => {
+            const isLinked = linkedIds.has(inv.id);
+            const amt = (inv.amount || 0) / 100;
+            const paid = (inv.paid_amount || 0) / 100;
+            const outstanding = (inv.outstanding_amount || inv.amount || 0) / 100;
+            const statusColor = inv.status === 'settled' ? '#10b981' : inv.status === 'partial' ? '#f59e0b' : '#ef4444';
+            const statusLabel = inv.status === 'settled' ? 'Paid' : inv.status === 'partial' ? 'Partial' : 'Open';
+            const typeLabel = inv.tx_type?.includes('bill') ? 'Bill' : 'Invoice';
+            return `<div class="bp-inv-item" data-search="${esc((inv.note||'')+(inv.invoice_number||'')+(inv.contact_name||'')).toLowerCase()}"
+              style="display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:${isLinked?'default':'pointer'};opacity:${isLinked?'.5':'1'};background:var(--bg2);"
+              ${isLinked ? '' : `onclick="window._bpEngine._selectInvoice('${inv.id}','${fieldId}','${rowId||''}')"`}>
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(inv.note || inv.invoice_number || 'Untitled')}</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(inv.contact_name || '')} · ${typeLabel} · ${inv.date || ''}</div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;">
+                <div style="font-weight:700;font-size:14px;">${fmtMoney(amt, inv.currency || p.currency)}</div>
+                <span style="font-size:10px;font-weight:600;color:${statusColor};background:${statusColor}15;padding:2px 6px;border-radius:4px;">${statusLabel}</span>
+              </div>
+              ${isLinked ? '<span style="font-size:10px;color:var(--muted);">Already linked</span>' : ''}
+            </div>`;
+          }).join('')}
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">
+        <button class="bs" onclick="document.getElementById('bpInvPickerBg').remove()">Cancel</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function _filterInvPicker(query) {
+  const q = (query || '').toLowerCase().trim();
+  document.querySelectorAll('.bp-inv-item').forEach(el => {
+    el.style.display = !q || (el.dataset.search || '').includes(q) ? '' : 'none';
+  });
+}
+
+async function _selectInvoice(entryId, fieldId, rowId) {
+  const p = _curPanel;
+  if (!p) return;
+  const bizId = _bpBusinessId();
+
+  // If rowId is provided, link directly via RPC
+  if (rowId) {
+    const { data, error } = await supabase.rpc('link_invoice_to_cell', {
+      p_business_id: bizId,
+      p_panel_id: p.id,
+      p_row_id: rowId,
+      p_field_id: fieldId,
+      p_entry_id: entryId
+    });
+    if (error || data?.error) {
+      toast('Link failed: ' + (error?.message || data?.error), 'error');
+      return;
+    }
+    // Update local cache
+    _curCellLinks = _curCellLinks.filter(cl => !(cl.row_id === rowId && cl.field_id === fieldId));
+    _curCellLinks.push({ row_id: rowId, field_id: fieldId, entry_id: entryId, ...data });
+    document.getElementById('bpInvPickerBg')?.remove();
+    toast('Invoice linked');
+    renderPanelView(_bpEl());
+    return;
+  }
+
+  // For add-row modal: store selection in a hidden input and fetch invoice data for display
+  const hiddenEl = document.getElementById(`bpr-inv-${fieldId}`);
+  if (hiddenEl) hiddenEl.value = entryId;
+
+  // Fetch the invoice entry data for display preview
+  const { data: invData } = await supabase
+    .from('entries')
+    .select('id, amount, paid_amount, outstanding_amount, status, note, invoice_number, currency')
+    .eq('id', entryId)
+    .single();
+
+  const displayEl = document.getElementById(`bpr-inv-display-${fieldId}`);
+  if (displayEl && invData) {
+    const amt = (invData.amount || 0) / 100;
+    const statusLabel = invData.status === 'settled' ? 'Paid' : invData.status === 'partial' ? 'Partial' : 'Open';
+    const statusColor = invData.status === 'settled' ? '#10b981' : invData.status === 'partial' ? '#f59e0b' : '#ef4444';
+    displayEl.innerHTML = `<div style="font-weight:600;font-size:13px;">${esc(invData.note || invData.invoice_number || 'Invoice')}</div>
+      <div style="font-size:12px;margin-top:2px;">${fmtMoney(amt, p.currency)} <span style="color:${statusColor};font-weight:600;">${statusLabel}</span></div>`;
+    displayEl.style.border = '1px solid rgba(16,185,129,.4)';
+    displayEl.style.textAlign = 'left';
+    displayEl.style.cursor = 'pointer';
+  }
+  document.getElementById('bpInvPickerBg')?.remove();
+}
+
+// Get cell link data for a specific cell
+function _getCellLink(rowId, fieldId) {
+  return _curCellLinks.find(cl => cl.row_id === rowId && cl.field_id === fieldId);
+}
+
+// Invoice sub-value resolution is handled directly in _resolveOperand()
+// via the 'invoice_sub' type and rowId-based cell link lookups.
+
 // ── Expose to window ──────────────────────────────────────────────
 export function exposeBpEngine() {
   window._bpEngine = {
@@ -2013,6 +2363,8 @@ export function exposeBpEngine() {
     openCreateModal, _doCreate,
     openEditPanelModal, _doEditPanel,
     openPanel, backToList,
+    get currentPanelId() { return _curPanel?.id || null; },
+    get _lastBizId() { return _lastBizId; },
     openFieldBuilder, openAddFieldChoice,
     _bpOpenFieldModal, _bpTypeChange, _bpUnitTypeChange, _bpUnitTypeChangeP, _bpRenderCalcList, _bpAddCalc, _bpUpdCalc, _bpRemCalc, _bpCalcOpChange, _bpSetSide, _bpPickColor, _bpSaveField,
     _bpMoveField, _bpDeleteField,
@@ -2023,6 +2375,8 @@ export function exposeBpEngine() {
     openMembersModal, _bpmAdd, _bpmAddByUserId, _bpmRemove, _bpmSaveAll,
     _bpDeletePanel,
     togglePublicPanel,
-    filterPublicPanels, previewPublicPanel, copyPublicPanel
+    filterPublicPanels, previewPublicPanel, copyPublicPanel,
+    // Invoice field
+    openInvoicePicker, _filterInvPicker, _selectInvoice
   };
 }

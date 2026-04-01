@@ -22,17 +22,16 @@ let _bsEntries = [];               // cached business entries
 let _bsEl = null;                  // content element ref
 
 // ── Business ID ──────────────────────────────────────────────────
+// Returns the active workspace's real business UUID from the businesses table.
 function _getBizId() {
-  const uid = getCurrentUser()?.id;
-  if (!uid) return 'BIZ-000000';
-  const key = 'mxi_business_id_' + uid;
-  let id = localStorage.getItem(key);
-  if (id) return id;
-  // Generate a stable Business ID from user UUID
-  const hash = uid.replace(/-/g,'').slice(0,8).toUpperCase();
-  id = 'BIZ-' + hash;
-  localStorage.setItem(key, id);
-  return id;
+  const ctx = window._bsContext;
+  if (ctx?.isActive && ctx.businessId) return ctx.businessId;
+  return null;
+}
+// Returns short display ID from UUID (for UI display only)
+function _getBizDisplayId(bizUuid) {
+  if (!bizUuid) return 'BIZ-000000';
+  return 'BIZ-' + bizUuid.replace(/-/g,'').slice(0,8).toUpperCase();
 }
 
 // ── Business Suite Tool Registry ──────────────────────────────────
@@ -47,7 +46,7 @@ const BS_TOOLS = [
   { id: 'bs-templates',  icon: '📑', label: 'Templates',        always: false },
   { id: 'bs-investments',icon: '📈', label: 'Investments',      always: false },
   { id: 'bs-branding',   icon: '🏷️', label: 'Branding',          always: false },
-  { id: 'bs-operatives', icon: '🔑', label: 'Operatives',       always: false },
+  { id: 'bs-operatives', icon: '🔑', label: 'Team & Roles',      always: true },
   { id: 'bs-settings',   icon: '⚙️', label: 'Suite Settings',   always: true },
 ];
 
@@ -60,42 +59,13 @@ const BS_BILL_TYPES = ['bill_sent', 'bill'];
 const BS_ALL_BIZ_TYPES = ['invoice_sent', 'invoice', 'bill_sent', 'bill'];
 const BS_EXPENSE_CATEGORIES = ['Stock/Inventory','Transport/Logistics','Utilities','Rent/Lease','Salaries/Wages','Marketing/Ads','Insurance','Professional Services','Office Supplies','Equipment','Maintenance','Travel','Telecommunications','Taxes/Fees','Miscellaneous'];
 
-// ── Business Context Tracker ──────────────────────────────────────
-// Tracks which templates, panels, and recurring rules belong to
-// the business context (vs personal). Only way to add items is
-// through creation in BS or installing from Public DB.
-function _bsItemsKey() { return 'mxi_bs_items_' + (getCurrentUser()?.id || 'def'); }
-
-function _getBsItems() {
-  try {
-    const raw = localStorage.getItem(_bsItemsKey());
-    if (raw) return JSON.parse(raw);
-  } catch(_) {}
-  return { templates: [], panels: [], recurring: [], investments: [] };
-}
-
-function _saveBsItems(items) {
-  try { localStorage.setItem(_bsItemsKey(), JSON.stringify(items)); } catch(_) {}
-}
-
-function _addBsItem(type, id) {
-  const items = _getBsItems();
-  if (!items[type]) items[type] = [];
-  if (!items[type].includes(id)) items[type].push(id);
-  _saveBsItems(items);
-}
-
-function _removeBsItem(type, id) {
-  const items = _getBsItems();
-  if (!items[type]) return;
-  items[type] = items[type].filter(x => x !== id);
-  _saveBsItems(items);
-}
-
-function _isBsItem(type, id) {
-  const items = _getBsItems();
-  return (items[type] || []).includes(id);
-}
+// ── Business Context Tracker (LEGACY — now handled by business_id column) ──
+// These are kept as no-ops for backward compatibility with any code that calls them.
+// Everything is now scoped by business_id on the database tables themselves.
+function _getBsItems() { return { templates: [], panels: [], recurring: [], investments: [] }; }
+function _addBsItem(_type, _id) {}
+function _removeBsItem(_type, _id) {}
+function _isBsItem(_type, _id) { return true; } // Everything in the query IS a business item now
 
 // ── Helpers ───────────────────────────────────────────────────────
 function _bsModKey() { return 'mxi_bs_tools_' + (getCurrentUser()?.id || 'def'); }
@@ -129,19 +99,161 @@ window._isBsItem = _isBsItem;
 window._getBsItems = _getBsItems;
 window._getBizId = _getBizId;
 
+// ── Context-aware data scoping ───────────────────────────────────
+// Returns the active business UUID for all data queries.
+// This is THE canonical way to scope any query in BS.
+function _bsBusinessId() {
+  const ctx = window._bsContext;
+  if (ctx?.businessId) return ctx.businessId;
+  // Fallback to session's own business
+  if (window.getSession) return window.getSession().businessId || null;
+  return null;
+}
+// Legacy compat shim — old code that calls _bsDataOwnerId() still works
+function _bsDataOwnerId() {
+  const ctx = window._bsContext;
+  return ctx?.ownerId || getCurrentUser()?.id;
+}
+function _bsDataBizId() { return _bsBusinessId(); }
+
+// ── Centralized Business Context ─────────────────────────────────
+// Single source of truth for all BS identity state.
+// Populated by resolve_workspace() RPC — never manually assembled.
+window._bsContext = {
+  businessId: null,     // UUID from businesses table — THE key
+  ownerId: null,        // owner's auth.uid
+  ownerName: null,
+  ownerLogo: null,
+  ownerBizId: null,     // display-only short ID
+  businessCurrency: 'USD',
+  role: null,           // 'owner' | 'admin' | 'operative'
+  permissions: {},
+  scopes: {},
+  isActive: false
+};
+
+// Set context from resolve_workspace() RPC result
+window.setBsContext = function(wsData) {
+  window._bsContext = {
+    businessId: wsData.business_id,
+    ownerId: wsData.owner_id,
+    ownerName: wsData.business_name || 'Business Suite',
+    ownerLogo: wsData.business_logo || null,
+    ownerBizId: _getBizDisplayId(wsData.business_id),
+    businessCurrency: wsData.business_currency || 'USD',
+    role: wsData.role || 'owner',
+    permissions: wsData.permissions || {},
+    scopes: wsData.scopes || {},
+    isActive: true
+  };
+  // Legacy shims
+  window._bsActiveContext = true;
+  window._bsActiveBizId = window._bsContext.ownerBizId;
+  window._bsOwnerUserId = wsData.owner_id;
+  window._bsIsOwnBusiness = (wsData.role === 'owner');
+  // Persist operative's working business so it survives page navigation
+  if (wsData.role !== 'owner') {
+    try { sessionStorage.setItem('mxi_bs_operative_biz', wsData.business_id); } catch(_) {}
+  } else {
+    try { sessionStorage.removeItem('mxi_bs_operative_biz'); } catch(_) {}
+  }
+};
+
+window.clearBsContext = function() {
+  window._bsContext = {
+    businessId: null, ownerId: null, ownerName: null, ownerLogo: null,
+    ownerBizId: null, businessCurrency: 'USD', role: null,
+    permissions: {}, scopes: {}, isActive: false
+  };
+  if (typeof window.clearBsAccess === 'function') window.clearBsAccess();
+  window._bsActiveContext = false;
+  window._bsActiveBizId = '';
+  window._bsOwnerUserId = null;
+  window._bsIsOwnBusiness = true;
+  window._bsOpsRouted = false;
+  // Clear any open ledger panel so it doesn't persist across BS switches
+  if (window._bpEngine) {
+    try { window._bpEngine.backToList(); } catch(_) {}
+  }
+};
+
+// ── Business Access Context (Layer 2: Permissions) ───────────────
+// Separate from identity — controls what the acting user can do.
+const FULL_OWNER_PERMISSIONS = {
+  clients_read: true, clients_write: true,
+  invoices_read: true, invoices_create: true, invoices_edit: true,
+  bills_read: true, bills_create: true, bills_edit: true,
+  ledgers_read: true, ledgers_write: true,
+  templates_read: true, templates_create: true,
+  recurring_read: true, recurring_create: true,
+  investments_read: true, investments_write: true,
+  branding_manage: true, operatives_manage: true, settings_manage: true
+};
+
+const DEFAULT_OPERATIVE_PERMISSIONS = {
+  clients_read: true, clients_write: false,
+  invoices_read: true, invoices_create: false, invoices_edit: false,
+  bills_read: true, bills_create: false, bills_edit: false,
+  ledgers_read: true, ledgers_write: false,
+  templates_read: true, templates_create: false,
+  recurring_read: true, recurring_create: false,
+  investments_read: false, investments_write: false,
+  branding_manage: false, operatives_manage: false, settings_manage: false
+};
+
+window._bsAccess = {
+  actingUserId: null,
+  ownerId: null,
+  sharedPanelId: null,
+  permissions: { ...DEFAULT_OPERATIVE_PERMISSIONS },
+  isOperative: false
+};
+
+window.setBsAccess = function({ actingUserId, ownerId, sharedPanelId, permissions, isOperative }) {
+  window._bsAccess = {
+    actingUserId: actingUserId || null,
+    ownerId: ownerId || null,
+    sharedPanelId: sharedPanelId || null,
+    permissions: permissions || { ...DEFAULT_OPERATIVE_PERMISSIONS },
+    isOperative: !!isOperative
+  };
+};
+
+window.clearBsAccess = function() {
+  window._bsAccess = {
+    actingUserId: null,
+    ownerId: null,
+    sharedPanelId: null,
+    permissions: { ...DEFAULT_OPERATIVE_PERMISSIONS },
+    isOperative: false
+  };
+};
+
+// Check a specific permission — returns true if allowed
+window.bsCanDo = function(action) {
+  const ctx = window._bsContext;
+  if (!ctx?.isActive) return false;
+  // Owner and admin have all permissions
+  if (ctx.role === 'owner' || ctx.role === 'admin') return true;
+  // Operatives check against their permission grant from business_members
+  return !!ctx.permissions?.[action];
+};
+
+// Expose constants for external modules
+window.FULL_OWNER_PERMISSIONS = FULL_OWNER_PERMISSIONS;
+window.DEFAULT_OPERATIVE_PERMISSIONS = DEFAULT_OPERATIVE_PERMISSIONS;
+
 // ── Business sender identity ──────────────────────────────────────
 // Returns the business name when BS context is active, otherwise personal name.
-// Used by entries-page, sharing, and notifications to set the correct sender.
 window._getBsSenderName = function() {
+  const ctx = window._bsContext;
+  if (ctx?.isActive && ctx.ownerName) return ctx.ownerName;
   const profile = getCurrentProfile() || {};
-  if (window._bsActiveContext && window._bsActiveBizId) {
-    return profile.company_name || profile.display_name || 'Business';
-  }
-  return profile.display_name || profile.company_name || 'Someone';
+  return profile.company_name || profile.display_name || 'Someone';
 };
 window._getBsSenderEmail = function() {
   const profile = getCurrentProfile() || {};
-  if (window._bsActiveContext && window._bsActiveBizId) {
+  if (window._bsContext?.isActive) {
     return profile.company_email || getCurrentUser()?.email || '';
   }
   return getCurrentUser()?.email || '';
@@ -153,20 +265,109 @@ export async function renderBusinessSuite(el) {
   const currentUser = getCurrentUser();
   if (!currentUser) { el.innerHTML = '<p style="color:var(--muted);padding:20px;">Please log in.</p>'; return; }
 
+  // Show loading state immediately to prevent flash of previous page content
+  el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;padding:60px 20px;gap:12px;">
+    <div style="width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;"></div>
+    <span style="color:var(--muted);font-size:14px;">Loading Business Suite…</span>
+  </div>`;
+
   // Expand content area for suite layout (remove max-width constraint)
   const contentEl = document.getElementById('content');
   if (contentEl) { contentEl.style.maxWidth = 'none'; contentEl.style.margin = '0'; }
   const mainEl = document.getElementById('main');
   if (mainEl) { mainEl.style.padding = '0'; }
 
+  // ── Resolve workspace via RPC ──
+  // Determines which business we're in and what permissions the user has.
+  // If _bsContext.businessId is already set (e.g. by ops entry), use it.
+  // Otherwise resolve the user's own business.
+  let ctx = window._bsContext;
+  let targetBizId = ctx?.businessId || null;
+
+  if (!targetBizId) {
+    // Check if operative was previously working in a foreign business
+    try {
+      const savedOpBiz = sessionStorage.getItem('mxi_bs_operative_biz');
+      if (savedOpBiz) targetBizId = savedOpBiz;
+    } catch(_) {}
+  }
+
+  if (!targetBizId) {
+    // No business selected — resolve user's own business via RPC
+    const { data: myBiz, error: myBizErr } = await supabase.rpc('my_business_id');
+    if (myBizErr || !myBiz) {
+      console.error('[BS] Could not resolve own business:', myBizErr?.message);
+      el.innerHTML = '<p style="color:var(--red);padding:20px;">Could not load business. Please refresh.</p>';
+      return;
+    }
+    targetBizId = myBiz;
+  }
+
+  // Call resolve_workspace RPC — single call gets business info + role + permissions
+  const { data: wsData, error: wsErr } = await supabase.rpc('resolve_workspace', { p_business_id: targetBizId });
+  if (wsErr || !wsData || wsData.error) {
+    console.error('[BS] resolve_workspace failed:', wsErr?.message || wsData?.error);
+    el.innerHTML = '<p style="color:var(--red);padding:20px;">Access denied or business not found.</p>';
+    return;
+  }
+
+  // Set the full context from RPC result
+  setBsContext(wsData);
+  ctx = window._bsContext;
+
+  const bizName = ctx.ownerName || 'Business Suite';
+  const bizLogo = ctx.ownerLogo || '';
+  const bizId = ctx.ownerBizId || 'BIZ-000000';
+  const isOwnBusiness = ctx.role === 'owner';
+
+  // Set legacy access context for backward compat
+  setBsAccess({
+    actingUserId: currentUser.id,
+    ownerId: ctx.ownerId,
+    sharedPanelId: null,
+    permissions: ctx.permissions || FULL_OWNER_PERMISSIONS,
+    isOperative: ctx.role === 'operative'
+  });
+
+  // Build logo HTML — show image if available, else first letter
+  const logoHtml = bizLogo
+    ? `<img src="${esc(bizLogo)}" style="width:36px;height:36px;border-radius:8px;object-fit:contain;flex-shrink:0;" alt="">`
+    : `<div style="width:36px;height:36px;border-radius:8px;background:var(--accent,#6366F1);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0;">${bizName.charAt(0).toUpperCase()}</div>`;
+
+  // Operative badge — show when working in someone else's business
+  const opBadge = !isOwnBusiness
+    ? `<div style="font-size:10px;color:var(--accent,#6366F1);font-weight:600;margin-top:2px;">⚡ Operative</div>`
+    : '';
+
   // Restore last section
   try { _bsSection = localStorage.getItem('mxi_bs_section') || 'bs-dash'; } catch(_) {}
 
   const enabledTools = _getBsTools();
 
-  // Build sidebar
+  // Permission map: sidebar section → required permission
+  const SECTION_PERMS = {
+    'bs-dash': null,              // always visible
+    'bs-invoices': 'invoices_read',
+    'bs-bills': 'bills_read',
+    'bs-clients': 'clients_read',
+    'bs-suppliers': 'clients_read',  // suppliers share client permission
+    'bs-recurring': 'recurring_read',
+    'bs-panels': 'ledgers_read',
+    'bs-templates': 'templates_read',
+    'bs-investments': 'investments_read',
+    'bs-branding': 'branding_manage',
+    'bs-operatives': 'operatives_manage',
+    'bs-settings': 'settings_manage'
+  };
+
+  // Build sidebar — hide sections the user can't access
   const sidebarHtml = BS_TOOLS
     .filter(t => enabledTools[t.id] !== false)
+    .filter(t => {
+      const perm = SECTION_PERMS[t.id];
+      if (!perm) return true; // no permission needed
+      return window.bsCanDo(perm);
+    })
     .map(t => `
       <button class="bs-nav-btn ${_bsSection === t.id ? 'bs-nav-active' : ''}" data-bs-section="${t.id}"
         onclick="window._bsNavigate('${t.id}')">
@@ -178,25 +379,36 @@ export async function renderBusinessSuite(el) {
   el.innerHTML = `
     <div class="bs-shell">
       <div class="bs-sidebar" id="bs-sidebar">
-        <div class="bs-sidebar-header">
-          <div style="font-size:18px;font-weight:800;letter-spacing:-.02em;color:var(--text);">${esc(getCurrentProfile()?.company_name || 'Business Suite')}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${_getBizId()}</div>
+        <div class="bs-sidebar-header" style="display:flex;align-items:center;gap:10px;">
+          ${logoHtml}
+          <div style="min-width:0;">
+            <div style="font-size:16px;font-weight:800;letter-spacing:-.02em;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(bizName)}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:1px;">${bizId}</div>
+            ${opBadge}
+          </div>
         </div>
         <div class="bs-sidebar-nav" id="bs-sidebar-nav">
           ${sidebarHtml}
-        </div>
-        <div class="bs-sidebar-footer">
-          <button class="bs-nav-btn" onclick="window._bsNavigate('bs-back')" style="color:var(--muted);">
-            <span class="bs-nav-icon">←</span>
-            <span class="bs-nav-label">Back to Personal</span>
-          </button>
+          <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;">
+            <button class="bs-nav-btn" onclick="window._bsNavigate('bs-back')" style="color:var(--muted);">
+              <span class="bs-nav-icon">←</span>
+              <span class="bs-nav-label">${isOwnBusiness ? 'Back to Personal' : 'Exit to My Ops'}</span>
+            </button>
+          </div>
         </div>
       </div>
       <div class="bs-main" id="bs-main">
-        <div class="bs-mobile-header" id="bs-mobile-header">
+        <div class="bs-mobile-header" id="bs-mobile-header" style="display:flex;align-items:center;gap:8px;">
           <button class="bs-hamburger" onclick="document.getElementById('bs-sidebar').classList.toggle('bs-sidebar-open')">☰</button>
-          <span style="font-weight:700;font-size:15px;">Business Suite</span>
+          <span style="font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(bizName)}</span>
+          ${!isOwnBusiness ? '<span style="font-size:10px;color:var(--accent);font-weight:500;padding:2px 6px;background:rgba(99,102,241,.12);border-radius:6px;">⚡ Operative</span>' : ''}
         </div>
+        ${!isOwnBusiness ? `<div style="background:rgba(99,102,241,.08);border-bottom:1px solid rgba(99,102,241,.2);padding:8px 24px;display:flex;align-items:center;gap:8px;font-size:12px;">
+          <span style="font-weight:700;color:var(--accent,#6366F1);">⚡ Working as ${esc(ctx.role || 'operative')}</span>
+          <span style="color:var(--muted);">in</span>
+          <span style="font-weight:700;color:var(--text);">${esc(bizName)}</span>
+          <span style="color:var(--muted);font-family:monospace;font-size:11px;">${bizId}</span>
+        </div>` : ''}
         <div id="bs-content" style="padding:20px 24px;max-width:1100px;padding-bottom:80px;">
           <p style="color:var(--muted);">Loading…</p>
         </div>
@@ -227,16 +439,17 @@ export async function renderBusinessSuite(el) {
 // ── Section Navigation ────────────────────────────────────────────
 window._bsNavigate = function(section) {
   if (section === 'bs-back') {
-    // Clear any lingering BS context flags to prevent personal items getting tagged
-    window._bsActiveContext = false;
-    window._bsActiveBizId = '';
-    window._bsCreatingPanel = false;
-    window._bsCreatingTemplate = false;
-    window._bsCreatingRecurring = false;
-    window._bsCreatingInvestment = false;
+    const wasOwn = window._bsContext?.role === 'owner';
+    try { sessionStorage.removeItem('mxi_bs_operative_biz'); } catch(_) {}
+    clearBsContext();
     // Close sidebar on mobile
     document.getElementById('bs-sidebar')?.classList.remove('bs-sidebar-open');
-    if (window.app?.navigate) window.app.navigate('dash');
+    // If was in someone else's business, go back to My Ops; otherwise dashboard
+    if (wasOwn) {
+      if (window.app?.navigate) window.app.navigate('dash');
+    } else {
+      if (window.app?.navigate) window.app.navigate('operations');
+    }
     return;
   }
   _bsSection = section;
@@ -283,14 +496,15 @@ async function _bsRenderDash(el) {
   const profile = getCurrentProfile();
   const cur = profile?.default_currency || 'USD';
 
-  // Fetch business entries (invoices, bills) — filtered by business_id
-  const bizId = _getBizId();
+  // Use business_id for all data scoping
+  const bizUuid = _bsBusinessId();
+
+  // Fetch business entries scoped to the business
   const { data: entries } = await supabase
     .from('entries')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('business_id', bizUuid)
     .in('tx_type', BS_ALL_BIZ_TYPES)
-    .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false })
     .limit(50);
@@ -350,15 +564,14 @@ async function _bsRenderDash(el) {
     </div>
     ` : ''}
 
-    <!-- Business header with branding -->
+    <!-- Business header -->
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
-      ${profile?.logo_url ? `<img src="${esc(profile.logo_url)}" style="max-height:48px;max-width:120px;border-radius:8px;object-fit:contain;">` : ''}
       <div style="flex:1;min-width:0;">
-        <h2 style="font-size:22px;font-weight:800;margin:0;">${esc(profile?.company_name || 'Business Overview')}</h2>
-        <p style="color:var(--muted);font-size:13px;margin-top:2px;">Welcome back, ${esc(userName)} · <span style="font-family:monospace;font-size:12px;">${_getBizId()}</span></p>
+        <h2 style="font-size:22px;font-weight:700;margin:0;">Overview</h2>
+        <p style="color:var(--muted);font-size:13px;margin-top:2px;">Welcome back, ${esc(userName)} · <span style="font-family:monospace;font-size:12px;">${window._bsContext?.ownerBizId || 'BIZ-000000'}</span></p>
       </div>
       <div style="display:flex;gap:8px;">
-        <button class="btn btn-secondary btn-sm" onclick="window._bsNavigate('bs-branding')" style="white-space:nowrap;">Edit Branding</button>
+        ${window.bsCanDo('branding_manage') ? `<button class="btn btn-secondary btn-sm" onclick="window._bsNavigate('bs-branding')" style="white-space:nowrap;">Edit Branding</button>` : ''}
         <button class="btn btn-secondary btn-sm" onclick="window._bsNavigate('bs-dash')" title="Refresh" style="padding:6px 10px;">↻</button>
       </div>
     </div>
@@ -386,12 +599,12 @@ async function _bsRenderDash(el) {
       </div>
     </div>
 
-    <!-- Quick Actions -->
+    <!-- Quick Actions (permission-gated) -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:28px;">
-      <button class="btn btn-primary" onclick="window._bsQuickAction('invoice')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">+ New Invoice</button>
-      <button class="btn btn-secondary" onclick="window._bsReceiveBill?window._bsReceiveBill():window._bsQuickAction('bill')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">+ Receive Bill</button>
-      <button class="btn btn-secondary" onclick="window._bsNavigate('bs-clients')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">Clients</button>
-      <button class="btn btn-secondary" onclick="window._bsNavigate('bs-panels')" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;">Ledgers</button>
+      ${window.bsCanDo('invoices_create') ? `<button class="btn btn-primary" onclick="window._bsQuickAction('invoice')" style="padding:12px;font-size:13px;font-weight:600;border-radius:10px;">+ New Invoice</button>` : `<button class="btn btn-secondary" disabled style="padding:12px;font-size:13px;font-weight:600;border-radius:10px;opacity:.4;cursor:not-allowed;">+ New Invoice</button>`}
+      ${window.bsCanDo('bills_create') ? `<button class="btn btn-secondary" onclick="window._bsReceiveBill?window._bsReceiveBill():window._bsQuickAction('bill')" style="padding:12px;font-size:13px;font-weight:600;border-radius:10px;">+ Receive Bill</button>` : `<button class="btn btn-secondary" disabled style="padding:12px;font-size:13px;font-weight:600;border-radius:10px;opacity:.4;cursor:not-allowed;">+ Receive Bill</button>`}
+      ${window.bsCanDo('clients_read') ? `<button class="btn btn-secondary" onclick="window._bsNavigate('bs-clients')" style="padding:12px;font-size:13px;font-weight:600;border-radius:10px;">Clients</button>` : ''}
+      ${window.bsCanDo('ledgers_read') ? `<button class="btn btn-secondary" onclick="window._bsNavigate('bs-panels')" style="padding:12px;font-size:13px;font-weight:600;border-radius:10px;">Ledgers</button>` : ''}
     </div>
 
     <!-- Activity Summary -->
@@ -478,9 +691,11 @@ async function _bsRenderDash(el) {
 // Business-branded TX labels
 function _bsTxLabel(type) {
   const map = {
-    invoice_sent: 'Invoice',
+    invoice_sent: 'Invoice Sent',
+    invoice_received: 'Invoice Received',
     invoice: 'Invoice',
-    bill_sent: 'Bill',
+    bill_sent: 'Bill Sent',
+    bill_received: 'Bill Received',
     bill: 'Bill',
     owed_to_me: 'Receivable',
     i_owe: 'Payable',
@@ -495,7 +710,7 @@ function _bsTxLabel(type) {
 // Sets _bsActiveContext so saveNewEntry knows to return to BS (not personal entries)
 window._bsQuickAction = function(type) {
   window._bsActiveContext = true;
-  window._bsActiveBizId = _getBizId();
+  window._bsActiveBizId = _bsDataBizId();
   if (type === 'invoice') {
     if (window.openNewEntryModal) window.openNewEntryModal('invoice');
   } else if (type === 'bill') {
@@ -509,14 +724,13 @@ window._bsQuickAction = function(type) {
 async function _bsRenderInvoices(el) {
   const user = getCurrentUser();
   const cur = getCurrentProfile()?.default_currency || 'USD';
-  const bizId = _getBizId();
+  const bizUuid = _bsBusinessId();
 
   const { data } = await supabase
     .from('entries')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('business_id', bizUuid)
     .in('tx_type', BS_INVOICE_TYPES)
-    .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false });
 
@@ -538,7 +752,7 @@ async function _bsRenderInvoices(el) {
   // Apply search
   if (q) filtered = filtered.filter(e =>
     (e.contact_name||'').toLowerCase().includes(q) ||
-    (e.metadata?.inv_number||'').toLowerCase().includes(q) ||
+    (e.invoice_number||e.metadata?.inv_number||'').toLowerCase().includes(q) ||
     String(e.amount||'').includes(q)
   );
 
@@ -569,14 +783,19 @@ async function _bsRenderInvoices(el) {
           <p style="color:var(--muted);margin-bottom:12px;">${q ? 'No invoices match your search.' : 'No invoices match this filter.'}</p>
           ${!q ? '<button class="btn btn-primary btn-sm" onclick="window._bsQuickAction(\'invoice\')">Create First Invoice</button>' : ''}
         </div>`
-      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Client</th><th>Invoice #</th><th>Amount</th><th>Due</th><th>Status</th></tr></thead><tbody>
+      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Client</th><th>Ref #</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due</th><th>Status</th></tr></thead><tbody>
           ${filtered.map(e => {
             const isOverdue = e.status !== 'settled' && e.status !== 'voided' && e.metadata?.due_date && new Date(e.metadata.due_date) < new Date();
+            const settled = e.settled_amount || 0;
+            const remaining = e.amount - settled;
+            const refNum = e.invoice_number || e.metadata?.inv_number || (e.entry_number ? '#' + String(e.entry_number).padStart(4,'0') : '—');
             return `<tr style="cursor:pointer;${isOverdue?'background:rgba(208,120,120,.06);':''}" onclick="window._bsViewEntry('${e.id}')">
             <td style="color:var(--muted);font-size:13px;">${fmtDate(e.created_at)}</td>
             <td style="font-weight:600;">${esc(e.contact_name || '—')}</td>
-            <td style="color:var(--accent);font-size:13px;font-weight:600;">${esc(e.metadata?.inv_number || '—')}</td>
+            <td style="color:var(--accent);font-size:13px;font-weight:600;">${esc(refNum)}</td>
             <td style="font-weight:700;">${fmtMoney(e.amount, e.currency)}</td>
+            <td style="font-size:13px;color:${settled > 0 ? 'var(--green,#6ec77a)' : 'var(--muted-2)'};">${settled > 0 ? fmtMoney(settled, e.currency) : '—'}</td>
+            <td style="font-size:13px;font-weight:600;color:${remaining > 0 && e.status !== 'settled' ? 'var(--text)' : 'var(--muted-2)'};">${e.status === 'settled' ? '0' : fmtMoney(remaining, e.currency)}</td>
             <td style="color:${isOverdue?'var(--red,#d07878)':'var(--muted)'};font-size:13px;font-weight:${isOverdue?'600':'400'};">${fmtDate(e.metadata?.due_date)}${isOverdue?' ⚠':''}
             </td>
             <td>${statusBadge(e.status || 'draft')}</td>
@@ -597,14 +816,13 @@ window._bsViewEntry = function(entryId) {
 async function _bsRenderBills(el) {
   const user = getCurrentUser();
   const cur = getCurrentProfile()?.default_currency || 'USD';
-  const bizId = _getBizId();
+  const bizUuid = _bsBusinessId();
 
   const { data } = await supabase
     .from('entries')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('business_id', bizUuid)
     .in('tx_type', BS_BILL_TYPES)
-    .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false });
 
@@ -654,14 +872,19 @@ async function _bsRenderBills(el) {
           <p style="color:var(--muted);margin-bottom:12px;">${q ? 'No bills match your search.' : 'No bills match this filter.'}</p>
           ${!q ? '<button class="btn btn-primary btn-sm" onclick="window._bsReceiveBill?window._bsReceiveBill():window._bsQuickAction(\'bill\')">Receive First Bill</button>' : ''}
         </div>`
-      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Supplier</th><th>Ref #</th><th>Amount</th><th>Due</th><th>Status</th></tr></thead><tbody>
+      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Supplier</th><th>Ref #</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due</th><th>Status</th></tr></thead><tbody>
           ${filtered.map(e => {
             const isOverdue = e.status !== 'settled' && e.status !== 'voided' && e.metadata?.due_date && new Date(e.metadata.due_date) < new Date();
+            const settled = e.settled_amount || 0;
+            const remaining = e.amount - settled;
+            const refNum = e.metadata?.ref_number || e.invoice_number || (e.entry_number ? '#' + String(e.entry_number).padStart(4,'0') : '—');
             return `<tr style="cursor:pointer;${isOverdue?'background:rgba(208,120,120,.06);':''}" onclick="window._bsViewEntry('${e.id}')">
             <td style="color:var(--muted);font-size:13px;">${fmtDate(e.created_at)}</td>
             <td style="font-weight:600;">${esc(e.contact_name || '—')}</td>
-            <td style="color:var(--muted);font-size:13px;">${esc(e.metadata?.ref_number || '—')}</td>
+            <td style="color:var(--muted);font-size:13px;">${esc(refNum)}</td>
             <td style="font-weight:700;">${fmtMoney(e.amount, e.currency)}</td>
+            <td style="font-size:13px;color:${settled > 0 ? 'var(--green,#6ec77a)' : 'var(--muted-2)'};">${settled > 0 ? fmtMoney(settled, e.currency) : '—'}</td>
+            <td style="font-size:13px;font-weight:600;color:${remaining > 0 && e.status !== 'settled' ? 'var(--text)' : 'var(--muted-2)'};">${e.status === 'settled' ? '0' : fmtMoney(remaining, e.currency)}</td>
             <td style="color:${isOverdue?'var(--red,#d07878)':'var(--muted)'};font-size:13px;font-weight:${isOverdue?'600':'400'};">${fmtDate(e.metadata?.due_date)}${isOverdue?' ⚠':''}</td>
             <td>${statusBadge(e.status || 'draft')}</td>
           </tr>`}).join('')}
@@ -675,17 +898,16 @@ async function _bsRenderBills(el) {
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderClients(el) {
   const user = getCurrentUser();
-  const bizId = _getBizId();
-  const contacts = await listContacts(user.id);
+  const bizUuid = _bsBusinessId();
+  const contacts = await listContacts(bizUuid);
   _bsContacts = contacts;
 
   // Include ALL business transaction types so any interacted contact appears as a client
   const { data: invoices } = await supabase
     .from('entries')
     .select('contact_id, contact_name, amount, currency, status, tx_type, created_at')
-    .eq('user_id', user.id)
+    .eq('business_id', bizUuid)
     .in('tx_type', [...BS_INVOICE_TYPES, ...BS_BILL_TYPES, 'owed_to_me', 'i_owe', 'they_owe_you', 'you_owe_them'])
-    .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false });
 
@@ -771,17 +993,16 @@ async function _bsRenderClients(el) {
 async function _bsRenderSuppliers(el) {
   const user = getCurrentUser();
   const cur = getCurrentProfile()?.default_currency || 'USD';
-  const contacts = _bsContacts.length ? _bsContacts : await listContacts(user.id);
+  const bizUuid = _bsBusinessId();
+  const contacts = _bsContacts.length ? _bsContacts : await listContacts(bizUuid);
   _bsContacts = contacts;
 
   // Fetch ALL supplier bills (received bills, bills you owe) — business only
-  const bizId = _getBizId();
   const { data: bills } = await supabase
     .from('entries')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('business_id', bizUuid)
     .in('tx_type', [...BS_BILL_TYPES, 'i_owe'])
-    .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false });
 
@@ -996,7 +1217,7 @@ window._bsDoAddNewContact = async function() {
   const user = getCurrentUser();
   const { data: newContact, error } = await supabase
     .from('contacts')
-    .insert({ user_id: user.id, name, email: email || null })
+    .insert({ user_id: user.id, business_id: _bsBusinessId(), name, email: email || null })
     .select().single();
 
   if (error) { toast('Failed to add contact: ' + error.message, 'error'); return; }
@@ -1056,6 +1277,9 @@ window._bsSaveContact = async function(contactId) {
 // ── Receive Bill modal — Log an incoming supplier bill ─────────
 window._bsReceiveBill = function() {
   const cur = getCurrentProfile()?.default_currency || 'USD';
+  // Check if we have a preselected contact from add-new flow
+  const preContact = window._bsRbPreselectedContact || null;
+  if (preContact) window._bsRbPreselectedContact = null; // consume once
   openModal(`
     <div class="modal-title">Receive Bill</div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Log an incoming bill from a supplier. Record what it's for, the amount, and tag the expense category.</p>
@@ -1063,7 +1287,7 @@ window._bsReceiveBill = function() {
     <div class="form-group">
       <label style="display:flex;justify-content:space-between;align-items:center;">
         <span>Supplier *</span>
-        <button type="button" onclick="window._bsAddNewContact(function(c){if(c){document.getElementById('bs-rb-supplier').value=c.name;document.getElementById('bs-rb-contact-id').value=c.id;document.getElementById('bs-rb-contact-results').style.display='none';}closeModal();window._bsReceiveBill();})" style="font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;font-weight:700;">+ Add New</button>
+        <button type="button" onclick="window._bsAddNewContact(function(c){if(c){window._bsRbPreselectedContact=c;}closeModal();window._bsReceiveBill();})" style="font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;font-weight:700;">+ Add New</button>
       </label>
       <input type="text" id="bs-rb-supplier" placeholder="Search or enter supplier name…" autocomplete="off"
         oninput="window._bsRbSearchContact(this.value)" style="width:100%;">
@@ -1087,9 +1311,15 @@ window._bsReceiveBill = function() {
       </div>
     </div>
 
-    <div class="form-group">
-      <label>Due Date</label>
-      <input type="date" id="bs-rb-due">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-group">
+        <label>Due Date</label>
+        <input type="date" id="bs-rb-due">
+      </div>
+      <div class="form-group">
+        <label>Supplier Phone</label>
+        <input type="tel" id="bs-rb-phone" placeholder="e.g. +1 555-0100" style="width:100%;">
+      </div>
     </div>
 
     <div class="form-group">
@@ -1120,6 +1350,13 @@ window._bsReceiveBill = function() {
       <button class="btn btn-primary sm" onclick="window._bsSaveReceivedBill()">Log Bill</button>
     </div>
   `, { maxWidth: '520px' });
+  // Apply preselected contact if returning from add-new flow
+  if (preContact) {
+    const sEl = document.getElementById('bs-rb-supplier');
+    const idEl = document.getElementById('bs-rb-contact-id');
+    if (sEl) sEl.value = preContact.name || '';
+    if (idEl) idEl.value = preContact.id || '';
+  }
 };
 
 // Contact search for Receive Bill
@@ -1127,7 +1364,7 @@ window._bsRbSearchContact = async function(query) {
   const el = document.getElementById('bs-rb-contact-results');
   if (!el) return;
   if (!query || query.length < 1) { el.style.display = 'none'; return; }
-  const contacts = _bsContacts.length ? _bsContacts : await listContacts(getCurrentUser().id);
+  const contacts = _bsContacts.length ? _bsContacts : await listContacts(_bsBusinessId());
   _bsContacts = contacts;
   const q = query.toLowerCase();
   const matches = contacts.filter(c =>
@@ -1181,6 +1418,7 @@ window._bsSaveReceivedBill = async function() {
   const category = document.getElementById('bs-rb-category')?.value || '';
   const refNum = (document.getElementById('bs-rb-ref')?.value || '').trim();
   const notes = (document.getElementById('bs-rb-notes')?.value || '').trim();
+  const phone = (document.getElementById('bs-rb-phone')?.value || '').trim();
 
   if (!supplierName) { toast('Supplier is required', 'error'); return; }
   if (amount <= 0) { toast('Amount must be greater than 0', 'error'); return; }
@@ -1190,16 +1428,21 @@ window._bsSaveReceivedBill = async function() {
   // If no existing contact, create one
   let finalContactId = contactId;
   if (!finalContactId) {
+    const contactInsert = { user_id: user.id, business_id: _bsBusinessId(), name: supplierName, tags: ['supplier'] };
+    if (phone) contactInsert.phone = phone;
     const { data: newContact, error: cErr } = await supabase
       .from('contacts')
-      .insert({ user_id: user.id, name: supplierName, tags: ['supplier'] })
+      .insert(contactInsert)
       .select().single();
     if (cErr) { toast('Failed to create supplier contact', 'error'); return; }
     finalContactId = newContact.id;
     _bsContacts = []; // clear cache
+  } else if (phone && finalContactId) {
+    // Update existing contact's phone if provided
+    await supabase.from('contacts').update({ phone }).eq('id', finalContactId);
   }
 
-  const metadata = { business_id: _getBizId() };
+  const metadata = {};
   if (dueDate) metadata.due_date = dueDate;
   if (description) metadata.description = description;
   if (category) metadata.expense_category = category;
@@ -1211,14 +1454,15 @@ window._bsSaveReceivedBill = async function() {
   try {
     entry = await createEntry(user.id, {
       contactId: finalContactId,
-      txType: 'bill_sent',
+      txType: 'bill_received',
       amount,
       currency,
       date: billDate,
       note: description || '',
       invoiceNumber: refNum || '',
       status: 'posted',
-      metadata
+      metadata: Object.keys(metadata).length ? metadata : null,
+      businessId: _bsBusinessId()
     });
   } catch (err) {
     console.error('[_bsSaveReceivedBill] createEntry threw:', err);
@@ -1267,8 +1511,10 @@ window._bsConfirmPayment = async function(entryId) {
 
   const { data: entry } = await supabase.from('entries').select('metadata').eq('id', entryId).single();
   const meta = entry?.metadata || {};
-  // Defensively ensure business_id is preserved
-  if (!meta.business_id) meta.business_id = _getBizId();
+  // Defensively ensure business_id is preserved on the entry row
+  if (!entry.business_id) {
+    await supabase.from('entries').update({ business_id: _bsBusinessId() }).eq('id', entry.id);
+  }
   meta.paid_date = payDate;
   if (payNote) meta.payment_note = payNote;
 
@@ -1288,12 +1534,11 @@ window._bsConfirmPayment = async function(entryId) {
 async function _bsRenderRecurring(el) {
   const user = getCurrentUser();
   const cur = getCurrentProfile()?.default_currency || 'USD';
-  const rules = await listRecurring(user.id);
+  const bizUuid = _bsBusinessId();
+  const rules = await listRecurring(bizUuid);
 
-  // Filter to only those tracked in business context (by ID)
-  const bsItems = _getBsItems();
-  const bsRecurringIds = new Set(bsItems.recurring || []);
-  const bizRules = rules.filter(r => bsRecurringIds.has(r.id));
+  // All rules returned are already scoped to this business_id via RLS
+  const bizRules = rules;
   const activeRules = bizRules.filter(r => r.active);
   const pausedRules = bizRules.filter(r => !r.active);
   const totalRecurring = activeRules.reduce((s,r) => s + (r.amount||0), 0);
@@ -1360,8 +1605,22 @@ async function _bsRenderRecurring(el) {
 // SECTION: Business Ledgers (Form Generator)
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderPanels(el) {
+  // If a panel was open (user navigated away via sidebar), re-open it
+  // BUT only if it belongs to the current business context
+  const activePanelId = window._bpEngine?.currentPanelId;
+  if (activePanelId) {
+    const curBiz = _bsBusinessId();
+    const cachedBiz = window._bpEngine._lastBizId;
+    if (cachedBiz && cachedBiz === curBiz) {
+      window._bpEngine.openPanel(activePanelId);
+      return;
+    }
+    // Different business context — clear stale panel
+    try { window._bpEngine.backToList(); } catch(_) {}
+  }
+
   const user = getCurrentUser();
-  const userId = user.id;
+  const ownerId = _bsDataOwnerId();
   if (!window._bsPanelTab) window._bsPanelTab = 'mine';
   const tab = window._bsPanelTab;
 
@@ -1406,7 +1665,7 @@ async function _bsRenderPanels(el) {
         : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;">
             ${panels.map(p => {
               const fields = p.fields || [];
-              const isOwn = p.user_id === userId;
+              const isOwn = p.user_id === ownerId;
               return `
               <div class="card" style="padding:18px;">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
@@ -1432,9 +1691,10 @@ async function _bsRenderPanels(el) {
   }
 
   // ── My Ledgers tab ──
-  const allPanels = await listPanels(user.id);
-  const bsPanelIds = new Set(_getBsItems().panels || []);
-  const panels = allPanels.filter(p => bsPanelIds.has(p.id));
+  const bizUuid = _bsBusinessId();
+  const allPanels = await listPanels(bizUuid);
+  // All panels returned by listPanels are already scoped to this business_id via RLS
+  const panels = allPanels;
 
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
@@ -1490,7 +1750,7 @@ async function _bsRenderPanels(el) {
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderTemplates(el) {
   const user = getCurrentUser();
-  const userId = user.id;
+  const ownerId = _bsDataOwnerId();
 
   // Tab state: my templates vs public DB
   if (!window._bsTmplTab) window._bsTmplTab = 'mine';
@@ -1535,7 +1795,7 @@ async function _bsRenderTemplates(el) {
           </div>`
         : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;">
             ${display.map(t => {
-              const isOwn = t.user_id === userId;
+              const isOwn = t.user_id === ownerId;
               const fCount = (t.fields||[]).length;
               const creator = t.creator?.display_name || '';
               return `
@@ -1563,9 +1823,10 @@ async function _bsRenderTemplates(el) {
   }
 
   // ── My Templates tab — only show business-tracked templates ──
-  const allTemplates = await listTemplates(user.id);
-  const bsTmplIds = new Set(_getBsItems().templates || []);
-  const templates = allTemplates.filter(t => bsTmplIds.has(t.id));
+  const bizUuid = _bsBusinessId();
+  const allTemplates = await listTemplates(bizUuid);
+  // All templates returned are already scoped to this business_id via RLS
+  const templates = allTemplates;
   const display = tq ? templates.filter(t => (t.name||'').toLowerCase().includes(tq) || (t.description||'').toLowerCase().includes(tq)) : templates;
 
   el.innerHTML = `
@@ -1636,22 +1897,52 @@ window._bsCreatePanel = function() {
   else toast('Ledger engine not loaded', 'error');
 };
 
-window._bsCreateTemplate = function() {
+window._bsCreateTemplate = async function() {
   window._bsCreatingTemplate = true;
-  if (window.openNewTemplateModal) window.openNewTemplateModal();
-  else toast('Template builder not loaded', 'error');
+  // Ensure template module is loaded before calling
+  if (!window.openNewTemplateModal) {
+    try {
+      await import('./templates-page.js');
+    } catch(_) {}
+  }
+  if (window.openNewTemplateModal) {
+    try { window.openNewTemplateModal(); }
+    catch(e) { console.error('[_bsCreateTemplate]', e); toast('Error opening template builder: ' + e.message, 'error'); }
+  } else {
+    toast('Template builder not loaded — please refresh the page.', 'error');
+  }
 };
 
-window._bsCreateRecurring = function() {
+window._bsCreateRecurring = async function() {
   window._bsCreatingRecurring = true;
-  if (window.openNewRecurringModal) window.openNewRecurringModal();
-  else toast('Recurring module not loaded', 'error');
+  if (!window.openNewRecurringModal) {
+    try { await import('./recurring-page.js'); } catch(_) {}
+  }
+  if (window.openNewRecurringModal) {
+    try { window.openNewRecurringModal(); }
+    catch(e) { console.error('[_bsCreateRecurring]', e); toast('Error opening recurring form: ' + e.message, 'error'); }
+  } else {
+    toast('Recurring module not loaded — please refresh the page.', 'error');
+  }
 };
 
-window._bsCreateInvestment = function() {
+window._bsCreateInvestment = async function() {
   window._bsCreatingInvestment = true;
-  if (window.openNewInvestmentModal) window.openNewInvestmentModal();
-  else toast('Investment module not loaded', 'error');
+  // Set business context flags so the entry/investment knows it's from BS
+  window._bsActiveContext = true;
+  window._bsActiveBizId = _getBizDisplayId(_bsBusinessId());
+  // Ensure investment module is loaded before calling
+  if (!window.openNewInvestmentModal) {
+    try {
+      await import('./investments-page.js');
+    } catch(_) {}
+  }
+  if (window.openNewInvestmentModal) {
+    try { window.openNewInvestmentModal(); }
+    catch(e) { console.error('[_bsCreateInvestment]', e); toast('Error opening investment form: ' + e.message, 'error'); }
+  } else {
+    toast('Investment module not loaded — please refresh the page.', 'error');
+  }
 };
 
 // After panel save, check flag and track
@@ -1702,7 +1993,8 @@ window._invAfterSave = function(investmentId) {
 // Copy/install a public template
 window._bsCopyTemplate = async function(templateId) {
   const user = getCurrentUser();
-  const newTmpl = await copyPublicTemplate(user.id, templateId);
+  const bizUuid = _bsBusinessId();
+  const newTmpl = await copyPublicTemplate(bizUuid, user.id, templateId);
   // Track the newly installed template in business context
   if (newTmpl?.id) _addBsItem('templates', newTmpl.id);
   toast('Template installed to your business library', 'success');
@@ -1754,9 +2046,8 @@ async function _bsRenderInvestments(el) {
     .is('archived_at', null)
     .order('created_at', { ascending: false });
 
-  // Only show investments tracked in the business context
-  const bsInvIds = new Set(_getBsItems().investments || []);
-  const inv = (investments || []).filter(i => bsInvIds.has(i.id));
+  // All investments returned are already scoped to this business_id via RLS
+  const inv = investments || [];
   const totalMembers = inv.reduce((s,i) => s + (i.members||[]).length, 0);
   const totalTx = inv.reduce((s,i) => s + (i.transactions||[]).length, 0);
 
@@ -1848,6 +2139,9 @@ window._bsPreviewPanel = async function(panelId) {
 
 window._bsCopyPanel = async function(panelId) {
   const user = getCurrentUser();
+  const bizId = _bsBusinessId();
+  if (!bizId) { toast('No business context — please refresh', 'error'); return; }
+
   const { data: source } = await supabase
     .from('business_panels')
     .select('*')
@@ -1859,6 +2153,7 @@ window._bsCopyPanel = async function(panelId) {
   const { data, error } = await supabase
     .from('business_panels')
     .insert({
+      business_id: bizId,
       user_id: user.id,
       title: source.title + ' (Copy)',
       currency: source.currency,
@@ -1869,9 +2164,7 @@ window._bsCopyPanel = async function(panelId) {
     .single();
 
   if (error) { toast('Failed to copy: ' + error.message, 'error'); return; }
-  // Track the newly imported panel in business context
-  if (data?.id) _addBsItem('panels', data.id);
-  toast('Panel copied to your Business Ledgers', 'success');
+  toast('Ledger installed successfully', 'success');
   window._bsNavigate('bs-panels');
 };
 
@@ -1880,7 +2173,7 @@ window._bsCopyPanel = async function(panelId) {
 // ══════════════════════════════════════════════════════════════════
 function _bsRenderBranding(el) {
   const p = getCurrentProfile() || {};
-  const bizId = _getBizId();
+  const bizId = window._bsContext?.ownerBizId || 'BIZ-000000';
 
   el.innerHTML = `
     <div style="margin-bottom:24px;">
@@ -1962,18 +2255,30 @@ function _bsRenderBranding(el) {
           </div>
         </div>
         <div style="border-top:2px solid #e5e7eb;padding-top:12px;margin-top:8px;">
-          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;color:#888;border-bottom:1px solid #e5e7eb;">
-            <span style="font-weight:600;">Item</span><span style="font-weight:600;">Amount</span>
+          <div style="display:flex;padding:6px 0;font-size:12px;color:#888;border-bottom:1px solid #e5e7eb;">
+            <span style="flex:2;font-weight:600;">Item</span><span style="width:40px;text-align:center;font-weight:600;">Qty</span><span style="width:80px;text-align:right;font-weight:600;">Price</span><span style="width:90px;text-align:right;font-weight:600;">Total</span>
           </div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;color:#1a1a1a;border-bottom:1px solid #e5e7eb;">
-            <span>Sample line item</span><span style="font-weight:600;">${p.default_currency||'USD'} 100.00</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;color:#1a1a1a;border-bottom:1px solid #e5e7eb;">
-            <span>Consulting service</span><span style="font-weight:600;">${p.default_currency||'USD'} 250.00</span>
-          </div>
-          <div style="display:flex;justify-content:flex-end;padding:12px 0;font-size:15px;font-weight:800;color:#1a1a1a;">
-            Total: ${p.default_currency||'USD'} 350.00
-          </div>
+          ${(() => {
+            // Try to find a real recent invoice with line items for preview
+            const sampleItems = window._bsBrandPreviewItems || [
+              { description: 'Your item or service', qty: 1, price: 100 },
+              { description: 'Another line item', qty: 2, price: 75 }
+            ];
+            const cur = p.default_currency || 'USD';
+            const fmt = (v) => new Intl.NumberFormat('en-US', { style:'currency', currency: cur, minimumFractionDigits:2 }).format(v);
+            let total = 0;
+            const rows = sampleItems.map(li => {
+              const lineTotal = (li.qty || 1) * (li.price || 0);
+              total += lineTotal;
+              return `<div style="display:flex;padding:8px 0;font-size:13px;color:#1a1a1a;border-bottom:1px solid #e5e7eb;">
+                <span style="flex:2;">${li.description || '—'}</span>
+                <span style="width:40px;text-align:center;color:#888;">${li.qty || 1}</span>
+                <span style="width:80px;text-align:right;">${fmt(li.price || 0)}</span>
+                <span style="width:90px;text-align:right;font-weight:600;">${fmt(lineTotal)}</span>
+              </div>`;
+            }).join('');
+            return rows + `<div style="display:flex;justify-content:flex-end;padding:12px 0;font-size:15px;font-weight:800;color:#1a1a1a;">Total: ${fmt(total)}</div>`;
+          })()}
         </div>
         <div style="font-size:10px;color:#aaa;margin-top:8px;text-align:center;font-family:monospace;">${bizId} · Powered by Money IntX</div>
       </div>
@@ -2027,7 +2332,7 @@ window._bsSaveBranding = async function() {
   if (hdr) {
     hdr.innerHTML = `
       <div style="font-size:18px;font-weight:800;letter-spacing:-.02em;color:var(--text);">${esc(updates.company_name || 'Business Suite')}</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:2px;">${_getBizId()}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px;">${window._bsContext?.ownerBizId || 'BIZ-000000'}</div>
     `;
   }
 };
@@ -2050,45 +2355,55 @@ const BS_ROLE_PERMS = {
   viewer:  { canManageTeam: false, canManageTools: false, canCreateEntries: false,canEditEntries: false,canDeleteEntries: false,canManagePanels: false,canViewAll: true, canExport: false }
 };
 
-function _bsOpKey() { return 'mxi_bs_operatives_' + (getCurrentUser()?.id || 'def'); }
+// Cached members list — refreshed on each render
+let _bsMembersCache = [];
 
-function _getOperatives() {
-  try {
-    const raw = localStorage.getItem(_bsOpKey());
-    if (raw) return JSON.parse(raw);
-  } catch(_) {}
-  // Default: current user is Owner
-  const u = getCurrentUser();
-  const p = getCurrentProfile();
-  const defaults = [{
-    id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36),
-    name: p?.display_name || u?.email || 'You',
-    email: u?.email || '',
-    role: 'owner',
+async function _fetchBusinessMembers() {
+  const bizId = _bsBusinessId();
+  if (!bizId) return [];
+  const currentUserId = getCurrentUser()?.id;
+  // Fetch members first (no join — FK points to auth.users, not public.users)
+  const { data, error } = await supabase
+    .from('business_members')
+    .select('id, user_id, role, permissions, created_at')
+    .eq('business_id', bizId)
+    .order('created_at');
+  if (error) { console.error('[fetchMembers]', error.message); return []; }
+  // Resolve user profiles in a separate query
+  const userIds = (data || []).map(m => m.user_id).filter(Boolean);
+  let userMap = {};
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase.from('users').select('id, display_name, email').in('id', userIds);
+    (profiles || []).forEach(p => { userMap[p.id] = p; });
+  }
+  _bsMembersCache = (data || []).map(m => {
+    const profile = userMap[m.user_id] || {};
+    return {
+    id: m.id,
+    user_id: m.user_id,
+    name: profile.display_name || profile.email || 'Unknown',
+    email: profile.email || '',
+    role: m.role,
+    permissions: m.permissions || {},
     status: 'active',
-    added_at: new Date().toISOString(),
-    is_self: true
-  }];
-  try { localStorage.setItem(_bsOpKey(), JSON.stringify(defaults)); } catch(_) {}
-  return defaults;
-}
-
-function _saveOperatives(ops) {
-  try { localStorage.setItem(_bsOpKey(), JSON.stringify(ops)); } catch(_) {}
+    added_at: m.created_at,
+    is_self: m.user_id === currentUserId
+  };});
+  return _bsMembersCache;
 }
 
 async function _bsRenderOperatives(el) {
-  const operatives = _getOperatives();
+  const operatives = await _fetchBusinessMembers();
   const currentUserIsOwner = operatives.some(o => o.is_self && o.role === 'owner');
   const currentUserIsAdmin = operatives.some(o => o.is_self && (o.role === 'owner' || o.role === 'admin'));
 
   el.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
       <div>
-        <h2 style="font-size:20px;font-weight:800;margin:0;">Operatives</h2>
+        <h2 style="font-size:20px;font-weight:800;margin:0;">Team & Roles</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">Manage team members and their roles within your business</p>
       </div>
-      ${currentUserIsAdmin ? `<button class="btn btn-primary sm" onclick="window._bsAddOperative()">+ Add Operative</button>` : ''}
+      ${(currentUserIsAdmin || window.bsCanDo('operatives_manage')) ? `<button class="btn btn-primary sm" onclick="window._bsAddOperative()">+ Add Member</button>` : ''}
     </div>
 
     <!-- Role legend -->
@@ -2211,8 +2526,7 @@ window._bsSearchMembers = async function(query) {
     .limit(10);
 
   const users = data || [];
-  const ops = _getOperatives();
-  const existingIds = new Set(ops.filter(o => o.user_id).map(o => o.user_id));
+  const existingIds = new Set(_bsMembersCache.filter(o => o.user_id).map(o => o.user_id));
 
   if (users.length === 0) {
     resultsEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--muted);font-size:12px;">No members found. They must have a Money IntX account first.</div>';
@@ -2270,18 +2584,23 @@ window._bsSaveNewOperative = async function() {
   const role = document.getElementById('bs-op-role')?.value || 'viewer';
   if (!userId || !name) { toast('Please search and select a member first', 'error'); return; }
 
-  const ops = _getOperatives();
-  if (ops.some(o => o.user_id === userId)) { toast('This member is already an operative', 'error'); return; }
+  const bizId = _bsBusinessId();
+  // Map UI role to permission set
+  const perms = role === 'admin' ? FULL_OWNER_PERMISSIONS
+    : role === 'manager' ? { ...DEFAULT_OPERATIVE_PERMISSIONS, invoices_create: true, bills_create: true, clients_write: true }
+    : { ...DEFAULT_OPERATIVE_PERMISSIONS };
 
-  ops.push({
-    id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36),
-    user_id: userId,
-    name, email, role,
-    status: 'invited',
-    added_at: new Date().toISOString(),
-    is_self: false
-  });
-  _saveOperatives(ops);
+  const { error } = await supabase
+    .from('business_members')
+    .upsert({
+      business_id: bizId,
+      user_id: userId,
+      role: role === 'owner' ? 'operative' : (role === 'admin' ? 'admin' : 'operative'),
+      permissions: perms,
+      invited_by: getCurrentUser()?.id
+    }, { onConflict: 'business_id,user_id' });
+
+  if (error) { toast('Failed to add operative: ' + error.message, 'error'); return; }
   closeModal();
 
   // Send invitation email
@@ -2311,7 +2630,7 @@ window._bsSaveNewOperative = async function() {
 };
 
 window._bsEditOperative = function(opId) {
-  const ops = _getOperatives();
+  const ops = _bsMembersCache;
   const op = ops.find(o => o.id === opId);
   if (!op) return;
   const currentRole = BS_ROLES.find(r => r.id === op.role) || BS_ROLES[3];
@@ -2341,23 +2660,34 @@ window._bsEditOperative = function(opId) {
   `, { maxWidth: '440px' });
 };
 
-window._bsSaveEditOperative = function(opId) {
+window._bsSaveEditOperative = async function(opId) {
   const role = document.getElementById('bs-op-role')?.value || 'viewer';
+  const perms = role === 'admin' ? FULL_OWNER_PERMISSIONS
+    : role === 'manager' ? { ...DEFAULT_OPERATIVE_PERMISSIONS, invoices_create: true, bills_create: true, clients_write: true }
+    : { ...DEFAULT_OPERATIVE_PERMISSIONS };
 
-  const ops = _getOperatives();
-  const idx = ops.findIndex(o => o.id === opId);
-  if (idx < 0) return;
-  ops[idx].role = role;
-  _saveOperatives(ops);
+  const { error } = await supabase
+    .from('business_members')
+    .update({
+      role: role === 'admin' ? 'admin' : 'operative',
+      permissions: perms,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', opId);
+
+  if (error) { toast('Failed to update role: ' + error.message, 'error'); return; }
   closeModal();
   toast('Role updated to ' + (BS_ROLES.find(r=>r.id===role)?.label || role), 'success');
   _bsRenderOperatives(document.getElementById('bs-content'));
 };
 
-window._bsRemoveOperative = function(opId) {
+window._bsRemoveOperative = async function(opId) {
   if (!confirm('Remove this operative?')) return;
-  const ops = _getOperatives().filter(o => o.id !== opId);
-  _saveOperatives(ops);
+  const { error } = await supabase
+    .from('business_members')
+    .delete()
+    .eq('id', opId);
+  if (error) { toast('Failed to remove: ' + error.message, 'error'); return; }
   toast('Operative removed', 'success');
   _bsRenderOperatives(document.getElementById('bs-content'));
 };
@@ -2368,7 +2698,7 @@ window._bsRemoveOperative = function(opId) {
 function _bsRenderSettings(el) {
   const tools = _getBsTools();
   const profile = getCurrentProfile() || {};
-  const bizId = _getBizId();
+  const bizId = window._bsContext?.ownerBizId || 'BIZ-000000';
 
   el.innerHTML = `
     <div style="margin-bottom:20px;">
@@ -2481,14 +2811,13 @@ function _bsRenderSettings(el) {
 // Export business data as CSV
 window._bsExportData = async function() {
   const user = getCurrentUser();
-  const bizId = _getBizId();
+  const bizUuid = _bsBusinessId();
   toast('Preparing export…', 'info');
   const { data: entries } = await supabase
     .from('entries')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('business_id', bizUuid)
     .in('tx_type', BS_ALL_BIZ_TYPES)
-    .contains('metadata', { business_id: bizId })
     .is('archived_at', null)
     .order('created_at', { ascending: false });
   if (!entries || entries.length === 0) { toast('No business data to export', 'info'); return; }
@@ -2500,7 +2829,7 @@ window._bsExportData = async function() {
     e.amount || 0,
     e.currency || 'USD',
     e.status || 'draft',
-    e.metadata?.inv_number || e.metadata?.ref_number || '',
+    e.invoice_number || e.metadata?.inv_number || e.metadata?.ref_number || '',
     e.metadata?.due_date || ''
   ]);
   const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(','))].join('\n');
@@ -2520,10 +2849,17 @@ window._bsClearTracker = function() {
   window._bsNavigate('bs-settings');
 };
 
-window._bsResetOperatives = function() {
+window._bsResetOperatives = async function() {
   if (!confirm('Remove all operatives except yourself? This cannot be undone.')) return;
-  const ops = _getOperatives().filter(o => o.is_self);
-  _saveOperatives(ops);
+  const bizId = _bsBusinessId();
+  const currentUserId = getCurrentUser()?.id;
+  // Delete all members except the current user
+  const { error } = await supabase
+    .from('business_members')
+    .delete()
+    .eq('business_id', bizId)
+    .neq('user_id', currentUserId);
+  if (error) { toast('Failed to reset: ' + error.message, 'error'); return; }
   toast('Operatives reset — only you remain', 'success');
   window._bsNavigate('bs-settings');
 };
@@ -2574,10 +2910,7 @@ const BS_CSS = `
   gap: 2px;
 }
 
-.bs-sidebar-footer {
-  padding: 8px;
-  border-top: 1px solid var(--border);
-}
+/* bs-sidebar-footer removed — "Back to Personal" is now inside bs-sidebar-nav */
 
 .bs-nav-btn {
   display: flex;

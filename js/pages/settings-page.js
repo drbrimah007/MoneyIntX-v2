@@ -317,7 +317,7 @@ window.saveSettings = async function() {
   const { error } = await supabase.from('users').update(updates).eq('id', currentUser.id);
   if (error) return toast(error.message, 'error');
   currentProfile = await getProfile(currentUser.id); setCurrentProfile(currentProfile);
-  document.getElementById('sidebar-user-name').textContent = currentProfile.display_name;
+  const _sn = document.getElementById('sidebar-user-name'); if (_sn) _sn.textContent = currentProfile.display_name;
   // Update sidebar avatar if it exists
   const sidebarAvatar = document.getElementById('sidebar-avatar-img');
   if (sidebarAvatar && photoUrl) { sidebarAvatar.src = photoUrl; sidebarAvatar.style.display = ''; }

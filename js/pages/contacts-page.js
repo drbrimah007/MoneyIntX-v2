@@ -1,6 +1,6 @@
 // ── Contacts Page Module ──────────────────────────────────────────
 
-import { getCurrentUser, getCurrentProfile, contactColor, renderPagination, PAGE_SIZE, _invalidateEntries } from './state.js';
+import { getCurrentUser, getCurrentProfile, getMyBusinessId, getActiveBusinessId, contactColor, renderPagination, PAGE_SIZE, _invalidateEntries } from './state.js';
 import { fmtMoney, getLedgerSummary } from '../entries.js';
 import { listContacts, createContact, deleteContact } from '../contacts.js';
 import { esc, statusBadge, TX_LABELS, TX_COLORS, fmtDate, toast, openModal, closeModal } from '../ui.js';
@@ -18,8 +18,10 @@ export async function renderContacts(el, page = 1) {
     contacts = window._impersonatedData.contacts || [];
     ledger   = window._impersonatedData.ledger   || [];
   } else {
+    // Use businessId from BS context if available, otherwise use userId (personal context)
+    const bizUuid = getMyBusinessId();
     [contacts, ledger] = await Promise.all([
-      listContacts(currentUser.id),
+      listContacts(bizUuid),
       getLedgerSummary(currentUser.id)
     ]);
   }
@@ -65,8 +67,8 @@ export async function renderContacts(el, page = 1) {
           <div style="font-weight:600;font-size:14px;">${esc(c.name)}</div>
         </td>
         <td style="color:var(--green);font-weight:600;font-size:13px;">${toy > 0 ? fmtMoney(toy) : '<span style="color:var(--muted);">—</span>'}</td>
-        <td class="hide-mobile" style="color:var(--owe-color, var(--red));font-size:13px;">${yot > 0 ? fmtMoney(yot) : '<span style="color:var(--muted);">—</span>'}</td>
-        <td style="font-weight:700;color:${net > 0 ? 'var(--green)' : net < 0 ? 'var(--owe-color, var(--red))' : 'var(--muted)'};">${net !== 0 ? fmtMoney(Math.abs(net)) : '—'}</td>
+        <td class="hide-mobile" style="color:var(--owe-color, #8D8CFF);font-size:13px;">${yot > 0 ? fmtMoney(yot) : '<span style="color:var(--muted);">—</span>'}</td>
+        <td style="font-weight:700;color:${net > 0 ? 'var(--green)' : net < 0 ? 'var(--owe-color, #8D8CFF)' : 'var(--muted)'};">${net !== 0 ? fmtMoney(Math.abs(net)) : '—'}</td>
         <td onclick="event.stopPropagation();">
           <div class="action-menu">
             <button class="action-menu-btn" onclick="toggleActionMenu(this)">⋮</button>
@@ -311,7 +313,7 @@ window.showCPTab = function(tab, contactId) {
       <div style="background:var(--bg2);border-radius:12px;overflow:hidden;">
         ${[
           ['Charges / Loans to them', d.toyEntries.length, 'var(--green)'],
-          ['Amounts I owe them', d.yotEntries.length, 'var(--owe-color, var(--red))'],
+          ['Amounts I owe them', d.yotEntries.length, 'var(--owe-color, #8D8CFF)'],
           ['Payments received', d.toyCredits.length, 'var(--blue)'],
           ['Payments I made', d.yotCredits.length, 'var(--muted)'],
         ].map(([label, count, color]) => `
@@ -391,16 +393,19 @@ window.saveNewContact = async function(returnCallback) {
   const name = document.getElementById('nc-name').value.trim();
   const email = document.getElementById('nc-email').value.trim().toLowerCase();
   if (!name) return toast('Name is required.', 'error');
-  // Block duplicate emails
+  // Block duplicate emails within same business scope (use active workspace)
+  const bizUuidCheck = getActiveBusinessId();
   if (email) {
     const existing = (window._allContacts || []).find(c => (c.email||'').toLowerCase() === email);
     if (existing) return toast(`Email already used by "${existing.name}".`, 'error');
-    // Also check DB in case contacts list is stale
+    // Also check DB in case contacts list is stale — scope by business_id
     const { data: dup } = await supabase.from('contacts')
-      .select('id,name').eq('user_id', currentUser.id).eq('email', email).maybeSingle();
+      .select('id,name').eq('business_id', bizUuidCheck).eq('email', email).maybeSingle();
     if (dup) return toast(`Email already used by "${dup.name}".`, 'error');
   }
-  const newContact = await createContact(currentUser.id, {
+  // Use active workspace business (BS context if inside BS, otherwise personal)
+  const bizUuid = getActiveBusinessId();
+  const newContact = await createContact(bizUuid, currentUser.id, {
     name, email,
     phone: document.getElementById('nc-phone').value.trim()
   });

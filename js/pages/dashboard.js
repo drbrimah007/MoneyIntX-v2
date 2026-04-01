@@ -2,7 +2,7 @@
 // Dashboard Page
 // ────────────────────────────────────────────────────────────────────────────
 
-import { getCurrentUser, getCurrentProfile } from './state.js';
+import { getCurrentUser, getCurrentProfile, getMyBusinessId } from './state.js';
 import { contactColor, _fmtAmt } from './state.js';
 import { getDashboardTotals, recentEntries, getLedgerSummary, getCurrencyLedger, fmtMoney, toCents, invalidateEntryCache } from '../entries.js';
 import { listContacts } from '../contacts.js';
@@ -49,10 +49,12 @@ export async function renderDash(el) {
     [totals, recent, contacts, unread, pendingShares] = await Promise.all([
       getDashboardTotals(currentUser.id),
       recentEntries(currentUser.id, 15),
-      listContacts(currentUser.id),
+      listContacts(getMyBusinessId()),
       getUnreadCount(currentUser.id),
       listReceivedShares(currentUser.id).catch(() => [])
     ]);
+    // Exclude Business Suite entries from personal dashboard
+    recent = (recent || []).filter(e => !e.metadata?.business_id);
     // Cache contacts for entry modal
     window._allContacts = contacts;
     [ledger, currencyRows] = await Promise.all([
@@ -126,8 +128,8 @@ export async function renderDash(el) {
         return `<div onclick="navTo('entries')"
           style="background:rgba(0,0,0,.30);border:1px solid hsla(${hue},65%,55%,.4);border-radius:10px;padding:8px 11px;cursor:pointer;white-space:nowrap;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;">
-            <span style="font-size:11px;font-weight:800;opacity:.9;">${icon} ${esc(cur)}</span>
-            <span style="font-size:13px;font-weight:900;color:${netColor};">${netCur >= 0 ? '+' : ''}${_fmtAmt(netCur/100, cur)}</span>
+            <span style="font-size:11px;font-weight:600;opacity:.9;">${icon} ${esc(cur)}</span>
+            <span style="font-size:13px;font-weight:700;color:${netColor};">${netCur >= 0 ? '+' : ''}${_fmtAmt(netCur/100, cur)}</span>
           </div>
           <div style="display:flex;flex-direction:column;gap:2px;">
             <div style="display:flex;justify-content:space-between;gap:10px;font-size:10px;opacity:.75;">
@@ -148,11 +150,11 @@ export async function renderDash(el) {
     <div class="hero-flex" style="display:flex;align-items:stretch;gap:14px;flex-wrap:wrap;">
       <!-- Primary currency block -->
       <div style="flex:1;min-width:0;">
-        <div style="font-size:11px;opacity:0.75;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px;">${netLabel} · ${defaultCur}</div>
-        <div style="font-size:36px;font-weight:900;letter-spacing:-.02em;line-height:1;">${fmtMoney(netAbs, defaultCur)}</div>
+        <div style="font-size:11px;opacity:0.75;font-weight:500;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px;">${netLabel} · ${defaultCur}</div>
+        <div style="font-size:36px;font-weight:700;letter-spacing:-.02em;line-height:1;">${fmtMoney(netAbs, defaultCur)}</div>
         <div style="display:flex;gap:18px;font-size:12px;opacity:0.85;margin-top:10px;">
-          <div><span style="opacity:.7;">Owed to Me</span><div style="font-weight:800;font-size:14px;">${fmtMoney(toy, defaultCur)}</div></div>
-          <div><span style="opacity:.7;">I Owe</span><div style="font-weight:800;font-size:14px;">${fmtMoney(yot, defaultCur)}</div></div>
+          <div><span style="opacity:.7;">Owed to Me</span><div style="font-weight:600;font-size:14px;">${fmtMoney(toy, defaultCur)}</div></div>
+          <div><span style="opacity:.7;">I Owe</span><div style="font-weight:600;font-size:14px;">${fmtMoney(yot, defaultCur)}</div></div>
         </div>
         <!-- Compact currency pill — dropdown rendered in body to avoid overflow:hidden clipping -->
         <div style="display:inline-block;margin-top:10px;">
@@ -176,23 +178,23 @@ export async function renderDash(el) {
   const pendingCount = pendingEntryCount + pendingShareCount;
   html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin-bottom:14px;">
     <div class="stat-card" style="cursor:pointer;border-color:var(--line-2,var(--border));" onclick="navTo('contacts')">
-      <div class="stat-lbl">Contacts</div><div class="stat-val" style="color:var(--blue);">${contacts.length}</div>
+      <div class="stat-lbl"><span style="margin-right:4px;font-size:14px;">👥</span>Contacts</div><div class="stat-val" style="color:var(--blue);">${contacts.length}</div>
     </div>
     <div class="stat-card" style="cursor:pointer;border-color:var(--line-2,var(--border));" onclick="navTo('entries')">
-      <div class="stat-lbl">Entries</div><div class="stat-val">${recent.length}+</div>
+      <div class="stat-lbl"><span style="margin-right:4px;font-size:14px;">📄</span>Entries</div><div class="stat-val">${recent.length}+</div>
     </div>
     <div class="stat-card" style="cursor:pointer;border-color:rgba(214,185,122,.18);" onclick="navTo('entries')">
-      <div class="stat-lbl">Pending</div><div class="stat-val" style="color:var(--amber);">${pendingCount}</div>
+      <div class="stat-lbl"><span style="margin-right:4px;font-size:14px;">⏳</span>Pending</div><div class="stat-val" style="color:var(--amber);">${pendingCount}</div>
     </div>
     ${unread > 0 ? `<div class="stat-card" style="cursor:pointer;border-color:rgba(108,99,255,.22);" onclick="navTo('notifications')">
-      <div class="stat-lbl">Unread</div><div class="stat-val" style="color:var(--accent);">${unread}</div>
+      <div class="stat-lbl"><span style="margin-right:4px;font-size:14px;">🔔</span>Unread</div><div class="stat-val" style="color:var(--accent);">${unread}</div>
     </div>` : ''}
   </div>`;
 
   // (Currency ledgers now embedded inside hero card — no separate section needed)
 
   // Quick Actions — canvas-style pill tab strip
-  const _qaBtnBase = 'display:inline-flex;align-items:center;gap:6px;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;border:1px solid;letter-spacing:.01em;transition:filter .15s;';
+  const _qaBtnBase = 'display:inline-flex;align-items:center;gap:6px;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;border:1px solid;letter-spacing:.01em;transition:filter .15s;';
   html += `<div style="margin-bottom:14px;overflow-x:auto;padding-bottom:2px;">
     <div style="display:flex;gap:8px;min-width:max-content;">
       <button onclick="openNewEntryModal('owe-me')"
@@ -230,6 +232,11 @@ export async function renderDash(el) {
         onmouseover="this.style.borderColor='rgba(255,255,255,.3)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.color='var(--muted)'">
         Invest
       </button>` : ''}
+      <button onclick="navTo('operations')"
+        style="${_qaBtnBase}background:rgba(99,102,241,.10);border-color:rgba(99,102,241,.20);color:var(--accent,#6366F1);"
+        onmouseover="this.style.filter='brightness(1.12)'" onmouseout="this.style.filter=''">
+        🏢 My Ops
+      </button>
       <button onclick="navTo('recurring')"
         style="${_qaBtnBase}background:transparent;border-color:rgba(255,255,255,.15);color:var(--muted);"
         onmouseover="this.style.borderColor='rgba(255,255,255,.3)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='rgba(255,255,255,.15)';this.style.color='var(--muted)'">
@@ -259,7 +266,7 @@ export async function renderDash(el) {
     topContacts.forEach(l => {
       const nb = l.net_balance || 0;
       const pct = maxAbs > 0 ? Math.abs(nb) / maxAbs * 100 : 0;
-      const color = nb > 0 ? 'var(--green)' : 'var(--owe-color, var(--red))';
+      const color = nb > 0 ? 'var(--green)' : 'var(--owe-color, #8D8CFF)';
       const label = nb > 0 ? 'owes you' : 'you owe';
       const aColor = contactColor(l.contact_id);
       html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:pointer;" onclick="openContactDetail('${l.contact_id}')">
@@ -304,7 +311,7 @@ export async function renderDash(el) {
       const amtCents = snap.amount !== undefined ? snap.amount : toCents(amt);
       const cur = snap.currency || 'USD';
       // Flip tx_type to show recipient's perspective (sender's "Owed to me" → recipient's "I Owe")
-      const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'bill','bill':'invoice','advance_paid':'advance_received','advance_received':'advance_paid' };
+      const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'invoice_received','bill':'bill_received','advance_paid':'advance_received','advance_received':'advance_paid' };
       const flippedCat = SNAP_FLIP[snap.tx_type] || snap.tx_type;
       const txLabel = TX_LABELS[flippedCat] || snap.tx_type || '—';
       const isOwedToMe = ['you_owe_them','owed_to_me','bill_received','invoice_received','advance_received'].includes(flippedCat);

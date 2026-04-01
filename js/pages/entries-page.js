@@ -1,6 +1,6 @@
 // ── Entries Page Module ──────────────────────────────────────────
 
-import { getCurrentUser, getCurrentProfile, contactColor, contactAvatar, renderPagination, PAGE_SIZE, _invalidateEntries, _fmtAmt } from './state.js';
+import { getCurrentUser, getCurrentProfile, getMyBusinessId, getActiveBusinessId, contactColor, contactAvatar, renderPagination, PAGE_SIZE, _invalidateEntries, _fmtAmt } from './state.js';
 import { listEntries, getEntry, createEntry, updateEntry, deleteEntry, archiveEntry, unarchiveEntry, restoreEntry, voidEntry, fmtMoney, toCents, getDashboardTotals, invalidateEntryCache } from '../entries.js';
 import { bulkArchive, bulkNoLedger, bulkDelete } from '../bulk.js';
 import { listContacts, createContact } from '../contacts.js';
@@ -49,6 +49,7 @@ function _navAfterAction() {
 export function resetEntriesCache() { _entriesAll = []; _pendingSharesAll = null; }
 
 export async function renderEntries(el, page, forceRefresh) {
+ try {
   if (page) _entriesPage = page;
   const isFirstLoad = !page || page === 1;
   if (isFirstLoad && _entriesAll.length === 0) el.innerHTML = '<p style="color:var(--muted);padding:20px;">Loading…</p>';
@@ -64,9 +65,10 @@ export async function renderEntries(el, page, forceRefresh) {
         if (needEntries) _entriesAll = window._impersonatedData.entries || [];
         if (needShares)  _pendingSharesAll = [];
       } else {
+        const currentUser = getCurrentUser();
         const promises = [];
-        promises.push(needEntries ? listEntries(getCurrentUser().id) : Promise.resolve(null));
-        promises.push(needShares  ? listReceivedShares(getCurrentUser().id).catch(() => []) : Promise.resolve(null));
+        promises.push(needEntries ? listEntries(currentUser.id) : Promise.resolve(null));
+        promises.push(needShares  ? listReceivedShares(currentUser.id).catch(() => []) : Promise.resolve(null));
         const [entriesResult, sharesResult] = await Promise.all(promises);
         if (entriesResult !== null) _entriesAll = _dedupById(entriesResult);
         if (sharesResult !== null) _pendingSharesAll = _dedupById((sharesResult || []).filter(s => s.status !== 'confirmed' && s.status !== 'dismissed'));
@@ -76,13 +78,19 @@ export async function renderEntries(el, page, forceRefresh) {
 
   const _sm = window._selectMode || false;
   const query = (_entriesFilter || '').toLowerCase();
+  // In personal view, only show entries that belong to user's OWN business
+  // AND exclude entries that have been moved to Business Suite
+  const _myBizId = window.getSession ? window.getSession().businessId : null;
+  const _personalEntries = window._bsActiveContext
+    ? _entriesAll
+    : _entriesAll.filter(e => (!_myBizId || e.business_id === _myBizId) && !e.metadata?.moved_from_personal);
   const filtered = query
-    ? _entriesAll.filter(e => {
+    ? _personalEntries.filter(e => {
         const cName = e.contact?.name || e.from_name || '';
         const lbl = TX_LABELS[e.tx_type] || e.tx_type;
         return (cName + ' ' + lbl + ' ' + (e.invoice_number||'') + ' ' + e.status).toLowerCase().includes(query);
       })
-    : _entriesAll;
+    : _personalEntries;
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   if (_entriesPage > totalPages && totalPages > 0) _entriesPage = totalPages;
@@ -116,7 +124,7 @@ export async function renderEntries(el, page, forceRefresh) {
       const amtCents = snap.amount !== undefined ? snap.amount : toCents(amt);
       const cur = snap.currency || 'USD';
       // Flip tx_type to show recipient's perspective
-      const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'bill','bill':'invoice','advance_paid':'advance_received','advance_received':'advance_paid' };
+      const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'invoice_received','bill':'bill_received','advance_paid':'advance_received','advance_received':'advance_paid' };
       const flippedCat = SNAP_FLIP[snap.tx_type] || snap.tx_type;
       const txLabel = TX_LABELS[flippedCat] || snap.tx_type || '—';
       // Color: green-ish if they owe you, purple-ish if you owe them
@@ -145,7 +153,7 @@ export async function renderEntries(el, page, forceRefresh) {
       <button class="bs sm" onclick="bulkAction('noledger')">Rm Ledger</button>
       <button class="bs sm" onclick="bulkAction('restore')">Restore</button>
       <button class="bs sm" style="color:var(--red);" onclick="bulkAction('delete')">Delete</button>
-      <button class="bs sm" style="margin-left:auto;" onclick="window._selectedEntries.clear();navTo('entries');">Cancel</button>
+      <button class="bs sm" style="margin-left:auto;" onclick="window._cancelBulkSelect();">Cancel</button>
     </div>`;
   }
 
@@ -200,6 +208,10 @@ export async function renderEntries(el, page, forceRefresh) {
     html += `</div>`;
   }
   el.innerHTML = html;
+ } catch (err) {
+  console.error('[renderEntries] Error:', err);
+  el.innerHTML = `<p style="color:var(--red);padding:20px;">Error loading entries: ${err.message}</p>`;
+ }
 }
 
 window.renderEntriesPage = function(p) {
@@ -267,20 +279,23 @@ window.openEntryDetail = async function(id, options) {
             <button class="bs sm" onclick="openAdjustSettlementModal('${s.id}','${entry.id}','${fmtMoney(s.amount, entry.currency)}',${reviewMode})" style="padding:6px 10px;font-size:11px;background:var(--amber,#D5BA78);color:#000;border-color:var(--amber,#D5BA78);font-weight:600;">⚙ Edit &amp; Adjust</button>
           </div>`
         : '';
-      settleHtml += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;${isPending ? 'background:rgba(213,186,120,.05);margin:0 -12px;padding:8px 12px;border-radius:8px;border:1px solid rgba(213,186,120,.2);margin-bottom:6px;' : ''}">
-        <div>
-          <strong>${fmtMoney(s.amount, entry.currency)}</strong>
-          ${s.method ? `<span style="color:var(--muted);margin-left:8px;">${esc(s.method)}</span>` : ''}
-          ${statusBadgeHtml ? `<span style="margin-left:8px;">${statusBadgeHtml}</span>` : ''}
-          ${s.note ? `<div style="color:var(--muted);font-size:12px;margin-top:2px;">${esc(s.note)}</div>` : ''}
-          ${s.proof_url ? `<div style="margin-top:4px;">
-            ${s.proof_url.match(/\.(jpg|jpeg|png|gif|webp)$/i)
-              ? `<img src="${esc(s.proof_url)}" style="max-width:100px;max-height:80px;border-radius:4px;border:1px solid var(--border);cursor:pointer;margin-top:2px;" onclick="window.open('${esc(s.proof_url)}','_blank')" title="Click to view full size">`
-              : `<a href="${esc(s.proof_url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);font-size:12px;text-decoration:underline;">📎 View Proof</a>`}
-          </div>` : ''}
-          ${pendingActions}
+      settleHtml += `<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;${isPending ? 'background:rgba(213,186,120,.05);margin:0 -12px;padding:10px 12px;border-radius:8px;border:1px solid rgba(213,186,120,.2);margin-bottom:6px;' : ''}">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <strong>${fmtMoney(s.amount, entry.currency)}</strong>
+            ${s.method ? `<span style="color:var(--muted);">${esc(s.method)}</span>` : ''}
+            ${statusBadgeHtml || ''}
+            ${s.proof_url ? (s.proof_url.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+              ? `<a href="${esc(s.proof_url)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;color:var(--accent);font-size:12px;font-weight:600;text-decoration:none;background:rgba(99,102,241,.08);padding:3px 8px;border-radius:6px;">📎 Proof</a>`
+              : `<a href="${esc(s.proof_url)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;color:var(--accent);font-size:12px;font-weight:600;text-decoration:none;background:rgba(99,102,241,.08);padding:3px 8px;border-radius:6px;">📎 View File</a>`) : ''}
+          </div>
+          <div style="color:var(--muted);font-size:12px;">${fmtDate(s.created_at)}</div>
         </div>
-        <div style="color:var(--muted);font-size:12px;">${fmtDate(s.created_at)}</div>
+        ${s.proof_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? `<div style="margin-top:6px;">
+          <img src="${esc(s.proof_url)}" style="max-width:160px;max-height:100px;border-radius:6px;border:1px solid var(--border);cursor:pointer;" onclick="window.open('${esc(s.proof_url)}','_blank')" title="Click to view full size">
+        </div>` : ''}
+        ${s.note ? `<div style="color:var(--muted);font-size:12px;margin-top:4px;">${esc(s.note)}</div>` : ''}
+        ${pendingActions}
       </div>`;
     });
     settleHtml += `</div>`;
@@ -375,6 +390,23 @@ window.openEntryDetail = async function(id, options) {
         <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">🔒 Note to self</div>
         <div style="font-size:13px;">${esc(entry.note)}</div>
       </div>` : ''}
+      ${(entry.metadata?.line_items?.length > 0) ? `<div style="margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Line Items</div>
+        <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+          <div style="display:flex;padding:8px 12px;background:var(--bg3);border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">
+            <span style="flex:2;">Item</span><span style="width:50px;text-align:center;">Qty</span><span style="width:80px;text-align:right;">Price</span><span style="width:90px;text-align:right;">Total</span>
+          </div>
+          ${entry.metadata.line_items.map(li => `<div style="display:flex;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px;align-items:center;">
+            <span style="flex:2;">${esc(li.description || '—')}</span>
+            <span style="width:50px;text-align:center;color:var(--muted);">${li.qty || 1}</span>
+            <span style="width:80px;text-align:right;">${fmtMoney(Math.round((li.price||0)*100), entry.currency)}</span>
+            <span style="width:90px;text-align:right;font-weight:700;">${fmtMoney(Math.round((li.qty||1)*(li.price||0)*100), entry.currency)}</span>
+          </div>`).join('')}
+          <div style="display:flex;justify-content:flex-end;padding:10px 12px;background:var(--bg3);font-weight:800;font-size:14px;">
+            Total: ${fmtMoney(entry.metadata.line_items.reduce((s,li) => s + Math.round((li.qty||1)*(li.price||0)*100), 0), entry.currency)}
+          </div>
+        </div>
+      </div>` : ''}
       ${settleHtml}
       ${canMarkPaid ? `
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;">
@@ -388,6 +420,7 @@ window.openEntryDetail = async function(id, options) {
         ${['invoice_sent','bill_sent','invoice','bill'].includes(_ecat) && !isTerminal ? `<button class="bs sm" onclick="closeModal();openNotifyInvoiceModal('${entry.id}')" style="color:#60a5fa;">✉️ Email</button>` : ''}
         <button class="bs sm" onclick="printInvoice('${entry.id}')">Print</button>
         <button class="bs sm" onclick="duplicateEntry('${entry.id}');closeModal();">Duplicate</button>
+        ${(!entry.metadata?.moved_from_personal && (!window.getSession || entry.business_id === window.getSession().businessId)) ? `<button class="bs sm" onclick="migrateEntryToBS('${entry.id}');closeModal();" style="color:var(--accent);">→ Move to BS</button>` : `<button class="bs sm" onclick="migrateEntryToPersonal('${entry.id}');closeModal();" style="color:var(--accent);">← Move to Personal</button>`}
         <button class="bs sm" onclick="toggleNoLedger('${entry.id}',${!entry.no_ledger});closeModal();">${entry.no_ledger ? 'Restore Ledger' : 'Rm Ledger'}</button>
         <button class="bs sm" onclick="handleVoidEntry('${entry.id}');closeModal();" style="color:var(--amber);">Void</button>
         <button class="bs sm" onclick="confirmDeleteEntry('${entry.id}');closeModal();" style="color:var(--red);">Delete</button>
@@ -511,7 +544,7 @@ window.confirmAdjustedSettlement = async function(settlementId, entryId, reviewM
 window.openEditEntryModal = async function(id) {
   const entry = await getEntry(id);
   if (!entry) return toast('Entry not found.', 'error');
-  const contacts = await listContacts(getCurrentUser().id);
+  const contacts = await listContacts(getMyBusinessId());
   const contactOpts = contacts.map(c => `<option value="${c.id}" ${c.id === entry.contact_id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
   const statusOpts = ['draft','posted','sent','viewed','accepted','partially_settled','settled','fulfilled','overdue','disputed','voided','cancelled']
     .map(s => `<option value="${s}" ${s === entry.status ? 'selected' : ''}>${s.charAt(0).toUpperCase() + s.slice(1).replace('_',' ')}</option>`).join('');
@@ -1260,6 +1293,51 @@ window.handleArchiveEntry = async function(id, action) {
   _navAfterAction();
 };
 
+// ── Migrate Entry between Personal ↔ Business Suite ──────────────────
+// Move = reassign the actual business_id column (atomic, no duplication)
+window.migrateEntryToBS = async function(id) {
+  // Get the active BS business_id from session or BS context
+  const bizId = window._bsContext?.businessId || (window.getSession ? window.getSession().businessId : null);
+  if (!bizId) return toast('No active business found. Please open Business Suite first.', 'error');
+  const bizName = window._bsContext?.ownerName || '';
+  const { data: entry } = await supabase.from('entries').select('metadata, business_id').eq('id', id).single();
+  if (!entry) return toast('Entry not found.', 'error');
+  const meta = entry.metadata || {};
+  meta.moved_from_personal = true;
+  meta.moved_at = new Date().toISOString();
+  if (bizName) meta.business_name = bizName;
+  // Update the actual business_id column — this is what RLS checks
+  const { error } = await supabase.from('entries').update({
+    business_id: bizId,
+    metadata: meta
+  }).eq('id', id);
+  if (error) return toast('Move failed: ' + error.message, 'error');
+  _invalidateEntries();
+  toast('Entry moved to Business Suite.', 'success');
+  _navAfterAction();
+};
+
+window.migrateEntryToPersonal = async function(id) {
+  // Move back to user's personal business
+  const personalBizId = window.getSession ? window.getSession().businessId : null;
+  if (!personalBizId) return toast('Could not resolve personal workspace.', 'error');
+  const { data: entry } = await supabase.from('entries').select('metadata, business_id').eq('id', id).single();
+  if (!entry) return toast('Entry not found.', 'error');
+  const meta = entry.metadata || {};
+  delete meta.moved_from_personal;
+  delete meta.business_name;
+  meta.moved_to_personal_at = new Date().toISOString();
+  // Update the actual business_id column to user's own business
+  const { error } = await supabase.from('entries').update({
+    business_id: personalBizId,
+    metadata: meta
+  }).eq('id', id);
+  if (error) return toast('Move failed: ' + error.message, 'error');
+  _invalidateEntries();
+  toast('Entry moved to Personal.', 'success');
+  _navAfterAction();
+};
+
 // ── Share Entry — 1-step flow (generate link + show share options immediately) ──
 window.openShareModal = async function(id) {
   const entry = await getEntry(id);
@@ -1457,7 +1535,7 @@ window.doConfirmShare = async function(tokenId) {
 // Inline confirm/reject from entries list — updates IN PLACE, no page jump
 window.doPendingConfirm = async function(tokenId) {
   // Look up share details for the toast message
-  const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'bill','bill':'invoice','advance_paid':'advance_received','advance_received':'advance_paid' };
+  const SNAP_FLIP = { 'they_owe_you':'you_owe_them','you_owe_them':'they_owe_you','owed_to_me':'i_owe','i_owe':'owed_to_me','they_paid_you':'you_paid_them','you_paid_them':'they_paid_you','invoice_sent':'invoice_received','invoice_received':'invoice_sent','bill_sent':'bill_received','bill_received':'bill_sent','invoice':'invoice_received','bill':'bill_received','advance_paid':'advance_received','advance_received':'advance_paid' };
   const share = (_pendingSharesAll || []).find(s => s.id === tokenId);
   const snap = share?.entry_snapshot || {};
   const fromName = snap.from_name || share?.sender_name || 'Contact';
@@ -1807,9 +1885,11 @@ const NE_TABS = [
 ];
 
 window.openNewEntryModal = async function(defaultDirection, preselectedContactId) {
+  // Use active business (BS context if inside BS, otherwise personal)
+  const activeBiz = getActiveBusinessId();
   const [contacts, templates] = await Promise.all([
-    listContacts(getCurrentUser().id),
-    listTemplates(getCurrentUser().id)
+    listContacts(activeBiz),
+    listTemplates(activeBiz)
   ]);
   window._neContacts = contacts;
   window._neSelectedContactId = preselectedContactId || (contacts.length === 1 ? contacts[0].id : '');
@@ -2282,16 +2362,37 @@ window.saveNewEntry = async function() {
 
   // Combine main note + advance note
   const combinedNote = [note, advNote].filter(Boolean).join(' · ');
+
+  // ── Collect line items from invoice/bill item rows ─────────────
+  const _lineItems = [];
+  document.querySelectorAll('#ne-items-rows > div').forEach(row => {
+    const desc  = row.querySelector('input[type="text"]')?.value?.trim() || '';
+    const qty   = parseFloat(row.querySelector('.ne-item-qty')?.value) || 0;
+    const price = parseFloat(row.querySelector('.ne-item-price')?.value) || 0;
+    if (desc || qty || price) _lineItems.push({ description: desc, qty, price });
+  });
+
   // If creating from Business Suite, include business_id + sender identity in metadata
   const _bsMeta = window._bsActiveContext && window._bsActiveBizId
     ? { business_id: window._bsActiveBizId, business_name: window._getBsSenderName?.() || '' } : null;
+  // Store inv_number in metadata for BS invoice list display
+  if (_bsMeta && (invNumber || refNumber)) _bsMeta.inv_number = invNumber || refNumber;
+  if (_bsMeta && dueDate) _bsMeta.due_date = dueDate;
+  // Merge line items into metadata
+  const _entryMeta = { ...(_bsMeta || {}) };
+  if (_lineItems.length > 0) _entryMeta.line_items = _lineItems;
+  const _hasMeta = Object.keys(_entryMeta).length > 0 ? _entryMeta : null;
   let entry;
   try {
-    entry = await createEntry(getCurrentUser().id, {
+    const currentUser = getCurrentUser();
+    // Use active workspace business — BS context if inside BS, otherwise personal
+    const bizUuid = getActiveBusinessId();
+    entry = await createEntry(currentUser.id, {
       contactId, txType, amount: parseFloat(amount), currency, date,
       note: combinedNote,
       invoiceNumber: invNumber || refNumber || '',
-      metadata: _bsMeta
+      metadata: _hasMeta,
+      businessId: bizUuid
     });
   } catch (err) {
     console.error('[saveNewEntry] createEntry threw:', err);
@@ -2523,12 +2624,21 @@ window.confirmDeleteEntry = async function(id) {
 window.toggleSelectMode = function() {
   window._selectMode = !window._selectMode;
   if (!window._selectMode) window._selectedEntries.clear();
+  // Re-render in place to avoid page flash
   if (document.getElementById('bs-content') && window._bsNavigate) {
     const section = localStorage.getItem('mxi_bs_section') || 'bs-invoices';
     window._bsNavigate(section);
   } else {
-    navTo('entries');
+    const _el = document.getElementById('page-content') || document.getElementById('content');
+    if (_el) renderEntries(_el);
   }
+};
+
+window._cancelBulkSelect = function() {
+  if (window._selectedEntries) window._selectedEntries.clear();
+  window._selectMode = false;
+  const el = document.getElementById('page-content') || document.getElementById('bs-content') || document.getElementById('content');
+  if (el) renderEntries(el);
 };
 
 window.selectAllEntries = function(checked) {
@@ -2538,12 +2648,9 @@ window.selectAllEntries = function(checked) {
   } else {
     window._selectedEntries.clear();
   }
-  if (document.getElementById('bs-content') && window._bsNavigate) {
-    const section = localStorage.getItem('mxi_bs_section') || 'bs-invoices';
-    window._bsNavigate(section);
-  } else {
-    navTo('entries');
-  }
+  // Re-render in place (no full page nav — avoids flash)
+  const el = document.getElementById('page-content') || document.getElementById('bs-content');
+  if (el) renderEntries(el);
 };
 
 window.toggleEntrySelect = function(id, checked) {

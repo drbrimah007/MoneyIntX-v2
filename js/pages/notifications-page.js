@@ -23,18 +23,18 @@ export async function renderNotifications(el) {
 
   const typeBadge = (t) => {
     const map = {
-      reminder:           { bg:'rgba(248,113,113,.15)', color:'var(--red)',    label:'🚩 Reminder' },
-      notification:       { bg:'rgba(96,165,250,.15)',  color:'var(--accent)', label:'📬 Sent' },
-      payment_sent:       { bg:'rgba(96,165,250,.15)',  color:'var(--accent)', label:'📤 Sent' },
-      payment_received:   { bg:'rgba(95,211,154,.15)',  color:'var(--green)',  label:'📩 Received' },
-      settlement_pending:   { bg:'rgba(251,191,36,.15)',  color:'var(--amber)',  label:'⏳ Review' },
-      settlement_confirmed: { bg:'rgba(95,211,154,.15)',  color:'var(--green)',  label:'✅ Confirmed' },
-      settlement_rejected:  { bg:'rgba(248,113,113,.15)', color:'var(--red)',    label:'❌ Rejected' },
-      entry_received:       { bg:'rgba(108,99,255,.12)',  color:'var(--accent)', label:'📥 Received' },
-      viewed:               { bg:'rgba(108,99,255,.12)',  color:'var(--accent)', label:'👁 Viewed' },
-      confirmed:            { bg:'rgba(95,211,154,.15)',  color:'var(--green)',  label:'✅ Confirmed' },
-      shared_record:        { bg:'rgba(108,99,255,.12)',  color:'var(--accent)', label:'🔗 Shared' },
-      fulfilled:            { bg:'rgba(95,211,154,.15)',  color:'var(--green)',  label:'✅ Fulfilled' },
+      reminder:           { bg:'rgba(208,120,120,.12)', color:'var(--red, #d07878)', label:'🚩 Reminder' },
+      notification:       { bg:'rgba(143,168,214,.12)', color:'var(--accent)', label:'📬 Sent' },
+      payment_sent:       { bg:'rgba(143,168,214,.12)', color:'var(--accent)', label:'📤 Sent' },
+      payment_received:   { bg:'rgba(127,224,208,.12)', color:'var(--green)',  label:'📩 Received' },
+      settlement_pending:   { bg:'rgba(214,185,122,.12)', color:'var(--amber)',  label:'⏳ Review' },
+      settlement_confirmed: { bg:'rgba(127,224,208,.12)', color:'var(--green)',  label:'✅ Confirmed' },
+      settlement_rejected:  { bg:'rgba(208,120,120,.12)', color:'var(--red, #d07878)', label:'❌ Rejected' },
+      entry_received:       { bg:'rgba(143,168,214,.12)', color:'var(--accent)', label:'📥 Received' },
+      viewed:               { bg:'rgba(143,168,214,.12)', color:'var(--accent)', label:'👁 Viewed' },
+      confirmed:            { bg:'rgba(127,224,208,.12)', color:'var(--green)',  label:'✅ Confirmed' },
+      shared_record:        { bg:'rgba(143,168,214,.12)', color:'var(--accent)', label:'🔗 Shared' },
+      fulfilled:            { bg:'rgba(127,224,208,.12)', color:'var(--green)',  label:'✅ Fulfilled' },
     };
     const m = map[t] || { bg:'var(--bg3)', color:'var(--muted)', label:t||'📤 Sent' };
     return `<span class="badge" style="background:${m.bg};color:${m.color};">${m.label}</span>`;

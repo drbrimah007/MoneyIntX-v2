@@ -1,11 +1,11 @@
 // Money IntX v2 — Contacts Module
 import { supabase } from './supabase.js';
 
-export async function listContacts(userId, { archived = false } = {}) {
+export async function listContacts(businessId, { archived = false } = {}) {
   let query = supabase
     .from('contacts')
     .select('*')
-    .eq('user_id', userId)
+    .eq('business_id', businessId)
     .order('name');
   if (!archived) query = query.is('archived_at', null);
   const { data, error } = await query;
@@ -23,10 +23,11 @@ export async function getContact(id) {
   return data;
 }
 
-export async function createContact(userId, { name, email, phone, address, notes, tags }) {
+export async function createContact(businessId, userId, { name, email, phone, address, notes, tags }) {
   const { data, error } = await supabase
     .from('contacts')
     .insert({
+      business_id: businessId,
       user_id: userId,
       name,
       email: email || '',

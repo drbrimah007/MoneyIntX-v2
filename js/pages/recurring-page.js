@@ -1,7 +1,7 @@
 // Money IntX — Recurring Page Module
 // Extracted from index.html page modules
 
-import { getCurrentUser, getCurrentProfile, contactColor } from './state.js';
+import { getCurrentUser, getCurrentProfile, getMyBusinessId, contactColor } from './state.js';
 import { esc, toast, openModal, closeModal, fmtDate, TX_LABELS } from '../ui.js';
 import { supabase } from '../supabase.js';
 import { listContacts } from '../contacts.js';
@@ -19,7 +19,12 @@ const RECURRING_TYPES = [
 async function renderRecurringPage(el) {
   const currentUser = getCurrentUser();
   el.innerHTML = '<div class="page-header"><h2>Recurring</h2></div><p style="color:var(--muted);">Loading...</p>';
-  const rules = await listRecurring(currentUser.id);
+  // Use businessId from BS context if available, otherwise use userId
+  const bizUuid = getMyBusinessId();
+  const allRules = await listRecurring(bizUuid);
+  // Exclude BS-tracked recurring rules from Personal view
+  const _bsRecIds = (() => { try { const items = JSON.parse(localStorage.getItem('mxi_bs_items_' + currentUser.id) || '{}'); return new Set(items.recurring || []); } catch(_) { return new Set(); } })();
+  const rules = allRules.filter(r => !_bsRecIds.has(r.id));
   let html = `<div class="page-header"><h2>Recurring Rules</h2>
     <button class="btn btn-primary btn-sm" onclick="openNewRecurringModal()">+ New Rule</button>
   </div>`;
@@ -64,7 +69,7 @@ window.openEditRecurringModal = async function(ruleId) {
 async function _openRecurringModal(ruleId) {
   const currentUser = getCurrentUser();
   const profile = getCurrentProfile();
-  const contacts = await listContacts(currentUser.id);
+  const contacts = await listContacts(getMyBusinessId());
 
   // If editing, fetch the rule
   let rule = null;
@@ -377,7 +382,8 @@ window.doSaveRecurring = async function() {
       toast('Recurring rule updated!', 'success');
     } else {
       // Create new rule
-      const newRule = await createRecurring(currentUser.id, {
+      const bizUuid = getMyBusinessId();
+      const newRule = await createRecurring(bizUuid, currentUser.id, {
         contactId: contactId === 'self' ? null : contactId,
         txType,
         customLabel: customLabel || null,
