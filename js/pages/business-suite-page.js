@@ -172,8 +172,10 @@ window.clearBsContext = function() {
   window._bsIsOwnBusiness = true;
   window._bsOpsRouted = false;
   // Clear any open ledger panel so it doesn't persist across BS switches
-  if (window._bpEngine) {
-    try { window._bpEngine.backToList(); } catch(_) {}
+  // NOTE: Don't call backToList() here — it re-renders UI and can crash/loop.
+  // Just reset the cached panel state via the dedicated reset method.
+  if (window._bpEngine && window._bpEngine.resetPanelState) {
+    try { window._bpEngine.resetPanelState(); } catch(_) {}
   }
 };
 
@@ -1615,8 +1617,8 @@ async function _bsRenderPanels(el) {
       window._bpEngine.openPanel(activePanelId);
       return;
     }
-    // Different business context — clear stale panel
-    try { window._bpEngine.backToList(); } catch(_) {}
+    // Different business context — clear stale panel state (no re-render to avoid loop)
+    try { window._bpEngine.resetPanelState(); } catch(_) {}
   }
 
   const user = getCurrentUser();

@@ -2036,12 +2036,17 @@ async function _bpDeleteField(fid) {
   openFieldBuilder();
 }
 
-// ── Back to list ──────────────────────────────────────────────────
-function backToList() {
+// ── Reset panel state (no re-render) — safe to call during context switches
+function resetPanelState() {
   _curPanel      = null;
   _curRows       = [];
   _curMembership = null;
   _lastBizId     = null;
+}
+
+// ── Back to list ──────────────────────────────────────────────────
+function backToList() {
+  resetPanelState();
   // If inside Business Suite, navigate back to BS panels
   if (document.getElementById('bs-content') && window._bsNavigate) {
     window._bsNavigate('bs-panels');
@@ -2362,7 +2367,7 @@ export function exposeBpEngine() {
     renderBusinessPage,
     openCreateModal, _doCreate,
     openEditPanelModal, _doEditPanel,
-    openPanel, backToList,
+    openPanel, backToList, resetPanelState,
     get currentPanelId() { return _curPanel?.id || null; },
     get _lastBizId() { return _lastBizId; },
     openFieldBuilder, openAddFieldChoice,
