@@ -6,7 +6,7 @@ import { esc, toast, openModal, closeModal, fmtDate, fmtRelative, TX_LABELS } fr
 import { supabase } from '../supabase.js';
 import { listContacts } from '../contacts.js';
 import { fmtMoney, createEntry } from '../entries.js';
-import { listTemplates, createTemplate, copyPublicTemplate } from '../templates.js';
+import { listTemplates, createTemplate, updateTemplate, copyPublicTemplate } from '../templates.js';
 
 // Functions from other modules should be available
 // TX_LABELS, TX_COLORS, etc. on window

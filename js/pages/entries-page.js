@@ -165,7 +165,7 @@ export async function renderEntries(el, page, forceRefresh) {
       <th>Contact</th><th>Amount</th><th class="hide-mobile" style="max-width:90px;">Doc #</th><th class="hide-mobile">Type</th><th>Date</th><th>Status</th><th style="width:44px;"></th>
     </tr></thead><tbody>`;
     pageEntries.forEach(e => {
-      const cName = e.contact?.name || e.from_name || '—';
+      const cName = e.contact?.name || e.from_name || e.metadata?.client_name || e.metadata?.supplier_name || 'Unknown Contact';
       const cId = e.contact?.id || '';
       const _txKey = e.category || e.tx_type;
       const txLabel = TX_LABELS[_txKey] || _txKey;
@@ -249,7 +249,7 @@ window.openEntryDetail = async function(id, options) {
     }
   }
   if (!entry) return toast('Entry not found.', 'error');
-  const cName = entry.contact?.name || entry.from_name || '—';
+  const cName = entry.contact?.name || entry.from_name || entry.metadata?.client_name || entry.metadata?.supplier_name || 'Unknown Contact';
   const _ecat    = entry.category || entry.tx_type;
   const txLabel  = TX_LABELS[_ecat] || _ecat;
   const txColor  = TX_COLORS[_ecat] || 'var(--text)';

@@ -275,7 +275,7 @@ export async function renderDash(el) {
         </div>
         <div style="flex:1;min-width:0;">
           <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-            <span style="font-size:13px;font-weight:600;color:${aColor};">${esc(l.contact_name||'—')}</span>
+            <span style="font-size:13px;font-weight:600;color:${aColor};">${esc(l.contact_name||'Unknown Contact')}</span>
             <span style="font-size:13px;font-weight:800;color:${color};">${fmtMoney(Math.abs(nb))}</span>
           </div>
           <div style="height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;">
@@ -345,7 +345,7 @@ export async function renderDash(el) {
       <th>Contact</th><th>Amount</th><th class="hide-mobile">Doc #</th><th class="hide-mobile">Type</th><th>Date</th><th>Status</th><th style="width:44px;"></th>
     </tr></thead><tbody>`;
     recent.forEach(e => {
-      const cName = e.contact?.name || '—';
+      const cName = e.contact?.name || e.from_name || e.metadata?.client_name || e.metadata?.supplier_name || 'Unknown Contact';
       const cId = e.contact?.id || '';
       const _txKey = e.category || e.tx_type;
       const txLabel = TX_LABELS[_txKey] || _txKey;

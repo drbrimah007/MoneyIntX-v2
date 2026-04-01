@@ -171,7 +171,8 @@ window.clearBsContext = function() {
   window._bsOwnerUserId = null;
   window._bsIsOwnBusiness = true;
   window._bsOpsRouted = false;
-  // Ledger panel state cleanup deferred — handled by _bsRenderPanels
+  // Hard-reset ledger panel state so foreign panels don't persist
+  if (window._bpEngine?.resetPanelState) window._bpEngine.resetPanelState();
 };
 
 // ── Business Access Context (Layer 2: Permissions) ───────────────
@@ -716,6 +717,104 @@ window._bsQuickAction = function(type) {
 };
 
 // ══════════════════════════════════════════════════════════════════
+// SECTION: BS Pagination & Bulk Selection State
+// ══════════════════════════════════════════════════════════════════
+window._bsPg = window._bsPg || {};
+function _bsPage(section) { return window._bsPg[section] || 1; }
+function _bsSetPage(section, pg) { window._bsPg[section] = pg; }
+const BS_PAGE_SIZE = 10;
+
+// BS Bulk selection state
+window._bsSel = window._bsSel || {};
+function _bsSelected(section) { return window._bsSel[section] || new Set(); }
+function _bsToggleSel(section, id, checked) {
+  if (!window._bsSel[section]) window._bsSel[section] = new Set();
+  if (checked) window._bsSel[section].add(id); else window._bsSel[section].delete(id);
+}
+function _bsSelAll(section, ids, checked) {
+  if (!window._bsSel[section]) window._bsSel[section] = new Set();
+  if (checked) ids.forEach(id => window._bsSel[section].add(id));
+  else ids.forEach(id => window._bsSel[section].delete(id));
+}
+function _bsClearSel(section) { window._bsSel[section] = new Set(); }
+
+// Pagination HTML helper
+function _bsPagination(section, total, navFnName) {
+  const page = _bsPage(section);
+  const totalPages = Math.ceil(total / BS_PAGE_SIZE);
+  if (totalPages <= 1) return '';
+  return `<div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 0;">
+    <button class="bs sm" onclick="${navFnName}(${page-1})" ${page<=1?'disabled':''} style="padding:5px 12px;border-radius:6px;font-size:12px;">← Prev</button>
+    <span style="font-size:13px;color:var(--muted);">Page ${page} of ${totalPages} · ${total} items</span>
+    <button class="bs sm" onclick="${navFnName}(${page+1})" ${page>=totalPages?'disabled':''} style="padding:5px 12px;border-radius:6px;font-size:12px;">Next →</button>
+  </div>`;
+}
+
+// Bulk actions bar HTML helper
+function _bsBulkBar(section, count, actions) {
+  if (count === 0) return '';
+  return `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--accent);border-radius:8px;margin-bottom:12px;color:#fff;">
+    <span style="font-size:13px;font-weight:700;">${count} selected</span>
+    <div style="display:flex;gap:6px;margin-left:auto;">
+      ${actions.map(a => `<button class="bs sm" onclick="${a.onclick}" style="background:rgba(255,255,255,.2);color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">${a.label}</button>`).join('')}
+      <button class="bs sm" onclick="window._bsClearAndRefresh('${section}')" style="background:rgba(255,255,255,.15);color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer;">✕ Clear</button>
+    </div>
+  </div>`;
+}
+
+// Clear selection and refresh
+window._bsClearAndRefresh = function(section) {
+  _bsClearSel(section);
+  window._bsNavigate('bs-' + section);
+};
+
+// Toggle selection and refresh
+window._bsToggle = function(section, id, checked) {
+  _bsToggleSel(section, id, checked);
+  window._bsNavigate('bs-' + section);
+};
+
+// Bulk delete action
+window._bsBulkDelete = async function(section) {
+  const sel = _bsSelected(section);
+  if (sel.size === 0) return;
+  if (!confirm(`Delete ${sel.size} item(s)? This cannot be undone.`)) return;
+  const ids = [...sel];
+  for (const id of ids) {
+    await supabase.from('entries').delete().eq('id', id);
+  }
+  _bsClearSel(section);
+  toast(`${ids.length} item(s) deleted`, 'success');
+  window._bsNavigate('bs-' + section);
+};
+
+// Bulk archive action
+window._bsBulkArchive = async function(section) {
+  const sel = _bsSelected(section);
+  if (sel.size === 0) return;
+  const ids = [...sel];
+  for (const id of ids) {
+    await supabase.from('entries').update({ archived_at: new Date().toISOString() }).eq('id', id);
+  }
+  _bsClearSel(section);
+  toast(`${ids.length} item(s) archived`, 'success');
+  window._bsNavigate('bs-' + section);
+};
+
+// Bulk mark paid action
+window._bsBulkMarkPaid = async function(section) {
+  const sel = _bsSelected(section);
+  if (sel.size === 0) return;
+  const ids = [...sel];
+  for (const id of ids) {
+    await supabase.from('entries').update({ status: 'settled' }).eq('id', id);
+  }
+  _bsClearSel(section);
+  toast(`${ids.length} item(s) marked as paid`, 'success');
+  window._bsNavigate('bs-' + section);
+};
+
+// ══════════════════════════════════════════════════════════════════
 // SECTION: Invoices
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderInvoices(el) {
@@ -753,6 +852,15 @@ async function _bsRenderInvoices(el) {
     String(e.amount||'').includes(q)
   );
 
+  // Reset pagination when filter/search changes
+  if (q || f) _bsSetPage('invoices', 1);
+
+  // Pagination
+  const page = _bsPage('invoices');
+  const totalFiltered = filtered.length;
+  const pageItems = filtered.slice((page - 1) * BS_PAGE_SIZE, page * BS_PAGE_SIZE);
+  const sel = _bsSelected('invoices');
+
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <div>
@@ -780,13 +888,20 @@ async function _bsRenderInvoices(el) {
           <p style="color:var(--muted);margin-bottom:12px;">${q ? 'No invoices match your search.' : 'No invoices match this filter.'}</p>
           ${!q ? '<button class="btn btn-primary btn-sm" onclick="window._bsQuickAction(\'invoice\')">Create First Invoice</button>' : ''}
         </div>`
-      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Client</th><th>Ref #</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due</th><th>Status</th></tr></thead><tbody>
-          ${filtered.map(e => {
+      : `
+        ${_bsBulkBar('invoices', sel.size, [
+          { label: 'Delete', onclick: 'window._bsBulkDelete("invoices")' },
+          { label: 'Archive', onclick: 'window._bsBulkArchive("invoices")' },
+          { label: 'Mark Paid', onclick: 'window._bsBulkMarkPaid("invoices")' }
+        ])}
+        <div class="card"><div class="tbl-wrap"><table><thead><tr><th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllInv(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th><th>Date</th><th>Client</th><th>Ref #</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due</th><th>Status</th></tr></thead><tbody>
+          ${pageItems.map(e => {
             const isOverdue = e.status !== 'settled' && e.status !== 'voided' && e.metadata?.due_date && new Date(e.metadata.due_date) < new Date();
             const settled = e.settled_amount || 0;
             const remaining = e.amount - settled;
             const refNum = e.invoice_number || e.metadata?.inv_number || (e.entry_number ? '#' + String(e.entry_number).padStart(4,'0') : '—');
             return `<tr style="cursor:pointer;${isOverdue?'background:rgba(208,120,120,.06);':''}" onclick="window._bsViewEntry('${e.id}')">
+            <td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${sel.has(e.id)?'checked':''} onchange="window._bsToggle('invoices','${e.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>
             <td style="color:var(--muted);font-size:13px;">${fmtDate(e.created_at)}</td>
             <td style="font-weight:600;">${esc(e.contact_name || '—')}</td>
             <td style="color:var(--accent);font-size:13px;font-weight:600;">${esc(refNum)}</td>
@@ -797,7 +912,9 @@ async function _bsRenderInvoices(el) {
             </td>
             <td>${statusBadge(e.status || 'draft')}</td>
           </tr>`}).join('')}
-        </tbody></table></div></div>`
+        </tbody></table></div></div>
+        ${_bsPagination('invoices', totalFiltered, 'window._bsInvPage')}
+      `
     }
   `;
 }
@@ -805,6 +922,24 @@ async function _bsRenderInvoices(el) {
 // View entry detail — reuse the main app's detail modal
 window._bsViewEntry = function(entryId) {
   if (window.openEntryDetail) window.openEntryDetail(entryId);
+};
+
+// Invoices page navigation
+window._bsInvPage = function(pg) {
+  _bsSetPage('invoices', pg);
+  window._bsNavigate('bs-invoices');
+};
+
+// Invoices select all on page
+window._bsSelAllInv = function(checked) {
+  // Toggle all visible checkboxes on the current page
+  const pageCheckboxes = document.querySelectorAll('tbody input[type="checkbox"]');
+  pageCheckboxes.forEach(cb => {
+    cb.checked = checked;
+    // Trigger change to update state
+    const event = new Event('change', { bubbles: true });
+    cb.dispatchEvent(event);
+  });
 };
 
 // ══════════════════════════════════════════════════════════════════
@@ -843,6 +978,15 @@ async function _bsRenderBills(el) {
     String(e.amount||'').includes(q)
   );
 
+  // Reset pagination when filter/search changes
+  if (q || f) _bsSetPage('bills', 1);
+
+  // Pagination
+  const page = _bsPage('bills');
+  const totalFiltered = filtered.length;
+  const pageItems = filtered.slice((page - 1) * BS_PAGE_SIZE, page * BS_PAGE_SIZE);
+  const sel = _bsSelected('bills');
+
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <div>
@@ -869,13 +1013,20 @@ async function _bsRenderBills(el) {
           <p style="color:var(--muted);margin-bottom:12px;">${q ? 'No bills match your search.' : 'No bills match this filter.'}</p>
           ${!q ? '<button class="btn btn-primary btn-sm" onclick="window._bsReceiveBill?window._bsReceiveBill():window._bsQuickAction(\'bill\')">Receive First Bill</button>' : ''}
         </div>`
-      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Supplier</th><th>Ref #</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due</th><th>Status</th></tr></thead><tbody>
-          ${filtered.map(e => {
+      : `
+        ${_bsBulkBar('bills', sel.size, [
+          { label: 'Delete', onclick: 'window._bsBulkDelete("bills")' },
+          { label: 'Archive', onclick: 'window._bsBulkArchive("bills")' },
+          { label: 'Mark Paid', onclick: 'window._bsBulkMarkPaid("bills")' }
+        ])}
+        <div class="card"><div class="tbl-wrap"><table><thead><tr><th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllBill(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th><th>Date</th><th>Supplier</th><th>Ref #</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due</th><th>Status</th></tr></thead><tbody>
+          ${pageItems.map(e => {
             const isOverdue = e.status !== 'settled' && e.status !== 'voided' && e.metadata?.due_date && new Date(e.metadata.due_date) < new Date();
             const settled = e.settled_amount || 0;
             const remaining = e.amount - settled;
             const refNum = e.metadata?.ref_number || e.invoice_number || (e.entry_number ? '#' + String(e.entry_number).padStart(4,'0') : '—');
             return `<tr style="cursor:pointer;${isOverdue?'background:rgba(208,120,120,.06);':''}" onclick="window._bsViewEntry('${e.id}')">
+            <td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${sel.has(e.id)?'checked':''} onchange="window._bsToggle('bills','${e.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>
             <td style="color:var(--muted);font-size:13px;">${fmtDate(e.created_at)}</td>
             <td style="font-weight:600;">${esc(e.contact_name || '—')}</td>
             <td style="color:var(--muted);font-size:13px;">${esc(refNum)}</td>
@@ -885,10 +1036,30 @@ async function _bsRenderBills(el) {
             <td style="color:${isOverdue?'var(--red,#d07878)':'var(--muted)'};font-size:13px;font-weight:${isOverdue?'600':'400'};">${fmtDate(e.metadata?.due_date)}${isOverdue?' ⚠':''}</td>
             <td>${statusBadge(e.status || 'draft')}</td>
           </tr>`}).join('')}
-        </tbody></table></div></div>`
+        </tbody></table></div></div>
+        ${_bsPagination('bills', totalFiltered, 'window._bsBillPage')}
+      `
     }
   `;
 }
+
+// Bills page navigation
+window._bsBillPage = function(pg) {
+  _bsSetPage('bills', pg);
+  window._bsNavigate('bs-bills');
+};
+
+// Bills select all on page
+window._bsSelAllBill = function(checked) {
+  // Toggle all visible checkboxes on the current page
+  const pageCheckboxes = document.querySelectorAll('tbody input[type="checkbox"]');
+  pageCheckboxes.forEach(cb => {
+    cb.checked = checked;
+    // Trigger change to update state
+    const event = new Event('change', { bubbles: true });
+    cb.dispatchEvent(event);
+  });
+};
 
 // ══════════════════════════════════════════════════════════════════
 // SECTION: Clients
@@ -933,7 +1104,17 @@ async function _bsRenderClients(el) {
   // Search
   if (!window._bsClientSearch) window._bsClientSearch = '';
   const cq = window._bsClientSearch.toLowerCase();
-  const displayClients = cq ? clients.filter(c => (c.name||'').toLowerCase().includes(cq) || (c.email||'').toLowerCase().includes(cq)) : clients;
+  let displayClients = cq ? clients.filter(c => (c.name||'').toLowerCase().includes(cq) || (c.email||'').toLowerCase().includes(cq)) : clients;
+
+  // Reset pagination when search changes
+  if (cq) _bsSetPage('clients', 1);
+
+  // Pagination
+  const page = _bsPage('clients');
+  const totalFiltered = displayClients.length;
+  displayClients = displayClients.slice((page - 1) * BS_PAGE_SIZE, page * BS_PAGE_SIZE);
+  const sel = _bsSelected('clients');
+
   const topClients = clients.slice(0, 3);
 
   el.innerHTML = `
@@ -970,8 +1151,13 @@ async function _bsRenderClients(el) {
           <p style="color:var(--muted);margin-bottom:12px;">${cq ? 'No clients match your search.' : 'No clients yet. Clients appear here automatically when you send your first invoice.'}</p>
           ${!cq ? '<button class="btn btn-primary btn-sm" onclick="window._bsQuickAction(\'invoice\')">Send First Invoice</button>' : ''}
         </div>`
-      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Client</th><th>Contact</th><th>Invoices</th><th>Total Billed</th><th>Outstanding</th><th>Last Invoice</th></tr></thead><tbody>
+      : `
+        ${_bsBulkBar('clients', sel.size, [
+          { label: 'Delete', onclick: 'window._bsBulkDeleteContact("clients")' }
+        ])}
+        <div class="card"><div class="tbl-wrap"><table><thead><tr><th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllClient(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th><th>Client</th><th>Contact</th><th>Invoices</th><th>Total Billed</th><th>Outstanding</th><th>Last Invoice</th></tr></thead><tbody>
           ${displayClients.map(c => `<tr style="cursor:pointer;" onclick="window._bsEditContact('${c.id}')">
+            <td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${sel.has(c.id)?'checked':''} onchange="window._bsToggle('clients','${c.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>
             <td style="font-weight:600;">${contactAvatar(c.name, c.id, 28)} ${esc(c.name)}</td>
             <td style="font-size:12px;color:var(--muted);">${esc(c.email || c.phone || '—')}</td>
             <td style="text-align:center;">${c.count}</td>
@@ -979,10 +1165,44 @@ async function _bsRenderClients(el) {
             <td style="font-weight:700;color:${c.unpaid > 0 ? 'var(--green,#7fe0d0)' : 'var(--muted)'};">${fmtMoney(c.unpaid, cur)}</td>
             <td style="color:var(--muted);font-size:12px;">${fmtRelative(c.lastDate)}</td>
           </tr>`).join('')}
-        </tbody></table></div></div>`
+        </tbody></table></div></div>
+        ${_bsPagination('clients', totalFiltered, 'window._bsClientPage')}
+      `
     }
   `;
 }
+
+// Bulk delete contacts
+window._bsBulkDeleteContact = async function(section) {
+  const sel = _bsSelected(section);
+  if (sel.size === 0) return;
+  if (!confirm(`Delete ${sel.size} contact(s)? This cannot be undone.`)) return;
+  const ids = [...sel];
+  for (const id of ids) {
+    await supabase.from('contacts').delete().eq('id', id);
+  }
+  _bsClearSel(section);
+  toast(`${ids.length} contact(s) deleted`, 'success');
+  window._bsNavigate('bs-' + section);
+};
+
+// Clients page navigation
+window._bsClientPage = function(pg) {
+  _bsSetPage('clients', pg);
+  window._bsNavigate('bs-clients');
+};
+
+// Clients select all on page
+window._bsSelAllClient = function(checked) {
+  // Toggle all visible checkboxes on the current page
+  const pageCheckboxes = document.querySelectorAll('tbody input[type="checkbox"]');
+  pageCheckboxes.forEach(cb => {
+    cb.checked = checked;
+    // Trigger change to update state
+    const event = new Event('change', { bubbles: true });
+    cb.dispatchEvent(event);
+  });
+};
 
 // ══════════════════════════════════════════════════════════════════
 // SECTION: Suppliers
@@ -1048,8 +1268,26 @@ async function _bsRenderSuppliers(el) {
     String(e.amount||'').includes(sq)
   );
 
+  // Reset pagination when filter/search changes
+  if (sq || sf) _bsSetPage('suppliers-bills', 1);
+
+  // Pagination for Bills Log
+  const billPage = _bsPage('suppliers-bills');
+  const billsTotal = displayBills.length;
+  const billsPageItems = displayBills.slice((billPage - 1) * BS_PAGE_SIZE, billPage * BS_PAGE_SIZE);
+  const billSel = _bsSelected('suppliers-bills');
+
   // Filter suppliers for supplier tab
-  const displaySuppliers = sq ? suppliers.filter(c => (c.name||'').toLowerCase().includes(sq) || (c.email||'').toLowerCase().includes(sq)) : suppliers;
+  let displaySuppliers = sq ? suppliers.filter(c => (c.name||'').toLowerCase().includes(sq) || (c.email||'').toLowerCase().includes(sq)) : suppliers;
+
+  // Reset pagination when search changes for suppliers tab
+  if (sq) _bsSetPage('suppliers-dir', 1);
+
+  // Pagination for Supplier Directory
+  const supPage = _bsPage('suppliers-dir');
+  const suppliersTotal = displaySuppliers.length;
+  displaySuppliers = displaySuppliers.slice((supPage - 1) * BS_PAGE_SIZE, supPage * BS_PAGE_SIZE);
+  const supSel = _bsSelected('suppliers-dir');
 
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
@@ -1143,10 +1381,17 @@ async function _bsRenderSuppliers(el) {
             <p style="color:var(--muted);margin-bottom:12px;">${sq ? 'No bills match your search.' : 'No bills received yet. Log your first supplier bill.'}</p>
             ${!sq ? '<button class="btn btn-primary btn-sm" onclick="window._bsReceiveBill()">Receive First Bill</button>' : ''}
           </div>`
-        : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Supplier</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
-            ${displayBills.map(e => {
+        : `
+          ${_bsBulkBar('suppliers-bills', billSel.size, [
+            { label: 'Delete', onclick: 'window._bsBulkDelete("suppliers-bills")' },
+            { label: 'Archive', onclick: 'window._bsBulkArchive("suppliers-bills")' },
+            { label: 'Mark Paid', onclick: 'window._bsBulkMarkPaid("suppliers-bills")' }
+          ])}
+          <div class="card"><div class="tbl-wrap"><table><thead><tr><th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllSupBill(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th><th>Date</th><th>Supplier</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
+            ${billsPageItems.map(e => {
               const isPaid = e.status === 'settled';
               return `<tr style="cursor:pointer;" onclick="window._bsViewEntry('${e.id}')">
+              <td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${billSel.has(e.id)?'checked':''} onchange="window._bsToggle('suppliers-bills','${e.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>
               <td style="color:var(--muted);font-size:13px;">${fmtDate(e.created_at)}</td>
               <td style="font-weight:600;">${esc(e.contact_name || '—')}</td>
               <td style="font-size:12px;color:var(--muted);max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(e.metadata?.description || e.metadata?.ref_number || '—')}</td>
@@ -1157,7 +1402,9 @@ async function _bsRenderSuppliers(el) {
                 ${!isPaid ? `<button class="bs sm" onclick="event.stopPropagation();window._bsRecordPayment('${e.id}')" style="font-size:11px;color:var(--green,#5fd39a);" title="Record payment">💰 Pay</button>` : ''}
               </td>
             </tr>`}).join('')}
-          </tbody></table></div></div>`
+          </tbody></table></div></div>
+          ${_bsPagination('suppliers-bills', billsTotal, 'window._bsSupBillPage')}
+        `
       }
     ` : `
       <!-- Supplier Directory Tab -->
@@ -1166,8 +1413,13 @@ async function _bsRenderSuppliers(el) {
             <div style="font-size:36px;margin-bottom:10px;">🏪</div>
             <p style="color:var(--muted);margin-bottom:12px;">${sq ? 'No suppliers match your search.' : 'No suppliers yet. Suppliers appear automatically when you log a bill.'}</p>
           </div>`
-        : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Supplier</th><th>Contact</th><th>Bills</th><th>Total Billed</th><th>Outstanding</th><th>Last Bill</th></tr></thead><tbody>
+        : `
+          ${_bsBulkBar('suppliers-dir', supSel.size, [
+            { label: 'Delete', onclick: 'window._bsBulkDeleteContact("suppliers-dir")' }
+          ])}
+          <div class="card"><div class="tbl-wrap"><table><thead><tr><th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllSupDir(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th><th>Supplier</th><th>Contact</th><th>Bills</th><th>Total Billed</th><th>Outstanding</th><th>Last Bill</th></tr></thead><tbody>
             ${displaySuppliers.map(c => `<tr style="cursor:pointer;" onclick="window._bsEditContact('${c.id}')">
+              <td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${supSel.has(c.id)?'checked':''} onchange="window._bsToggle('suppliers-dir','${c.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>
               <td style="font-weight:600;">${contactAvatar(c.name, c.id, 28)} ${esc(c.name)}</td>
               <td style="font-size:12px;color:var(--muted);">${esc(c.email || c.phone || '—')}</td>
               <td style="text-align:center;">${c.count}</td>
@@ -1175,11 +1427,49 @@ async function _bsRenderSuppliers(el) {
               <td style="font-weight:700;color:${c.unpaid > 0 ? 'var(--red,#d07878)' : 'var(--muted)'};">${fmtMoney(c.unpaid, cur)}</td>
               <td style="color:var(--muted);font-size:12px;">${fmtRelative(c.lastDate)}</td>
             </tr>`).join('')}
-          </tbody></table></div></div>`
+          </tbody></table></div></div>
+          ${_bsPagination('suppliers-dir', suppliersTotal, 'window._bsSupDirPage')}
+        `
       }
     `}
   `;
 }
+
+// Suppliers Bills Log page navigation
+window._bsSupBillPage = function(pg) {
+  _bsSetPage('suppliers-bills', pg);
+  window._bsNavigate('bs-suppliers');
+};
+
+// Suppliers Bills Log select all on page
+window._bsSelAllSupBill = function(checked) {
+  // Toggle all visible checkboxes on the current page
+  const pageCheckboxes = document.querySelectorAll('tbody input[type="checkbox"]');
+  pageCheckboxes.forEach(cb => {
+    cb.checked = checked;
+    // Trigger change to update state
+    const event = new Event('change', { bubbles: true });
+    cb.dispatchEvent(event);
+  });
+};
+
+// Suppliers Directory page navigation
+window._bsSupDirPage = function(pg) {
+  _bsSetPage('suppliers-dir', pg);
+  window._bsNavigate('bs-suppliers');
+};
+
+// Suppliers Directory select all on page
+window._bsSelAllSupDir = function(checked) {
+  // Toggle all visible checkboxes on the current page
+  const pageCheckboxes = document.querySelectorAll('tbody input[type="checkbox"]');
+  pageCheckboxes.forEach(cb => {
+    cb.checked = checked;
+    // Trigger change to update state
+    const event = new Event('change', { bubbles: true });
+    cb.dispatchEvent(event);
+  });
+};
 
 // ── Reusable Add New Contact Function ──────────────────────────────
 // Opens a modal to create a new contact with Name + Email fields
@@ -1602,11 +1892,17 @@ async function _bsRenderRecurring(el) {
 // SECTION: Business Ledgers (Form Generator)
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderPanels(el) {
-  // If a panel was open (user navigated away via sidebar), re-open it
+  // If a panel was open, re-open ONLY if it belongs to the current business context
   const activePanelId = window._bpEngine?.currentPanelId;
   if (activePanelId) {
-    window._bpEngine.openPanel(activePanelId);
-    return;
+    const cachedBiz = window._bpEngine._lastBizId;
+    const currentBiz = _bsDataOwnerId() || (window.getSession ? window.getSession().businessId : null);
+    if (cachedBiz && currentBiz && cachedBiz === currentBiz) {
+      window._bpEngine.openPanel(activePanelId);
+      return;
+    }
+    // Stale context — reset and fall through to list
+    window._bpEngine.resetPanelState();
   }
 
   const user = getCurrentUser();
@@ -2414,8 +2710,10 @@ async function _bsRenderOperatives(el) {
       ${operatives.length === 0 ? `
         <div style="padding:40px;text-align:center;color:var(--muted);">No operatives yet</div>
       ` : operatives.map(op => {
-        const role = BS_ROLES.find(r => r.id === op.role) || BS_ROLES[3];
-        const perms = BS_ROLE_PERMS[op.role] || BS_ROLE_PERMS.viewer;
+        // Resolve display role: check permissions._ui_role first, then map legacy 'operative' → 'manager'
+        const displayRole = op.permissions?._ui_role || (op.role === 'operative' ? 'manager' : op.role);
+        const role = BS_ROLES.find(r => r.id === displayRole) || BS_ROLES[3];
+        const perms = BS_ROLE_PERMS[displayRole] || BS_ROLE_PERMS.viewer;
         return `
           <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid var(--border);">
             <div style="width:38px;height:38px;border-radius:50%;background:${op.is_self ? 'var(--accent,#6366F1)' : 'var(--bg3)'};display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0;border:2px solid var(--border);">
@@ -2623,7 +2921,9 @@ window._bsEditOperative = function(opId) {
   const ops = _bsMembersCache;
   const op = ops.find(o => o.id === opId);
   if (!op) return;
-  const currentRole = BS_ROLES.find(r => r.id === op.role) || BS_ROLES[3];
+  // Resolve actual UI role from permissions._ui_role or legacy mapping
+  const effectiveRole = op.permissions?._ui_role || (op.role === 'operative' ? 'manager' : op.role);
+  const currentRole = BS_ROLES.find(r => r.id === effectiveRole) || BS_ROLES[3];
 
   openModal(`
     <div class="modal-title">Edit Operative Role</div>
@@ -2640,7 +2940,7 @@ window._bsEditOperative = function(opId) {
     <div class="form-group">
       <label>Change Role</label>
       <select id="bs-op-role" style="width:100%;">
-        ${BS_ROLES.filter(r => r.id !== 'owner').map(r => `<option value="${r.id}" ${r.id===op.role?'selected':''}>${r.label} — ${r.desc}</option>`).join('')}
+        ${BS_ROLES.filter(r => r.id !== 'owner').map(r => `<option value="${r.id}" ${r.id===effectiveRole?'selected':''}>${r.label} — ${r.desc}</option>`).join('')}
       </select>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
@@ -2651,15 +2951,18 @@ window._bsEditOperative = function(opId) {
 };
 
 window._bsSaveEditOperative = async function(opId) {
-  const role = document.getElementById('bs-op-role')?.value || 'viewer';
-  const perms = role === 'admin' ? FULL_OWNER_PERMISSIONS
-    : role === 'manager' ? { ...DEFAULT_OPERATIVE_PERMISSIONS, invoices_create: true, bills_create: true, clients_write: true }
+  const uiRole = document.getElementById('bs-op-role')?.value || 'viewer';
+  const perms = uiRole === 'admin' ? FULL_OWNER_PERMISSIONS
+    : uiRole === 'manager' ? { ...DEFAULT_OPERATIVE_PERMISSIONS, invoices_create: true, bills_create: true, clients_write: true }
     : { ...DEFAULT_OPERATIVE_PERMISSIONS };
+  // DB constraint only allows owner|admin|operative — store UI role in permissions.ui_role
+  const dbRole = uiRole === 'admin' ? 'admin' : 'operative';
+  perms._ui_role = uiRole; // persist manager vs viewer distinction
 
   const { error } = await supabase
     .from('business_members')
     .update({
-      role: role === 'admin' ? 'admin' : 'operative',
+      role: dbRole,
       permissions: perms,
       updated_at: new Date().toISOString()
     })
@@ -2667,7 +2970,8 @@ window._bsSaveEditOperative = async function(opId) {
 
   if (error) { toast('Failed to update role: ' + error.message, 'error'); return; }
   closeModal();
-  toast('Role updated to ' + (BS_ROLES.find(r=>r.id===role)?.label || role), 'success');
+  toast('Role updated to ' + (BS_ROLES.find(r=>r.id===uiRole)?.label || uiRole), 'success');
+  _bsMembersCache = []; // clear cache to force fresh fetch
   _bsRenderOperatives(document.getElementById('bs-content'));
 };
 
