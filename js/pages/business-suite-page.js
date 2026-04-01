@@ -171,12 +171,7 @@ window.clearBsContext = function() {
   window._bsOwnerUserId = null;
   window._bsIsOwnBusiness = true;
   window._bsOpsRouted = false;
-  // Clear any open ledger panel so it doesn't persist across BS switches
-  // NOTE: Don't call backToList() here — it re-renders UI and can crash/loop.
-  // Just reset the cached panel state via the dedicated reset method.
-  if (window._bpEngine && window._bpEngine.resetPanelState) {
-    try { window._bpEngine.resetPanelState(); } catch(_) {}
-  }
+  // Ledger panel state cleanup deferred — handled by _bsRenderPanels
 };
 
 // ── Business Access Context (Layer 2: Permissions) ───────────────
@@ -1608,17 +1603,10 @@ async function _bsRenderRecurring(el) {
 // ══════════════════════════════════════════════════════════════════
 async function _bsRenderPanels(el) {
   // If a panel was open (user navigated away via sidebar), re-open it
-  // BUT only if it belongs to the current business context
   const activePanelId = window._bpEngine?.currentPanelId;
   if (activePanelId) {
-    const curBiz = _bsBusinessId();
-    const cachedBiz = window._bpEngine._lastBizId;
-    if (cachedBiz && cachedBiz === curBiz) {
-      window._bpEngine.openPanel(activePanelId);
-      return;
-    }
-    // Different business context — clear stale panel state (no re-render to avoid loop)
-    try { window._bpEngine.resetPanelState(); } catch(_) {}
+    window._bpEngine.openPanel(activePanelId);
+    return;
   }
 
   const user = getCurrentUser();
