@@ -90,6 +90,12 @@ export async function createEntry(userId, {
   status = 'posted', metadata = null, source = 'manual', recurringRuleId = null,
   businessId = null
 }) {
+  // Guard: every entry MUST have a contact
+  if (!contactId) {
+    const err = new Error('Cannot create entry without a contact');
+    err.sbError = { message: 'contact_id is required' };
+    throw err;
+  }
   // Atomically increment counter via RPC (1 round-trip instead of 2)
   let nextNum = 1;
   const { data: counterData, error: counterErr } = await supabase
