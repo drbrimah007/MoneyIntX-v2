@@ -19,7 +19,7 @@ export async function getUnreadCount(userId) {
     .from('notifications')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .not('read', 'eq', true); // catches false AND null (rows inserted before default was set)
+    .eq('status', 'unread');
   if (error) console.error('[getUnreadCount]', error.message);
   return count || 0;
 }
@@ -36,9 +36,9 @@ export async function markRead(id) {
 export async function markAllRead(userId) {
   const { error } = await supabase
     .from('notifications')
-    .update({ read: true, read_at: new Date().toISOString() })
+    .update({ read: true, read_at: new Date().toISOString(), status: 'read' })
     .eq('user_id', userId)
-    .not('read', 'eq', true); // catches false AND null
+    .eq('status', 'unread');
   if (error) console.error('[markAllRead]', error.message);
   return !error;
 }

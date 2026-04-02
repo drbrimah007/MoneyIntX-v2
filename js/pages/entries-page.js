@@ -446,14 +446,7 @@ window.confirmSettlement = async function(settlementId, entryId, reviewMode) {
       return;
     }
     toast('Settlement confirmed.', 'success');
-    // Clean up settlement_pending notifications for this entry
-    try {
-      await supabase.from('notifications')
-        .delete()
-        .eq('user_id', getCurrentUser().id)
-        .eq('type', 'settlement_pending')
-        .eq('entry_id', entryId);
-    } catch(_) {}
+    // Notification cleanup is handled DB-side by the RPC (status → resolved)
     // DB is truth — clear ALL caches, then re-fetch fresh
     _invalidateEntries();
     closeModal();
@@ -479,14 +472,7 @@ window.rejectSettlement = async function(settlementId, entryId, reviewMode) {
       return;
     }
     toast('Settlement rejected and removed.', 'success');
-    // Clean up settlement_pending notifications for this entry
-    try {
-      await supabase.from('notifications')
-        .delete()
-        .eq('user_id', getCurrentUser().id)
-        .eq('type', 'settlement_pending')
-        .eq('entry_id', entryId);
-    } catch(_) {}
+    // Notification cleanup is handled DB-side by the RPC (status → resolved)
     // DB is truth — clear ALL caches, then re-fetch fresh
     _invalidateEntries();
     closeModal();

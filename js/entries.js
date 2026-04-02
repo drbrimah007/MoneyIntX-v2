@@ -132,8 +132,13 @@ export async function createEntry(userId, {
     const { getActiveBusinessId } = await import('./pages/state.js');
     insertPayload.business_id = getActiveBusinessId();
   }
-  // Context discriminator: 'personal' or 'business' — frozen at creation time
+  // Context discriminator: frozen at creation time, never re-derived
   insertPayload.sender_context = senderContext || 'personal';
+  // Structural context columns (canonical — supersedes sender_context)
+  insertPayload.context_type = senderContext || 'personal';
+  insertPayload.context_id = (senderContext === 'business' && businessId)
+    ? businessId
+    : userId;
   if (senderBusinessName) insertPayload.sender_business_name = senderBusinessName;
   if (fromName) insertPayload.from_name = fromName;
   if (fromEmail) insertPayload.from_email = fromEmail;

@@ -514,7 +514,7 @@ async function _bsRenderDash(el) {
     .from('entries')
     .select('*')
     .eq('business_id', bizUuid)
-    .eq('sender_context', 'business')
+    .eq('context_type', 'business')
     .in('tx_type', BS_ALL_BIZ_TYPES)
     .is('archived_at', null)
     .order('created_at', { ascending: false })
@@ -839,7 +839,7 @@ async function _bsRenderInvoices(el) {
     .from('entries')
     .select('*')
     .eq('business_id', bizUuid)
-    .eq('sender_context', 'business')
+    .eq('context_type', 'business')
     .in('tx_type', BS_INVOICE_TYPES)
     .is('archived_at', null)
     .order('created_at', { ascending: false });
@@ -967,7 +967,7 @@ async function _bsRenderBills(el) {
     .from('entries')
     .select('*')
     .eq('business_id', bizUuid)
-    .eq('sender_context', 'business')
+    .eq('context_type', 'business')
     .in('tx_type', BS_BILL_TYPES)
     .is('archived_at', null)
     .order('created_at', { ascending: false });
@@ -1087,7 +1087,7 @@ async function _bsRenderClients(el) {
     .from('entries')
     .select('contact_id, contact_name, amount, currency, status, tx_type, created_at')
     .eq('business_id', bizUuid)
-    .eq('sender_context', 'business')
+    .eq('context_type', 'business')
     .in('tx_type', [...BS_INVOICE_TYPES, ...BS_BILL_TYPES, 'owed_to_me', 'i_owe', 'they_owe_you', 'you_owe_them'])
     .is('archived_at', null)
     .order('created_at', { ascending: false });
@@ -1230,7 +1230,7 @@ async function _bsRenderSuppliers(el) {
     .from('entries')
     .select('*')
     .eq('business_id', bizUuid)
-    .eq('sender_context', 'business')
+    .eq('context_type', 'business')
     .in('tx_type', [...BS_BILL_TYPES, 'i_owe'])
     .is('archived_at', null)
     .order('created_at', { ascending: false });
@@ -3199,7 +3199,7 @@ window._bsExportData = async function() {
     .from('entries')
     .select('*')
     .eq('business_id', bizUuid)
-    .eq('sender_context', 'business')
+    .eq('context_type', 'business')
     .in('tx_type', BS_ALL_BIZ_TYPES)
     .is('archived_at', null)
     .order('created_at', { ascending: false });

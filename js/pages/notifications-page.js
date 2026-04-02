@@ -49,11 +49,13 @@ export async function renderNotifications(el) {
     html += `<div class="card"><div class="tbl-wrap"><table><thead><tr>
       <th>Contact</th><th>Amount</th><th class="hide-mobile">Message</th><th>Date</th><th>Event</th><th></th>
     </tr></thead><tbody>`;
-    // Sort: actionable items (settlement_pending, payment_received) first, then newest
+    // Sort: actionable items first (but NOT if already resolved), then newest
     const ACTIONABLE = new Set(['settlement_pending','payment_received','payment_sent','shared_record','entry_received']);
     notifs.sort((a, b) => {
-      const aAct = ACTIONABLE.has(a.type) ? 0 : 1;
-      const bAct = ACTIONABLE.has(b.type) ? 0 : 1;
+      const aResolved = a.status === 'resolved';
+      const bResolved = b.status === 'resolved';
+      const aAct = (ACTIONABLE.has(a.type) && !aResolved) ? 0 : 1;
+      const bAct = (ACTIONABLE.has(b.type) && !bResolved) ? 0 : 1;
       if (aAct !== bAct) return aAct - bAct;
       return new Date(b.created_at) - new Date(a.created_at);
     });
@@ -81,15 +83,15 @@ export async function renderNotifications(el) {
         displayMessage = displayMessage.replace(myName + "'s shared record", "Your shared record");
       }
 
-      // Action button based on notification type
+      // Action button based on notification type + resolution status
       let actionBtn = '';
-      if (n.type === 'shared_record') {
-        // Always go to entries page where pending shares are shown — not openEntryDetail
-        // (the entry_id here is the SENDER's entry which the recipient can't access via RLS)
+      const isResolved = n.status === 'resolved';
+      if (isResolved && (n.type === 'settlement_pending' || n.type === 'payment_received')) {
+        // Already acted upon — show done indicator, not Review button
+        actionBtn = `<span style="font-size:12px;color:var(--green,#7fe0d0);font-weight:600;">✓ Done</span>`;
+      } else if (n.type === 'shared_record') {
         actionBtn = `<button onclick="navTo('entries')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">View</button>`;
       } else if (n.entry_id && (n.type === 'settlement_pending' || n.type === 'payment_received' || n.type === 'entry_received')) {
-        // Both settlement_pending AND payment_received should show Review (Confirm/Reject)
-        // payment_received was created by old code — treat it the same as settlement_pending
         const isSettlement = n.type === 'settlement_pending' || n.type === 'payment_received';
         actionBtn = `<button onclick="openEntryDetail('${n.entry_id}', { reviewMode: ${isSettlement ? 'true' : 'false'} })" style="background:var(--amber,#D5BA78);color:#000;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:700;margin-right:4px;">${isSettlement ? 'Review' : 'View'}</button>`;
       } else if (!n.entry_id && n.type === 'settlement_pending') {
