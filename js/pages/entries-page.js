@@ -1,7 +1,7 @@
 // ── Entries Page Module ──────────────────────────────────────────
 
 import { getCurrentUser, getCurrentProfile, getMyBusinessId, getActiveBusinessId, contactColor, contactAvatar, renderPagination, PAGE_SIZE, _invalidateEntries, _fmtAmt } from './state.js';
-import { listEntries, getEntry, createEntry, updateEntry, deleteEntry, archiveEntry, unarchiveEntry, restoreEntry, voidEntry, fmtMoney, toCents, getDashboardTotals, invalidateEntryCache } from '../entries.js';
+import { listEntries, getEntry, createEntry, updateEntry, deleteEntry, archiveEntry, unarchiveEntry, restoreEntry, voidEntry, fmtMoney, toCents, toDollars, getDashboardTotals, invalidateEntryCache } from '../entries.js';
 import { bulkArchive, bulkNoLedger, bulkDelete } from '../bulk.js';
 import { listContacts, createContact } from '../contacts.js';
 import { createShareToken, getShareUrl, listReceivedShares, dismissShare } from '../sharing.js';
