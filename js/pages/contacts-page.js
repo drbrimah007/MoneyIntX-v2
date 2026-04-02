@@ -237,7 +237,7 @@ window.openContactDetail = async function(id) {
   window._cpPage = 1;
   window._cpRenderEntriesTab = function() {
     const el = document.getElementById('cp-entries-wrap');
-    if (el) el.innerHTML = _cpEntriesTable(window._cpData.entries, window._cpPage);
+    if (el && window._cpData) el.innerHTML = _cpEntriesTable(window._cpData.entries, window._cpPage);
   };
 
   const netGrad = net > 0 ? '#064e3b' : net < 0 ? '#3b1d4e' : '#1e293b';

@@ -2171,6 +2171,7 @@ async function _bsRenderPanels(el) {
           ${_bsBulkBar('panels', _bsSelected('panels').size, [
             { label: 'Delete', onclick: 'window._bsBulkDeletePanels()' }
           ])}
+          ${_bsInSelectMode('panels') ? `<div style="margin-bottom:10px;"><label style="cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:6px;color:var(--muted);"><input type="checkbox" onchange="window._bsSelAllPanels(this.checked)" style="cursor:pointer;accent-color:var(--accent);"> Select All</label></div>` : ''}
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
           ${panels.map(p => `
             <div class="card" style="padding:18px;${_bsInSelectMode('panels')?'position:relative;':''}">
@@ -2320,6 +2321,7 @@ async function _bsRenderTemplates(el) {
           ${_bsBulkBar('templates', _bsSelected('templates').size, [
             { label: 'Delete', onclick: 'window._bsBulkDeleteTemplates()' }
           ])}
+          ${_bsInSelectMode('templates') ? `<div style="margin-bottom:10px;"><label style="cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:6px;color:var(--muted);"><input type="checkbox" onchange="window._bsSelAllTemplates(this.checked)" style="cursor:pointer;accent-color:var(--accent);"> Select All</label></div>` : ''}
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
           ${display.map(t => `
             <div class="card" style="padding:18px;${_bsInSelectMode('templates')?'position:relative;':''}">
@@ -2381,6 +2383,36 @@ window._bsBulkDeletePanels = async function() {
   if (fail > 0) toast(`${ok} deleted, ${fail} failed`, 'error');
   else toast(`${ok} ledger(s) deleted`, 'success');
   window._bsNavigate('bs-panels');
+};
+
+// Select all panels (card grid)
+window._bsSelAllPanels = function(checked) {
+  const ids = [...document.querySelectorAll('input[type="checkbox"][onchange*="panels"]')].map(cb => {
+    const m = cb.getAttribute('onchange')?.match(/'panels','([^']+)'/);
+    return m ? m[1] : null;
+  }).filter(Boolean);
+  _bsSelAll('panels', ids, checked);
+  window._bsNavigate('bs-panels');
+};
+
+// Select all templates (card grid)
+window._bsSelAllTemplates = function(checked) {
+  const ids = [...document.querySelectorAll('input[type="checkbox"][onchange*="templates"]')].map(cb => {
+    const m = cb.getAttribute('onchange')?.match(/'templates','([^']+)'/);
+    return m ? m[1] : null;
+  }).filter(Boolean);
+  _bsSelAll('templates', ids, checked);
+  window._bsNavigate('bs-templates');
+};
+
+// Select all investments (card grid)
+window._bsSelAllInvestments = function(checked) {
+  const ids = [...document.querySelectorAll('input[type="checkbox"][onchange*="investments"]')].map(cb => {
+    const m = cb.getAttribute('onchange')?.match(/'investments','([^']+)'/);
+    return m ? m[1] : null;
+  }).filter(Boolean);
+  _bsSelAll('investments', ids, checked);
+  window._bsNavigate('bs-investments');
 };
 
 // Bulk delete templates
@@ -2606,6 +2638,7 @@ async function _bsRenderInvestments(el) {
           ${_bsBulkBar('investments', _bsSelected('investments').size, [
             { label: 'Delete', onclick: 'window._bsBulkDeleteInvestments()' }
           ])}
+          ${_bsInSelectMode('investments') ? `<div style="margin-bottom:10px;"><label style="cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:6px;color:var(--muted);"><input type="checkbox" onchange="window._bsSelAllInvestments(this.checked)" style="cursor:pointer;accent-color:var(--accent);"> Select All</label></div>` : ''}
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
           ${inv.map(i => {
             const memberCount = (i.members||[]).length;

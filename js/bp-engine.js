@@ -335,7 +335,8 @@ export async function renderBusinessPage(el) {
 
   // ── Resolve user's own business (from session, no extra RPC) ──
   if (!window._bpOwnBusinessId && window.getSession) {
-    window._bpOwnBusinessId = window.getSession().businessId;
+    const _sess = window.getSession();
+    if (_sess?.businessId) window._bpOwnBusinessId = _sess.businessId;
   }
 
   // ── Check if table exists ──────────────────────────────────────
