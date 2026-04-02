@@ -242,19 +242,22 @@ window.FULL_OWNER_PERMISSIONS = FULL_OWNER_PERMISSIONS;
 window.DEFAULT_OPERATIVE_PERMISSIONS = DEFAULT_OPERATIVE_PERMISSIONS;
 
 // ── Business sender identity ──────────────────────────────────────
-// Returns the business name when BS context is active, otherwise personal name.
+// Returns the business name ONLY when BS context is active; otherwise null.
+// Callers must provide their own personal-name fallback.
 window._getBsSenderName = function() {
   const ctx = window._bsContext;
   if (ctx?.isActive && ctx.ownerName) return ctx.ownerName;
+  // NOT in BS context — return null so callers use personal identity
+  if (!window._bsActiveContext || !window._bsActiveBizId) return null;
   const profile = getCurrentProfile() || {};
-  return profile.company_name || profile.display_name || 'Someone';
+  return profile.company_name || null;
 };
 window._getBsSenderEmail = function() {
-  const profile = getCurrentProfile() || {};
-  if (window._bsContext?.isActive) {
-    return profile.company_email || getCurrentUser()?.email || '';
+  if (!window._bsActiveContext || !window._bsActiveBizId) {
+    return getCurrentUser()?.email || '';
   }
-  return getCurrentUser()?.email || '';
+  const profile = getCurrentProfile() || {};
+  return profile.company_email || getCurrentUser()?.email || '';
 };
 
 // ── Main Render ───────────────────────────────────────────────────
@@ -830,7 +833,9 @@ async function _bsRenderInvoices(el) {
     .is('archived_at', null)
     .order('created_at', { ascending: false });
 
-  const inv = data || [];
+  // Only show entries explicitly created in BS context (metadata.business_id present)
+  // Personal entries also have business_id column set but lack metadata.business_id
+  const inv = (data || []).filter(e => e.metadata?.business_id);
   const unpaid = inv.filter(e => e.status !== 'settled' && e.status !== 'voided');
   const overdue = unpaid.filter(e => e.metadata?.due_date && new Date(e.metadata.due_date) < new Date());
   const totalUnpaid = unpaid.filter(e => (e.currency||'USD') === cur).reduce((s,e) => s+(e.amount||0), 0);
@@ -932,14 +937,13 @@ window._bsInvPage = function(pg) {
 
 // Invoices select all on page
 window._bsSelAllInv = function(checked) {
-  // Toggle all visible checkboxes on the current page
-  const pageCheckboxes = document.querySelectorAll('tbody input[type="checkbox"]');
-  pageCheckboxes.forEach(cb => {
-    cb.checked = checked;
-    // Trigger change to update state
-    const event = new Event('change', { bubbles: true });
-    cb.dispatchEvent(event);
-  });
+  // Extract IDs from row checkboxes via their onchange attribute
+  const ids = [...document.querySelectorAll('tbody input[type="checkbox"]')].map(cb => {
+    const m = cb.getAttribute('onchange')?.match(/'invoices','([^']+)'/);
+    return m ? m[1] : null;
+  }).filter(Boolean);
+  _bsSelAll('invoices', ids, checked);
+  window._bsNavigate('bs-invoices');
 };
 
 // ══════════════════════════════════════════════════════════════════
@@ -958,7 +962,8 @@ async function _bsRenderBills(el) {
     .is('archived_at', null)
     .order('created_at', { ascending: false });
 
-  const bills = data || [];
+  // Only show entries explicitly created in BS context
+  const bills = (data || []).filter(e => e.metadata?.business_id);
   const unpaid = bills.filter(e => e.status !== 'settled' && e.status !== 'voided');
   const overdue = unpaid.filter(e => e.metadata?.due_date && new Date(e.metadata.due_date) < new Date());
   const totalUnpaid = unpaid.filter(e => (e.currency||'USD') === cur).reduce((s,e) => s+(e.amount||0), 0);
@@ -1051,14 +1056,12 @@ window._bsBillPage = function(pg) {
 
 // Bills select all on page
 window._bsSelAllBill = function(checked) {
-  // Toggle all visible checkboxes on the current page
-  const pageCheckboxes = document.querySelectorAll('tbody input[type="checkbox"]');
-  pageCheckboxes.forEach(cb => {
-    cb.checked = checked;
-    // Trigger change to update state
-    const event = new Event('change', { bubbles: true });
-    cb.dispatchEvent(event);
-  });
+  const ids = [...document.querySelectorAll('tbody input[type="checkbox"]')].map(cb => {
+    const m = cb.getAttribute('onchange')?.match(/'bills','([^']+)'/);
+    return m ? m[1] : null;
+  }).filter(Boolean);
+  _bsSelAll('bills', ids, checked);
+  window._bsNavigate('bs-bills');
 };
 
 // ══════════════════════════════════════════════════════════════════
@@ -1194,14 +1197,12 @@ window._bsClientPage = function(pg) {
 
 // Clients select all on page
 window._bsSelAllClient = function(checked) {
-  // Toggle all visible checkboxes on the current page
-  const pageCheckboxes = document.querySelectorAll('tbody input[type="checkbox"]');
-  pageCheckboxes.forEach(cb => {
-    cb.checked = checked;
-    // Trigger change to update state
-    const event = new Event('change', { bubbles: true });
-    cb.dispatchEvent(event);
-  });
+  const ids = [...document.querySelectorAll('tbody input[type="checkbox"]')].map(cb => {
+    const m = cb.getAttribute('onchange')?.match(/'clients','([^']+)'/);
+    return m ? m[1] : null;
+  }).filter(Boolean);
+  _bsSelAll('clients', ids, checked);
+  window._bsNavigate('bs-clients');
 };
 
 // ══════════════════════════════════════════════════════════════════
@@ -1443,14 +1444,12 @@ window._bsSupBillPage = function(pg) {
 
 // Suppliers Bills Log select all on page
 window._bsSelAllSupBill = function(checked) {
-  // Toggle all visible checkboxes on the current page
-  const pageCheckboxes = document.querySelectorAll('tbody input[type="checkbox"]');
-  pageCheckboxes.forEach(cb => {
-    cb.checked = checked;
-    // Trigger change to update state
-    const event = new Event('change', { bubbles: true });
-    cb.dispatchEvent(event);
-  });
+  const ids = [...document.querySelectorAll('tbody input[type="checkbox"]')].map(cb => {
+    const m = cb.getAttribute('onchange')?.match(/'suppliers-bills','([^']+)'/);
+    return m ? m[1] : null;
+  }).filter(Boolean);
+  _bsSelAll('suppliers-bills', ids, checked);
+  window._bsNavigate('bs-suppliers');
 };
 
 // Suppliers Directory page navigation
@@ -1461,14 +1460,12 @@ window._bsSupDirPage = function(pg) {
 
 // Suppliers Directory select all on page
 window._bsSelAllSupDir = function(checked) {
-  // Toggle all visible checkboxes on the current page
-  const pageCheckboxes = document.querySelectorAll('tbody input[type="checkbox"]');
-  pageCheckboxes.forEach(cb => {
-    cb.checked = checked;
-    // Trigger change to update state
-    const event = new Event('change', { bubbles: true });
-    cb.dispatchEvent(event);
-  });
+  const ids = [...document.querySelectorAll('tbody input[type="checkbox"]')].map(cb => {
+    const m = cb.getAttribute('onchange')?.match(/'suppliers-dir','([^']+)'/);
+    return m ? m[1] : null;
+  }).filter(Boolean);
+  _bsSelAll('suppliers-dir', ids, checked);
+  window._bsNavigate('bs-suppliers');
 };
 
 // ── Reusable Add New Contact Function ──────────────────────────────
@@ -1874,7 +1871,7 @@ async function _bsRenderRecurring(el) {
           <p style="color:var(--muted);margin-bottom:12px;">${bizRules.length === 0 ? 'No recurring billing rules yet. Set up automatic invoices or bills on a schedule.' : 'No rules match this filter.'}</p>
           ${bizRules.length === 0 ? '<button class="btn btn-primary btn-sm" onclick="window._bsCreateRecurring()">Create First Rule</button>' : ''}
         </div>`
-      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Contact</th><th>Type</th><th>Amount</th><th>Frequency</th><th>Next Run</th><th>Status</th></tr></thead><tbody>
+      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Contact</th><th>Type</th><th>Amount</th><th>Frequency</th><th>Next Run</th><th>Status</th><th style="width:120px;">Actions</th></tr></thead><tbody>
           ${displayRules.map(r => `<tr>
             <td style="font-weight:600;">${esc(r.contact?.name || 'Self')}</td>
             <td style="font-size:13px;">${esc(_bsTxLabel(r.tx_type))}</td>
@@ -1882,11 +1879,37 @@ async function _bsRenderRecurring(el) {
             <td>${esc(FREQUENCIES[r.frequency] || r.frequency)}</td>
             <td style="color:var(--muted);font-size:13px;">${fmtDate(r.next_run_at)}</td>
             <td><span class="badge ${r.active ? 'badge-green' : 'badge-gray'}">${r.active ? 'Active' : 'Paused'}</span></td>
+            <td style="white-space:nowrap;">
+              <button class="bs sm" onclick="event.stopPropagation();window._bsToggleRecurring('${r.id}',${!r.active})" style="font-size:11px;padding:3px 8px;cursor:pointer;">${r.active ? '⏸ Pause' : '▶ Resume'}</button>
+              <button class="bs sm" onclick="event.stopPropagation();window._bsDeleteRecurring('${r.id}')" style="font-size:11px;padding:3px 8px;cursor:pointer;color:var(--red,#d07878);">🗑</button>
+            </td>
           </tr>`).join('')}
         </tbody></table></div></div>`
     }
   `;
 }
+
+// ── Recurring rule actions ────────────────────────────────────────
+window._bsToggleRecurring = async function(ruleId, setActive) {
+  const { error } = await supabase
+    .from('recurring_rules')
+    .update({ active: setActive, updated_at: new Date().toISOString() })
+    .eq('id', ruleId);
+  if (error) { toast('Failed: ' + error.message, 'error'); return; }
+  toast(setActive ? 'Rule resumed' : 'Rule paused', 'success');
+  window._bsNavigate('bs-recurring');
+};
+
+window._bsDeleteRecurring = async function(ruleId) {
+  if (!confirm('Delete this recurring rule? This cannot be undone.')) return;
+  const { error } = await supabase
+    .from('recurring_rules')
+    .delete()
+    .eq('id', ruleId);
+  if (error) { toast('Failed: ' + error.message, 'error'); return; }
+  toast('Recurring rule deleted', 'success');
+  window._bsNavigate('bs-recurring');
+};
 
 // ══════════════════════════════════════════════════════════════════
 // SECTION: Business Ledgers (Form Generator)
@@ -2023,6 +2046,7 @@ async function _bsRenderPanels(el) {
               <div style="display:flex;gap:6px;margin-top:10px;">
                 <button class="bs sm" onclick="if(window._bpEngine?.openPanel)window._bpEngine.openPanel('${p.id}');" style="font-size:12px;">Open</button>
                 <button class="bs sm" onclick="if(window._bpEngine?.openEditPanelModal)window._bpEngine.openEditPanelModal('${p.id}');" style="font-size:12px;">✏ Edit</button>
+                <button class="bs sm" onclick="event.stopPropagation();window._bsDeletePanel('${p.id}','${esc(p.title)}')" style="font-size:12px;color:var(--red,#d07878);">🗑 Delete</button>
               </div>
             </div>
           `).join('')}
@@ -2166,6 +2190,7 @@ async function _bsRenderTemplates(el) {
               <div style="margin-top:12px;display:flex;gap:6px;">
                 <button class="btn btn-primary btn-sm" onclick="window._bsActiveContext=true;window._bsActiveBizId=window._getBizId?.()??'';if(window.useTemplateForEntry)window.useTemplateForEntry('${t.id}')">Use</button>
                 <button class="btn btn-secondary btn-sm" onclick="if(window.openEditTemplate)window.openEditTemplate('${t.id}')">Edit</button>
+                <button class="bs sm" onclick="event.stopPropagation();window._bsDeleteTemplate('${t.id}','${esc(t.name)}')" style="font-size:12px;color:var(--red,#d07878);cursor:pointer;">🗑</button>
               </div>
             </div>
           `).join('')}
@@ -2181,6 +2206,28 @@ window._bsCreatePanel = function() {
   window._bsCreatingPanel = true;
   if (window._bpEngine?.openCreateModal) window._bpEngine.openCreateModal();
   else toast('Ledger engine not loaded', 'error');
+};
+
+window._bsDeletePanel = async function(panelId, title) {
+  if (!confirm(`Delete ledger "${title}"? This cannot be undone.`)) return;
+  const { error } = await supabase
+    .from('business_panels')
+    .delete()
+    .eq('id', panelId);
+  if (error) { toast('Failed: ' + error.message, 'error'); return; }
+  toast('Ledger deleted', 'success');
+  window._bsNavigate('bs-panels');
+};
+
+window._bsDeleteTemplate = async function(templateId, name) {
+  if (!confirm(`Delete template "${name}"? This cannot be undone.`)) return;
+  const { error } = await supabase
+    .from('templates')
+    .delete()
+    .eq('id', templateId);
+  if (error) { toast('Failed: ' + error.message, 'error'); return; }
+  toast('Template deleted', 'success');
+  window._bsNavigate('bs-templates');
 };
 
 window._bsCreateTemplate = async function() {
@@ -2380,13 +2427,27 @@ async function _bsRenderInvestments(el) {
                 <span class="badge badge-blue">${memberCount} member${memberCount!==1?'s':''}</span>
                 <span class="badge badge-gray">${txCount} tx</span>
               </div>
-              <div style="font-size:11px;color:var(--muted);margin-top:8px;">Created ${fmtRelative(i.created_at)}</div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
+                <div style="font-size:11px;color:var(--muted);">Created ${fmtRelative(i.created_at)}</div>
+                <button class="bs sm" onclick="event.stopPropagation();window._bsDeleteInvestment('${i.id}','${esc(i.name)}')" style="font-size:11px;color:var(--red,#d07878);cursor:pointer;">🗑 Delete</button>
+              </div>
             </div>`;
           }).join('')}
         </div>`
     }
   `;
 }
+
+window._bsDeleteInvestment = async function(invId, name) {
+  if (!confirm(`Delete investment "${name}"? This cannot be undone.`)) return;
+  const { error } = await supabase
+    .from('investments')
+    .delete()
+    .eq('id', invId);
+  if (error) { toast('Failed: ' + error.message, 'error'); return; }
+  toast('Investment deleted', 'success');
+  window._bsNavigate('bs-investments');
+};
 
 // Legacy _bsRenderPanelDB removed — Public DB is now a tab inside _bsRenderPanels
 
@@ -2731,6 +2792,9 @@ async function _bsRenderOperatives(el) {
                 <button class="bs sm" onclick="window._bsRemoveOperative('${op.id}')" title="Remove" style="color:var(--red,#e57373);">✕</button>
               </div>
             ` : ''}
+            ${op.is_self && op.role !== 'owner' ? `
+              <button class="bs sm" onclick="window._bsLeaveBusiness('${op.id}')" title="Leave this business" style="color:var(--red,#d07878);font-size:12px;">Leave</button>
+            ` : ''}
           </div>`;
       }).join('')}
     </div>
@@ -2984,6 +3048,19 @@ window._bsRemoveOperative = async function(opId) {
   if (error) { toast('Failed to remove: ' + error.message, 'error'); return; }
   toast('Operative removed', 'success');
   _bsRenderOperatives(document.getElementById('bs-content'));
+};
+
+window._bsLeaveBusiness = async function(membershipId) {
+  if (!confirm('Leave this business? You will lose access to all shared data. This cannot be undone.')) return;
+  const { error } = await supabase
+    .from('business_members')
+    .delete()
+    .eq('id', membershipId);
+  if (error) { toast('Failed to leave: ' + error.message, 'error'); return; }
+  toast('You have left this business', 'success');
+  // Clear BS context and return to dashboard
+  clearBsContext();
+  if (window.navTo) window.navTo('dashboard');
 };
 
 // ══════════════════════════════════════════════════════════════════

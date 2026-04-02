@@ -446,6 +446,14 @@ window.confirmSettlement = async function(settlementId, entryId, reviewMode) {
       return;
     }
     toast('Settlement confirmed.', 'success');
+    // Clean up settlement_pending notifications for this entry
+    try {
+      await supabase.from('notifications')
+        .delete()
+        .eq('user_id', getCurrentUser().id)
+        .eq('type', 'settlement_pending')
+        .eq('entry_id', entryId);
+    } catch(_) {}
     // DB is truth — clear ALL caches, then re-fetch fresh
     _invalidateEntries();
     closeModal();
@@ -471,6 +479,14 @@ window.rejectSettlement = async function(settlementId, entryId, reviewMode) {
       return;
     }
     toast('Settlement rejected and removed.', 'success');
+    // Clean up settlement_pending notifications for this entry
+    try {
+      await supabase.from('notifications')
+        .delete()
+        .eq('user_id', getCurrentUser().id)
+        .eq('type', 'settlement_pending')
+        .eq('entry_id', entryId);
+    } catch(_) {}
     // DB is truth — clear ALL caches, then re-fetch fresh
     _invalidateEntries();
     closeModal();
@@ -2479,8 +2495,13 @@ window.saveNewEntry = async function() {
         .select('email').eq('id', contactId).single();
       const recipientEmail = cRow?.email?.trim() || '';
       if (recipientEmail) {
-        const fromName = window._getBsSenderName?.() || getCurrentProfile()?.display_name || 'Someone';
-        const fromEmail = window._getBsSenderEmail?.() || getCurrentUser().email;
+        // Use BS identity ONLY when explicitly in BS context; otherwise personal name
+        const fromName = (window._bsActiveContext && window._bsActiveBizId)
+          ? (window._getBsSenderName?.() || getCurrentProfile()?.display_name || 'Business')
+          : (getCurrentProfile()?.display_name || 'Someone');
+        const fromEmail = (window._bsActiveContext && window._bsActiveBizId)
+          ? (window._getBsSenderEmail?.() || getCurrentUser().email)
+          : (getCurrentUser().email);
         const autoSnap = {
           amount: Math.round(parseFloat(amount) * 100), // cents — consistent with entries table & fmtMoney
           currency, tx_type: category,
@@ -2510,7 +2531,9 @@ window.saveNewEntry = async function() {
   if (!notifyOn) return;
   try {
     const contactName = window._neContacts?.find(c => c.id === contactId)?.name || 'Contact';
-    const fromName    = window._getBsSenderName?.() || getCurrentProfile()?.display_name || 'Someone';
+    const fromName    = (window._bsActiveContext && window._bsActiveBizId)
+      ? (window._getBsSenderName?.() || getCurrentProfile()?.display_name || 'Business')
+      : (getCurrentProfile()?.display_name || 'Someone');
     const txLabel     = TX_LABELS[category] || category;
     const amtLabel    = `${currency} ${parseFloat(amount).toLocaleString()}`;
     const entryId     = entry?.id;
