@@ -739,6 +739,8 @@ const BS_PAGE_SIZE = 10;
 
 // BS Bulk selection state
 window._bsSel = window._bsSel || {};
+window._bsSelectMode = window._bsSelectMode || {};
+function _bsInSelectMode(section) { return !!window._bsSelectMode[section]; }
 function _bsSelected(section) { return window._bsSel[section] || new Set(); }
 function _bsToggleSel(section, id, checked) {
   if (!window._bsSel[section]) window._bsSel[section] = new Set();
@@ -750,6 +752,33 @@ function _bsSelAll(section, ids, checked) {
   else ids.forEach(id => window._bsSel[section].delete(id));
 }
 function _bsClearSel(section) { window._bsSel[section] = new Set(); }
+
+// Map section key → valid navigation route
+// suppliers-bills and suppliers-dir are sub-tabs of bs-suppliers
+function _bsRoute(section) {
+  if (section === 'suppliers-bills' || section === 'suppliers-dir') return 'bs-suppliers';
+  return 'bs-' + section;
+}
+
+// Enter select mode for a section
+window._bsEnterSelect = function(section) {
+  window._bsSelectMode[section] = true;
+  _bsClearSel(section);
+  window._bsNavigate(_bsRoute(section));
+};
+// Exit select mode for a section
+window._bsExitSelect = function(section) {
+  window._bsSelectMode[section] = false;
+  _bsClearSel(section);
+  window._bsNavigate(_bsRoute(section));
+};
+// Helper: select button or cancel button depending on mode
+function _bsSelectBtn(section) {
+  if (_bsInSelectMode(section)) {
+    return `<button class="bs sm" onclick="window._bsExitSelect('${section}')" style="padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;background:var(--red,#d07878);color:#fff;border:none;">✕ Cancel</button>`;
+  }
+  return `<button class="bs sm" onclick="window._bsEnterSelect('${section}')" style="padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--text);">☐ Select</button>`;
+}
 
 // Pagination HTML helper
 function _bsPagination(section, total, navFnName) {
@@ -763,55 +792,88 @@ function _bsPagination(section, total, navFnName) {
   </div>`;
 }
 
-// Bulk actions bar HTML helper
+// Bulk actions bar HTML helper — only shows when in select mode
 function _bsBulkBar(section, count, actions) {
-  if (count === 0) return '';
-  return `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--accent);border-radius:8px;margin-bottom:12px;color:#fff;">
-    <span style="font-size:13px;font-weight:700;">${count} selected</span>
+  if (!_bsInSelectMode(section)) return '';
+  return `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:${count > 0 ? 'var(--accent)' : 'var(--bg3)'};border:1px solid ${count > 0 ? 'var(--accent)' : 'var(--border)'};border-radius:8px;margin-bottom:12px;color:${count > 0 ? '#fff' : 'var(--text)'};">
+    <span style="font-size:13px;font-weight:700;">${count > 0 ? count + ' selected' : 'Select items below'}</span>
     <div style="display:flex;gap:6px;margin-left:auto;">
-      ${actions.map(a => `<button class="bs sm" onclick="${a.onclick}" style="background:rgba(255,255,255,.2);color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">${a.label}</button>`).join('')}
-      <button class="bs sm" onclick="window._bsClearAndRefresh('${section}')" style="background:rgba(255,255,255,.15);color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer;">✕ Clear</button>
+      ${count > 0 ? actions.map(a => `<button class="bs sm" onclick="${a.onclick}" style="background:${count > 0 ? 'rgba(255,255,255,.2)' : 'var(--bg3)'};color:${count > 0 ? '#fff' : 'var(--text)'};border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">${a.label}</button>`).join('') : ''}
+      <button class="bs sm" onclick="window._bsExitSelect('${section}')" style="background:${count > 0 ? 'rgba(255,255,255,.15)' : 'var(--bg3)'};color:${count > 0 ? '#fff' : 'var(--text)'};border:1px solid ${count > 0 ? 'transparent' : 'var(--border)'};padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer;">✕ Done</button>
     </div>
   </div>`;
 }
 
-// Clear selection and refresh
+// Clear selection, exit select mode, and refresh
 window._bsClearAndRefresh = function(section) {
+  window._bsSelectMode[section] = false;
   _bsClearSel(section);
-  window._bsNavigate('bs-' + section);
+  window._bsNavigate(_bsRoute(section));
 };
 
 // Toggle selection and refresh
 window._bsToggle = function(section, id, checked) {
   _bsToggleSel(section, id, checked);
-  window._bsNavigate('bs-' + section);
+  window._bsNavigate(_bsRoute(section));
 };
 
-// Bulk delete action
+// Bulk delete action (entries — soft delete)
 window._bsBulkDelete = async function(section) {
   const sel = _bsSelected(section);
   if (sel.size === 0) return;
   if (!confirm(`Delete ${sel.size} item(s)? This cannot be undone.`)) return;
   const ids = [...sel];
+  let ok = 0, fail = 0;
   for (const id of ids) {
-    await supabase.from('entries').delete().eq('id', id);
+    const { error } = await supabase.from('entries').update({
+      archived_at: new Date().toISOString(),
+      status: 'voided',
+      deleted_at: new Date().toISOString()
+    }).eq('id', id);
+    if (error) { fail++; console.error('[_bsBulkDelete] Error:', error.message); } else ok++;
   }
+  window._bsSelectMode[section] = false;
   _bsClearSel(section);
-  toast(`${ids.length} item(s) deleted`, 'success');
-  window._bsNavigate('bs-' + section);
+  if (fail > 0) toast(`${ok} deleted, ${fail} failed`, 'error');
+  else toast(`${ok} item(s) deleted`, 'success');
+  window._bsNavigate(_bsRoute(section));
+};
+
+// Single entry delete (soft delete)
+window._bsDeleteEntry = async function(entryId, section) {
+  if (!confirm('Delete this entry? This cannot be undone.')) return;
+  const { error } = await supabase.from('entries').update({
+    archived_at: new Date().toISOString(),
+    status: 'voided',
+    deleted_at: new Date().toISOString()
+  }).eq('id', entryId);
+  if (error) { toast('Failed: ' + error.message, 'error'); return; }
+  toast('Entry deleted', 'success');
+  window._bsNavigate(_bsRoute(section));
+};
+
+// Single contact delete
+window._bsDeleteContact = async function(contactId, section) {
+  if (!confirm('Delete this contact? This cannot be undone.')) return;
+  const { error } = await supabase.from('contacts').delete().eq('id', contactId);
+  if (error) { toast('Failed: ' + error.message, 'error'); return; }
+  toast('Contact deleted', 'success');
+  window._bsNavigate(_bsRoute(section));
 };
 
 // Bulk archive action
 window._bsBulkArchive = async function(section) {
   const sel = _bsSelected(section);
   if (sel.size === 0) return;
+  if (!confirm(`Archive ${sel.size} item(s)?`)) return;
   const ids = [...sel];
   for (const id of ids) {
     await supabase.from('entries').update({ archived_at: new Date().toISOString() }).eq('id', id);
   }
+  window._bsSelectMode[section] = false;
   _bsClearSel(section);
   toast(`${ids.length} item(s) archived`, 'success');
-  window._bsNavigate('bs-' + section);
+  window._bsNavigate(_bsRoute(section));
 };
 
 // Bulk mark paid action
@@ -822,9 +884,10 @@ window._bsBulkMarkPaid = async function(section) {
   for (const id of ids) {
     await supabase.from('entries').update({ status: 'settled' }).eq('id', id);
   }
+  window._bsSelectMode[section] = false;
   _bsClearSel(section);
   toast(`${ids.length} item(s) marked as paid`, 'success');
-  window._bsNavigate('bs-' + section);
+  window._bsNavigate(_bsRoute(section));
 };
 
 // ══════════════════════════════════════════════════════════════════
@@ -881,7 +944,10 @@ async function _bsRenderInvoices(el) {
         <h2 style="font-size:20px;font-weight:800;margin:0;">Invoices</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${inv.length} total · ${unpaid.length} unpaid${overdue.length > 0 ? ` · <span style="color:var(--red,#d07878);">${overdue.length} overdue</span>` : ''} · ${fmtMoney(totalUnpaid, cur)} outstanding</p>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('invoice')">+ New Invoice</button>
+      <div style="display:flex;gap:6px;">
+        ${_bsSelectBtn('invoices')}
+        <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('invoice')">+ New Invoice</button>
+      </div>
     </div>
     <!-- Search + Filters -->
     <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
@@ -908,14 +974,14 @@ async function _bsRenderInvoices(el) {
           { label: 'Archive', onclick: 'window._bsBulkArchive("invoices")' },
           { label: 'Mark Paid', onclick: 'window._bsBulkMarkPaid("invoices")' }
         ])}
-        <div class="card"><div class="tbl-wrap"><table><thead><tr><th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllInv(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th><th>Date</th><th>Client</th><th>Ref #</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due</th><th>Status</th></tr></thead><tbody>
+        <div class="card"><div class="tbl-wrap"><table><thead><tr>${_bsInSelectMode('invoices') ? `<th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllInv(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th>` : ''}<th>Date</th><th>Client</th><th>Ref #</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due</th><th>Status</th><th style="width:50px;"></th></tr></thead><tbody>
           ${pageItems.map(e => {
             const isOverdue = e.status !== 'settled' && e.status !== 'voided' && e.metadata?.due_date && new Date(e.metadata.due_date) < new Date();
             const settled = e.settled_amount || 0;
             const remaining = e.amount - settled;
             const refNum = e.invoice_number || e.metadata?.inv_number || (e.entry_number ? '#' + String(e.entry_number).padStart(4,'0') : '—');
             return `<tr style="cursor:pointer;${isOverdue?'background:rgba(208,120,120,.06);':''}" onclick="window._bsViewEntry('${e.id}')">
-            <td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${sel.has(e.id)?'checked':''} onchange="window._bsToggle('invoices','${e.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>
+            ${_bsInSelectMode('invoices') ? `<td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${sel.has(e.id)?'checked':''} onchange="window._bsToggle('invoices','${e.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>` : ''}
             <td style="color:var(--muted);font-size:13px;">${fmtDate(e.created_at)}</td>
             <td style="font-weight:600;">${esc(e.contact_name || '—')}</td>
             <td style="color:var(--accent);font-size:13px;font-weight:600;">${esc(refNum)}</td>
@@ -925,6 +991,7 @@ async function _bsRenderInvoices(el) {
             <td style="color:${isOverdue?'var(--red,#d07878)':'var(--muted)'};font-size:13px;font-weight:${isOverdue?'600':'400'};">${fmtDate(e.metadata?.due_date)}${isOverdue?' ⚠':''}
             </td>
             <td>${statusBadge(e.status || 'draft')}</td>
+            <td style="text-align:center;" onclick="event.stopPropagation();"><button onclick="window._bsDeleteEntry('${e.id}','invoices')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px;" title="Delete">🗑</button></td>
           </tr>`}).join('')}
         </tbody></table></div></div>
         ${_bsPagination('invoices', totalFiltered, 'window._bsInvPage')}
@@ -1007,7 +1074,10 @@ async function _bsRenderBills(el) {
         <h2 style="font-size:20px;font-weight:800;margin:0;">Bills</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${bills.length} total · ${unpaid.length} unpaid${overdue.length > 0 ? ` · <span style="color:var(--red,#d07878);">${overdue.length} overdue</span>` : ''} · ${fmtMoney(totalUnpaid, cur)} outstanding</p>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="window._bsReceiveBill?window._bsReceiveBill():window._bsQuickAction('bill')">+ Receive Bill</button>
+      <div style="display:flex;gap:6px;">
+        ${_bsSelectBtn('bills')}
+        <button class="btn btn-primary btn-sm" onclick="window._bsReceiveBill?window._bsReceiveBill():window._bsQuickAction('bill')">+ Receive Bill</button>
+      </div>
     </div>
     <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
       <input type="text" placeholder="Search bills…" value="${esc(window._bsBillSearch||'')}"
@@ -1033,14 +1103,14 @@ async function _bsRenderBills(el) {
           { label: 'Archive', onclick: 'window._bsBulkArchive("bills")' },
           { label: 'Mark Paid', onclick: 'window._bsBulkMarkPaid("bills")' }
         ])}
-        <div class="card"><div class="tbl-wrap"><table><thead><tr><th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllBill(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th><th>Date</th><th>Supplier</th><th>Ref #</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due</th><th>Status</th></tr></thead><tbody>
+        <div class="card"><div class="tbl-wrap"><table><thead><tr>${_bsInSelectMode('bills') ? `<th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllBill(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th>` : ''}<th>Date</th><th>Supplier</th><th>Ref #</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due</th><th>Status</th><th style="width:50px;"></th></tr></thead><tbody>
           ${pageItems.map(e => {
             const isOverdue = e.status !== 'settled' && e.status !== 'voided' && e.metadata?.due_date && new Date(e.metadata.due_date) < new Date();
             const settled = e.settled_amount || 0;
             const remaining = e.amount - settled;
             const refNum = e.metadata?.ref_number || e.invoice_number || (e.entry_number ? '#' + String(e.entry_number).padStart(4,'0') : '—');
             return `<tr style="cursor:pointer;${isOverdue?'background:rgba(208,120,120,.06);':''}" onclick="window._bsViewEntry('${e.id}')">
-            <td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${sel.has(e.id)?'checked':''} onchange="window._bsToggle('bills','${e.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>
+            ${_bsInSelectMode('bills') ? `<td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${sel.has(e.id)?'checked':''} onchange="window._bsToggle('bills','${e.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>` : ''}
             <td style="color:var(--muted);font-size:13px;">${fmtDate(e.created_at)}</td>
             <td style="font-weight:600;">${esc(e.contact_name || '—')}</td>
             <td style="color:var(--muted);font-size:13px;">${esc(refNum)}</td>
@@ -1049,6 +1119,7 @@ async function _bsRenderBills(el) {
             <td style="font-size:13px;font-weight:600;color:${remaining > 0 && e.status !== 'settled' ? 'var(--text)' : 'var(--muted-2)'};">${e.status === 'settled' ? '0' : fmtMoney(remaining, e.currency)}</td>
             <td style="color:${isOverdue?'var(--red,#d07878)':'var(--muted)'};font-size:13px;font-weight:${isOverdue?'600':'400'};">${fmtDate(e.metadata?.due_date)}${isOverdue?' ⚠':''}</td>
             <td>${statusBadge(e.status || 'draft')}</td>
+            <td style="text-align:center;" onclick="event.stopPropagation();"><button onclick="window._bsDeleteEntry('${e.id}','bills')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px;" title="Delete">🗑</button></td>
           </tr>`}).join('')}
         </tbody></table></div></div>
         ${_bsPagination('bills', totalFiltered, 'window._bsBillPage')}
@@ -1136,7 +1207,10 @@ async function _bsRenderClients(el) {
         <h2 style="font-size:20px;font-weight:800;margin:0;">Clients</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${clients.length} client${clients.length!==1?'s':''} · ${fmtMoney(totalReceivable, cur)} total receivable</p>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('invoice')">+ Invoice Client</button>
+      <div style="display:flex;gap:6px;">
+        ${_bsSelectBtn('clients')}
+        <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('invoice')">+ Invoice Client</button>
+      </div>
     </div>
 
     <!-- Top Clients summary -->
@@ -1168,15 +1242,16 @@ async function _bsRenderClients(el) {
         ${_bsBulkBar('clients', sel.size, [
           { label: 'Delete', onclick: 'window._bsBulkDeleteContact("clients")' }
         ])}
-        <div class="card"><div class="tbl-wrap"><table><thead><tr><th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllClient(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th><th>Client</th><th>Contact</th><th>Invoices</th><th>Total Billed</th><th>Outstanding</th><th>Last Invoice</th></tr></thead><tbody>
+        <div class="card"><div class="tbl-wrap"><table><thead><tr>${_bsInSelectMode('clients') ? `<th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllClient(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th>` : ''}<th>Client</th><th>Contact</th><th>Invoices</th><th>Total Billed</th><th>Outstanding</th><th>Last Invoice</th><th style="width:50px;"></th></tr></thead><tbody>
           ${displayClients.map(c => `<tr style="cursor:pointer;" onclick="window._bsEditContact('${c.id}')">
-            <td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${sel.has(c.id)?'checked':''} onchange="window._bsToggle('clients','${c.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>
+            ${_bsInSelectMode('clients') ? `<td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${sel.has(c.id)?'checked':''} onchange="window._bsToggle('clients','${c.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>` : ''}
             <td style="font-weight:600;">${contactAvatar(c.name, c.id, 28)} ${esc(c.name)}</td>
             <td style="font-size:12px;color:var(--muted);">${esc(c.email || c.phone || '—')}</td>
             <td style="text-align:center;">${c.count}</td>
             <td>${fmtMoney(c.total, cur)}</td>
             <td style="font-weight:700;color:${c.unpaid > 0 ? 'var(--green,#7fe0d0)' : 'var(--muted)'};">${fmtMoney(c.unpaid, cur)}</td>
             <td style="color:var(--muted);font-size:12px;">${fmtRelative(c.lastDate)}</td>
+            <td style="text-align:center;" onclick="event.stopPropagation();"><button onclick="window._bsDeleteContact('${c.id}','clients')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px;" title="Delete">🗑</button></td>
           </tr>`).join('')}
         </tbody></table></div></div>
         ${_bsPagination('clients', totalFiltered, 'window._bsClientPage')}
@@ -1191,12 +1266,16 @@ window._bsBulkDeleteContact = async function(section) {
   if (sel.size === 0) return;
   if (!confirm(`Delete ${sel.size} contact(s)? This cannot be undone.`)) return;
   const ids = [...sel];
+  let ok = 0, fail = 0;
   for (const id of ids) {
-    await supabase.from('contacts').delete().eq('id', id);
+    const { error } = await supabase.from('contacts').delete().eq('id', id);
+    if (error) fail++; else ok++;
   }
+  window._bsSelectMode[section] = false;
   _bsClearSel(section);
-  toast(`${ids.length} contact(s) deleted`, 'success');
-  window._bsNavigate('bs-' + section);
+  if (fail > 0) toast(`${ok} deleted, ${fail} failed`, 'error');
+  else toast(`${ok} contact(s) deleted`, 'success');
+  window._bsNavigate(_bsRoute(section));
 };
 
 // Clients page navigation
@@ -1307,7 +1386,10 @@ async function _bsRenderSuppliers(el) {
         <h2 style="font-size:20px;font-weight:800;margin:0;">Suppliers & Bills</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${suppliers.length} supplier${suppliers.length!==1?'s':''} · ${allBills.length} bill${allBills.length!==1?'s':''} · ${fmtMoney(totalPayable, cur)} outstanding</p>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="window._bsReceiveBill()">+ Receive Bill</button>
+      <div style="display:flex;gap:6px;">
+        ${_bsSelectBtn(tab === 'suppliers' ? 'suppliers-dir' : 'suppliers-bills')}
+        <button class="btn btn-primary btn-sm" onclick="window._bsReceiveBill()">+ Receive Bill</button>
+      </div>
     </div>
 
     <!-- KPI Cards -->
@@ -1399,19 +1481,20 @@ async function _bsRenderSuppliers(el) {
             { label: 'Archive', onclick: 'window._bsBulkArchive("suppliers-bills")' },
             { label: 'Mark Paid', onclick: 'window._bsBulkMarkPaid("suppliers-bills")' }
           ])}
-          <div class="card"><div class="tbl-wrap"><table><thead><tr><th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllSupBill(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th><th>Date</th><th>Supplier</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
+          <div class="card"><div class="tbl-wrap"><table><thead><tr>${_bsInSelectMode('suppliers-bills') ? `<th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllSupBill(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th>` : ''}<th>Date</th><th>Supplier</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
             ${billsPageItems.map(e => {
               const isPaid = e.status === 'settled';
               return `<tr style="cursor:pointer;" onclick="window._bsViewEntry('${e.id}')">
-              <td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${billSel.has(e.id)?'checked':''} onchange="window._bsToggle('suppliers-bills','${e.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>
+              ${_bsInSelectMode('suppliers-bills') ? `<td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${billSel.has(e.id)?'checked':''} onchange="window._bsToggle('suppliers-bills','${e.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>` : ''}
               <td style="color:var(--muted);font-size:13px;">${fmtDate(e.created_at)}</td>
               <td style="font-weight:600;">${esc(e.contact_name || '—')}</td>
               <td style="font-size:12px;color:var(--muted);max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(e.metadata?.description || e.metadata?.ref_number || '—')}</td>
               <td>${e.metadata?.expense_category ? `<span class="badge badge-gray" style="font-size:10px;">${esc(e.metadata.expense_category)}</span>` : '<span style="color:var(--muted);font-size:12px;">—</span>'}</td>
               <td style="font-weight:700;">${fmtMoney(e.amount, e.currency)}</td>
               <td>${statusBadge(e.status || 'draft')}</td>
-              <td style="white-space:nowrap;">
-                ${!isPaid ? `<button class="bs sm" onclick="event.stopPropagation();window._bsRecordPayment('${e.id}')" style="font-size:11px;color:var(--green,#5fd39a);" title="Record payment">💰 Pay</button>` : ''}
+              <td style="white-space:nowrap;" onclick="event.stopPropagation();">
+                ${!isPaid ? `<button class="bs sm" onclick="window._bsRecordPayment('${e.id}')" style="font-size:11px;color:var(--green,#5fd39a);" title="Record payment">💰 Pay</button>` : ''}
+                <button onclick="window._bsDeleteEntry('${e.id}','suppliers-bills')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px;" title="Delete">🗑</button>
               </td>
             </tr>`}).join('')}
           </tbody></table></div></div>
@@ -1429,15 +1512,16 @@ async function _bsRenderSuppliers(el) {
           ${_bsBulkBar('suppliers-dir', supSel.size, [
             { label: 'Delete', onclick: 'window._bsBulkDeleteContact("suppliers-dir")' }
           ])}
-          <div class="card"><div class="tbl-wrap"><table><thead><tr><th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllSupDir(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th><th>Supplier</th><th>Contact</th><th>Bills</th><th>Total Billed</th><th>Outstanding</th><th>Last Bill</th></tr></thead><tbody>
+          <div class="card"><div class="tbl-wrap"><table><thead><tr>${_bsInSelectMode('suppliers-dir') ? `<th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllSupDir(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th>` : ''}<th>Supplier</th><th>Contact</th><th>Bills</th><th>Total Billed</th><th>Outstanding</th><th>Last Bill</th><th style="width:50px;"></th></tr></thead><tbody>
             ${displaySuppliers.map(c => `<tr style="cursor:pointer;" onclick="window._bsEditContact('${c.id}')">
-              <td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${supSel.has(c.id)?'checked':''} onchange="window._bsToggle('suppliers-dir','${c.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>
+              ${_bsInSelectMode('suppliers-dir') ? `<td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${supSel.has(c.id)?'checked':''} onchange="window._bsToggle('suppliers-dir','${c.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>` : ''}
               <td style="font-weight:600;">${contactAvatar(c.name, c.id, 28)} ${esc(c.name)}</td>
               <td style="font-size:12px;color:var(--muted);">${esc(c.email || c.phone || '—')}</td>
               <td style="text-align:center;">${c.count}</td>
               <td>${fmtMoney(c.total, cur)}</td>
               <td style="font-weight:700;color:${c.unpaid > 0 ? 'var(--red,#d07878)' : 'var(--muted)'};">${fmtMoney(c.unpaid, cur)}</td>
               <td style="color:var(--muted);font-size:12px;">${fmtRelative(c.lastDate)}</td>
+              <td style="text-align:center;" onclick="event.stopPropagation();"><button onclick="window._bsDeleteContact('${c.id}','suppliers-dir')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px;" title="Delete">🗑</button></td>
             </tr>`).join('')}
           </tbody></table></div></div>
           ${_bsPagination('suppliers-dir', suppliersTotal, 'window._bsSupDirPage')}
@@ -1848,7 +1932,10 @@ async function _bsRenderRecurring(el) {
         <h2 style="font-size:20px;font-weight:800;margin:0;">Recurring Billing</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${bizRules.length} rule${bizRules.length!==1?'s':''} · ${activeRules.length} active · ${fmtMoney(totalRecurring, cur)} recurring revenue</p>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="window._bsCreateRecurring()">+ New Rule</button>
+      <div style="display:flex;gap:6px;">
+        ${_bsSelectBtn('recurring')}
+        <button class="btn btn-primary btn-sm" onclick="window._bsCreateRecurring()">+ New Rule</button>
+      </div>
     </div>
 
     <!-- Summary cards -->
@@ -1882,8 +1969,13 @@ async function _bsRenderRecurring(el) {
           <p style="color:var(--muted);margin-bottom:12px;">${bizRules.length === 0 ? 'No recurring billing rules yet. Set up automatic invoices or bills on a schedule.' : 'No rules match this filter.'}</p>
           ${bizRules.length === 0 ? '<button class="btn btn-primary btn-sm" onclick="window._bsCreateRecurring()">Create First Rule</button>' : ''}
         </div>`
-      : `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>Contact</th><th>Type</th><th>Amount</th><th>Frequency</th><th>Next Run</th><th>Status</th><th style="width:120px;">Actions</th></tr></thead><tbody>
+      : `
+          ${_bsBulkBar('recurring', _bsSelected('recurring').size, [
+            { label: 'Delete', onclick: 'window._bsBulkDeleteRecurring()' }
+          ])}
+          <div class="card"><div class="tbl-wrap"><table><thead><tr>${_bsInSelectMode('recurring') ? `<th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllRecurring(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th>` : ''}<th>Contact</th><th>Type</th><th>Amount</th><th>Frequency</th><th>Next Run</th><th>Status</th><th style="width:120px;">Actions</th></tr></thead><tbody>
           ${displayRules.map(r => `<tr>
+            ${_bsInSelectMode('recurring') ? `<td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${_bsSelected('recurring').has(r.id)?'checked':''} onchange="window._bsToggle('recurring','${r.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>` : ''}
             <td style="font-weight:600;">${esc(r.contact?.name || 'Self')}</td>
             <td style="font-size:13px;">${esc(_bsTxLabel(r.tx_type))}</td>
             <td style="font-weight:700;">${fmtMoney(r.amount, r.currency)}</td>
@@ -1919,6 +2011,34 @@ window._bsDeleteRecurring = async function(ruleId) {
     .eq('id', ruleId);
   if (error) { toast('Failed: ' + error.message, 'error'); return; }
   toast('Recurring rule deleted', 'success');
+  window._bsNavigate('bs-recurring');
+};
+
+// Bulk delete recurring rules
+window._bsBulkDeleteRecurring = async function() {
+  const sel = _bsSelected('recurring');
+  if (sel.size === 0) return;
+  if (!confirm(`Delete ${sel.size} recurring rule(s)? This cannot be undone.`)) return;
+  const ids = [...sel];
+  let ok = 0, fail = 0;
+  for (const id of ids) {
+    const { error } = await supabase.from('recurring_rules').delete().eq('id', id);
+    if (error) fail++; else ok++;
+  }
+  window._bsSelectMode['recurring'] = false;
+  _bsClearSel('recurring');
+  if (fail > 0) toast(`${ok} deleted, ${fail} failed`, 'error');
+  else toast(`${ok} rule(s) deleted`, 'success');
+  window._bsNavigate('bs-recurring');
+};
+
+// Recurring select all
+window._bsSelAllRecurring = function(checked) {
+  const ids = [...document.querySelectorAll('tbody input[type="checkbox"]')].map(cb => {
+    const m = cb.getAttribute('onchange')?.match(/'recurring','([^']+)'/);
+    return m ? m[1] : null;
+  }).filter(Boolean);
+  _bsSelAll('recurring', ids, checked);
   window._bsNavigate('bs-recurring');
 };
 
@@ -2022,7 +2142,10 @@ async function _bsRenderPanels(el) {
         <h2 style="font-size:20px;font-weight:800;margin:0;">Business Ledgers</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${panels.length} panel${panels.length!==1?'s':''} · ${panels.filter(p=>p.is_public).length} published</p>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="window._bsCreatePanel()">+ New Ledger</button>
+      <div style="display:flex;gap:6px;">
+        ${_bsSelectBtn('panels')}
+        <button class="btn btn-primary btn-sm" onclick="window._bsCreatePanel()">+ New Ledger</button>
+      </div>
     </div>
     <!-- Tabs -->
     <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);">
@@ -2045,9 +2168,14 @@ async function _bsRenderPanels(el) {
             <button class="btn btn-secondary btn-sm" onclick="window._bsPanelTab='public';window._bsNavigate('bs-panels');">Browse Public DB</button>
           </div>
         </div>`
-      : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
+      : `
+          ${_bsBulkBar('panels', _bsSelected('panels').size, [
+            { label: 'Delete', onclick: 'window._bsBulkDeletePanels()' }
+          ])}
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
           ${panels.map(p => `
-            <div class="card" style="padding:18px;">
+            <div class="card" style="padding:18px;${_bsInSelectMode('panels')?'position:relative;':''}">
+              ${_bsInSelectMode('panels') ? `<label style="position:absolute;top:10px;right:10px;cursor:pointer;" onclick="event.stopPropagation();"><input type="checkbox" ${_bsSelected('panels').has(p.id)?'checked':''} onchange="window._bsToggle('panels','${p.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></label>` : ''}
               <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
                 <div style="font-size:16px;font-weight:700;cursor:pointer;flex:1;" onclick="if(window._bpEngine?.openPanel)window._bpEngine.openPanel('${p.id}');else toast('Ledger engine not loaded','error');">${esc(p.title)}</div>
                 ${p.is_public ? '<span class="badge badge-blue" style="font-size:10px;flex-shrink:0;">Public</span>' : ''}
@@ -2156,7 +2284,10 @@ async function _bsRenderTemplates(el) {
         <h2 style="font-size:20px;font-weight:800;margin:0;">Templates</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${templates.length} template${templates.length!==1?'s':''} · Reusable invoice and form layouts</p>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="window._bsCreateTemplate()">+ New Template</button>
+      <div style="display:flex;gap:6px;">
+        ${_bsSelectBtn('templates')}
+        <button class="btn btn-primary btn-sm" onclick="window._bsCreateTemplate()">+ New Template</button>
+      </div>
     </div>
 
     <!-- Tabs -->
@@ -2185,9 +2316,14 @@ async function _bsRenderTemplates(el) {
             <button class="btn btn-secondary btn-sm" onclick="window._bsTmplTab=\'public\';window._bsNavigate(\'bs-templates\')">Browse Public DB</button>
           </div>
         </div>`
-      : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
+      : `
+          ${_bsBulkBar('templates', _bsSelected('templates').size, [
+            { label: 'Delete', onclick: 'window._bsBulkDeleteTemplates()' }
+          ])}
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
           ${display.map(t => `
-            <div class="card" style="padding:18px;">
+            <div class="card" style="padding:18px;${_bsInSelectMode('templates')?'position:relative;':''}">
+              ${_bsInSelectMode('templates') ? `<label style="position:absolute;top:10px;right:10px;cursor:pointer;" onclick="event.stopPropagation();"><input type="checkbox" ${_bsSelected('templates').has(t.id)?'checked':''} onchange="window._bsToggle('templates','${t.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></label>` : ''}
               <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                 <div style="font-size:16px;font-weight:700;">${esc(t.name)}</div>
                 ${t.is_public ? '<span class="badge badge-blue" style="font-size:10px;">Public</span>' : '<span class="badge badge-gray" style="font-size:10px;">Private</span>'}
@@ -2228,6 +2364,42 @@ window._bsDeletePanel = async function(panelId, title) {
   if (error) { toast('Failed: ' + error.message, 'error'); return; }
   toast('Ledger deleted', 'success');
   window._bsNavigate('bs-panels');
+};
+
+// Bulk delete panels
+window._bsBulkDeletePanels = async function() {
+  const sel = _bsSelected('panels');
+  if (sel.size === 0) return;
+  if (!confirm(`Delete ${sel.size} ledger(s)? This cannot be undone.`)) return;
+  const ids = [...sel];
+  let ok = 0, fail = 0;
+  for (const id of ids) {
+    const { error } = await supabase.from('business_panels').delete().eq('id', id);
+    if (error) fail++; else ok++;
+  }
+  window._bsSelectMode['panels'] = false;
+  _bsClearSel('panels');
+  if (fail > 0) toast(`${ok} deleted, ${fail} failed`, 'error');
+  else toast(`${ok} ledger(s) deleted`, 'success');
+  window._bsNavigate('bs-panels');
+};
+
+// Bulk delete templates
+window._bsBulkDeleteTemplates = async function() {
+  const sel = _bsSelected('templates');
+  if (sel.size === 0) return;
+  if (!confirm(`Delete ${sel.size} template(s)? This cannot be undone.`)) return;
+  const ids = [...sel];
+  let ok = 0, fail = 0;
+  for (const id of ids) {
+    const { error } = await supabase.from('templates').delete().eq('id', id);
+    if (error) fail++; else ok++;
+  }
+  window._bsSelectMode['templates'] = false;
+  _bsClearSel('templates');
+  if (fail > 0) toast(`${ok} deleted, ${fail} failed`, 'error');
+  else toast(`${ok} template(s) deleted`, 'success');
+  window._bsNavigate('bs-templates');
 };
 
 window._bsDeleteTemplate = async function(templateId, name) {
@@ -2401,7 +2573,10 @@ async function _bsRenderInvestments(el) {
         <h2 style="font-size:20px;font-weight:800;margin:0;">Investments</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${inv.length} investment${inv.length!==1?'s':''} · ${totalMembers} member${totalMembers!==1?'s':''} · ${totalTx} transaction${totalTx!==1?'s':''}</p>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="window._bsCreateInvestment()">+ New Investment</button>
+      <div style="display:flex;gap:6px;">
+        ${_bsSelectBtn('investments')}
+        <button class="btn btn-primary btn-sm" onclick="window._bsCreateInvestment()">+ New Investment</button>
+      </div>
     </div>
 
     ${inv.length > 0 ? `
@@ -2427,11 +2602,16 @@ async function _bsRenderInvestments(el) {
           <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Your business starts fresh. Create a new investment pool or manage existing ones here.</p>
           <button class="btn btn-primary btn-sm" onclick="window._bsCreateInvestment()">Create First Investment</button>
         </div>`
-      : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
+      : `
+          ${_bsBulkBar('investments', _bsSelected('investments').size, [
+            { label: 'Delete', onclick: 'window._bsBulkDeleteInvestments()' }
+          ])}
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
           ${inv.map(i => {
             const memberCount = (i.members||[]).length;
             const txCount = (i.transactions||[]).length;
-            return `<div class="card" style="padding:18px;cursor:pointer;transition:border-color .15s;" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor=''" onclick="if(window.openInvestmentDetail)window.openInvestmentDetail('${i.id}');">
+            return `<div class="card" style="padding:18px;cursor:pointer;transition:border-color .15s;${_bsInSelectMode('investments')?'position:relative;':''}" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor=''" onclick="if(window.openInvestmentDetail)window.openInvestmentDetail('${i.id}');">
+              ${_bsInSelectMode('investments') ? `<label style="position:absolute;top:10px;right:10px;cursor:pointer;" onclick="event.stopPropagation();"><input type="checkbox" ${_bsSelected('investments').has(i.id)?'checked':''} onchange="window._bsToggle('investments','${i.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></label>` : ''}
               <div style="font-size:16px;font-weight:700;">${esc(i.name)}</div>
               <div style="font-size:12px;color:var(--muted);margin-top:4px;">${esc(i.type || 'Standard')}</div>
               <div style="display:flex;gap:8px;margin-top:8px;">
@@ -2457,6 +2637,24 @@ window._bsDeleteInvestment = async function(invId, name) {
     .eq('id', invId);
   if (error) { toast('Failed: ' + error.message, 'error'); return; }
   toast('Investment deleted', 'success');
+  window._bsNavigate('bs-investments');
+};
+
+// Bulk delete investments
+window._bsBulkDeleteInvestments = async function() {
+  const sel = _bsSelected('investments');
+  if (sel.size === 0) return;
+  if (!confirm(`Delete ${sel.size} investment(s)? This cannot be undone.`)) return;
+  const ids = [...sel];
+  let ok = 0, fail = 0;
+  for (const id of ids) {
+    const { error } = await supabase.from('investments').delete().eq('id', id);
+    if (error) fail++; else ok++;
+  }
+  window._bsSelectMode['investments'] = false;
+  _bsClearSel('investments');
+  if (fail > 0) toast(`${ok} deleted, ${fail} failed`, 'error');
+  else toast(`${ok} investment(s) deleted`, 'success');
   window._bsNavigate('bs-investments');
 };
 

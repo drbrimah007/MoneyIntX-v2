@@ -7,6 +7,7 @@ import { esc, statusBadge, TX_LABELS, TX_COLORS, fmtDate, toast, openModal, clos
 import { supabase } from '../supabase.js';
 
 let _contactsPage = 1;
+let _selectedContacts = new Set();
 
 export async function renderContacts(el, page = 1) {
   _contactsPage = page;
@@ -51,8 +52,19 @@ export async function renderContacts(el, page = 1) {
     const start = (page - 1) * PAGE_SIZE;
     const pageItems = filtered.slice(start, start + PAGE_SIZE);
 
+    // Bulk action bar
+    if (_selectedContacts.size > 0) {
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--accent);border-radius:8px;margin-bottom:12px;color:#fff;">
+        <span style="font-size:13px;font-weight:700;">${_selectedContacts.size} selected</span>
+        <div style="display:flex;gap:6px;margin-left:auto;">
+          <button class="bs sm" onclick="bulkDeleteContacts()" style="background:rgba(255,255,255,.2);color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Delete</button>
+          <button class="bs sm" onclick="clearContactSelection()" style="background:rgba(255,255,255,.15);color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer;">✕ Clear</button>
+        </div>
+      </div>`;
+    }
+
     html += `<div class="card" style="padding:0;overflow:hidden;"><div class="tbl-wrap"><table><thead><tr>
-      <th style="width:36px;"></th><th>Name</th><th>Owed to Me</th><th class="hide-mobile">I Owe</th><th>Net</th><th style="width:42px;"></th>
+      <th style="width:36px;"><input type="checkbox" onchange="toggleAllContacts(this.checked)" ${_selectedContacts.size > 0 && _selectedContacts.size === pageItems.length ? 'checked' : ''} style="cursor:pointer;accent-color:var(--accent);"></th><th>Name</th><th>Owed to Me</th><th class="hide-mobile">I Owe</th><th>Net</th><th style="width:42px;"></th>
     </tr></thead><tbody>`;
 
     pageItems.forEach(c => {
@@ -62,7 +74,7 @@ export async function renderContacts(el, page = 1) {
       const net = toy - yot;
       const col = contactColor(c.id);
       html += `<tr class="contact-row" data-search="${esc(c.name + ' ' + (c.email||'')).toLowerCase()}" style="cursor:pointer;" onclick="openContactDetail('${c.id}')">
-        <td style="padding:8px 6px 8px 12px;"><span class="contact-avatar" style="width:30px;height:30px;font-size:13px;background:${col};">${esc(c.name.charAt(0).toUpperCase())}</span></td>
+        <td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${_selectedContacts.has(c.id)?'checked':''} onchange="toggleContactSel('${c.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>
         <td>
           <div style="font-weight:600;font-size:14px;">${esc(c.name)}</div>
         </td>
@@ -420,4 +432,35 @@ window.confirmDeleteContact = async function(id, name) {
   await deleteContact(id);
   toast('Contact deleted.', 'success');
   navTo('contacts');
+};
+
+window.toggleContactSel = function(id, checked) {
+  if (checked) _selectedContacts.add(id); else _selectedContacts.delete(id);
+  renderContacts(document.getElementById('content'), _contactsPage);
+};
+
+window.toggleAllContacts = function(checked) {
+  const cbs = document.querySelectorAll('tbody input[type="checkbox"]');
+  cbs.forEach(cb => {
+    const m = cb.getAttribute('onchange')?.match(/toggleContactSel\('([^']+)'/);
+    if (m) { if (checked) _selectedContacts.add(m[1]); else _selectedContacts.delete(m[1]); }
+  });
+  renderContacts(document.getElementById('content'), _contactsPage);
+};
+
+window.clearContactSelection = function() {
+  _selectedContacts.clear();
+  renderContacts(document.getElementById('content'), _contactsPage);
+};
+
+window.bulkDeleteContacts = async function() {
+  if (_selectedContacts.size === 0) return;
+  if (!confirm(`Delete ${_selectedContacts.size} contact(s)? This cannot be undone.`)) return;
+  const ids = [..._selectedContacts];
+  for (const id of ids) {
+    await deleteContact(id);
+  }
+  _selectedContacts.clear();
+  toast(`${ids.length} contact(s) deleted`, 'success');
+  renderContacts(document.getElementById('content'), 1);
 };

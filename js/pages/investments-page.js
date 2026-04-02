@@ -13,6 +13,8 @@ import {
   calcInvestmentStats
 } from '../investments.js';
 
+let _selectedInvestments = new Set();
+
 // Global investment type/status mappings (expected to be on window)
 // INV_TYPES, INV_STATUSES, currentUser, currentProfile should be available
 
@@ -76,12 +78,24 @@ export async function renderInvestments(el) {
       <div class="stat-card"><div class="stat-lbl">Overall G/L</div><div class="stat-val" style="font-size:17px;color:${totalGl>=0?'var(--green)':'var(--red)'};">${totalGl>=0?'+':''}${fmtMoney(totalGl)}</div></div>
     </div>`;
 
+    // Bulk action bar
+    if (_selectedInvestments.size > 0) {
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--accent);border-radius:8px;margin-bottom:12px;color:#fff;">
+        <span style="font-size:13px;font-weight:700;">${_selectedInvestments.size} selected</span>
+        <div style="display:flex;gap:6px;margin-left:auto;">
+          <button class="bs sm" onclick="bulkDeleteInvestments()" style="background:rgba(255,255,255,.2);color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Delete</button>
+          <button class="bs sm" onclick="clearInvestmentSelection()" style="background:rgba(255,255,255,.15);color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer;">✕ Clear</button>
+        </div>
+      </div>`;
+    }
+
     investments.forEach(inv => {
       const stats = window.calcInvestmentStats(inv);
       const isOwner = inv.user_id === currentUser.id;
       const partners = (inv.members || []).filter(m => m.role !== 'owner');
       const statusColors = { active:'badge-green', matured:'badge-blue', closed:'badge-gray', lost:'badge-red' };
-      html += `<div class="card" style="margin-bottom:12px;">
+      html += `<div class="card" style="margin-bottom:12px;position:relative;">
+        <label style="position:absolute;top:10px;right:42px;cursor:pointer;" onclick="event.stopPropagation();"><input type="checkbox" ${_selectedInvestments.has(inv.id)?'checked':''} onchange="toggleInvestmentSel('${inv.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></label>
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
           <div style="flex:1;">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
@@ -635,4 +649,26 @@ window.confirmDeleteInvestment = async function(id) {
     window._bsNavigate('bs-investments'); return;
   }
   window.navTo('investments');
+};
+
+window.toggleInvestmentSel = function(id, checked) {
+  if (checked) _selectedInvestments.add(id); else _selectedInvestments.delete(id);
+  renderInvestments(document.getElementById('content'));
+};
+
+window.clearInvestmentSelection = function() {
+  _selectedInvestments.clear();
+  renderInvestments(document.getElementById('content'));
+};
+
+window.bulkDeleteInvestments = async function() {
+  if (_selectedInvestments.size === 0) return;
+  if (!confirm(`Delete ${_selectedInvestments.size} investment(s)? This cannot be undone.`)) return;
+  const ids = [..._selectedInvestments];
+  for (const id of ids) {
+    await deleteInvestment(id);
+  }
+  _selectedInvestments.clear();
+  toast(`${ids.length} investment(s) deleted`, 'success');
+  renderInvestments(document.getElementById('content'));
 };

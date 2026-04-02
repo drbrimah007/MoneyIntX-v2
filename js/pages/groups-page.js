@@ -8,6 +8,8 @@ import { supabase } from '../supabase.js';
 import { listContacts } from '../contacts.js';
 import { createGroup, getGroup, deleteGroup, calcGroupStats, addGroupMember, removeGroupMember, createRound, markContributionPaid, postNotice, getNoticeBoard } from '../groups.js';
 
+let _selectedGroups = new Set();
+
 // Global function: calcGroupStats should be available on window
 
 // ── Groups ────────────────────────────────────────────────────────
@@ -63,12 +65,24 @@ export async function renderGroups(el) {
       <button class="btn btn-primary" onclick="openNewGroupModal()">+ Create First Group</button>
     </div>`;
   } else {
+    // Bulk action bar
+    if (_selectedGroups.size > 0) {
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--accent);border-radius:8px;margin-bottom:12px;color:#fff;">
+        <span style="font-size:13px;font-weight:700;">${_selectedGroups.size} selected</span>
+        <div style="display:flex;gap:6px;margin-left:auto;">
+          <button class="bs sm" onclick="bulkDeleteGroups()" style="background:rgba(255,255,255,.2);color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Delete</button>
+          <button class="bs sm" onclick="clearGroupSelection()" style="background:rgba(255,255,255,.15);color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer;">✕ Clear</button>
+        </div>
+      </div>`;
+    }
+
     groups.forEach(g => {
       const stats = calcGroupStats(g);
       const isOwner = g.user_id === currentUser.id;
       const activeMembers = (g.members || []).filter(m => m.status === 'active');
       const totalCollected = stats.totalCollected;
-      html += `<div class="card" style="margin-bottom:12px;">
+      html += `<div class="card" style="margin-bottom:12px;position:relative;">
+        <label style="position:absolute;top:10px;right:42px;cursor:pointer;" onclick="event.stopPropagation();"><input type="checkbox" ${_selectedGroups.has(g.id)?'checked':''} onchange="toggleGroupSel('${g.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></label>
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
           <div style="flex:1;">
             <h3 style="font-size:16px;margin:0 0 4px;cursor:pointer;font-weight:700;" onclick="openGroupDetail('${g.id}')">${esc(g.name)}</h3>
@@ -414,5 +428,27 @@ window.confirmDeleteGroup = async function(id) {
   await deleteGroup(id);
   toast('Group deleted.', 'success');
   window.navTo('groups');
+};
+
+window.toggleGroupSel = function(id, checked) {
+  if (checked) _selectedGroups.add(id); else _selectedGroups.delete(id);
+  renderGroups(document.getElementById('content'));
+};
+
+window.clearGroupSelection = function() {
+  _selectedGroups.clear();
+  renderGroups(document.getElementById('content'));
+};
+
+window.bulkDeleteGroups = async function() {
+  if (_selectedGroups.size === 0) return;
+  if (!confirm(`Delete ${_selectedGroups.size} group(s)? All rounds and member data will be lost.`)) return;
+  const ids = [..._selectedGroups];
+  for (const id of ids) {
+    await deleteGroup(id);
+  }
+  _selectedGroups.clear();
+  toast(`${ids.length} group(s) deleted`, 'success');
+  renderGroups(document.getElementById('content'));
 };
 

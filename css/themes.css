@@ -211,13 +211,13 @@
   --panel-2: #EEF3FA;
 
   --text:    #182033;
-  --text-2:  #4D5A72;
-  --muted:   #73819A;
-  --muted-2: #98A3B6;
+  --text-2:  #3A4760;
+  --muted:   #566378;
+  --muted-2: #6E7D94;
 
-  --border:  rgba(24,32,51,.08);
-  --line:    rgba(24,32,51,.08);
-  --line-2:  rgba(24,32,51,.12);
+  --border:  rgba(24,32,51,.18);
+  --line:    rgba(24,32,51,.16);
+  --line-2:  rgba(24,32,51,.22);
 
   --contact:    #6366F1;
 
@@ -247,7 +247,7 @@
   --user-gold:   #b45309;
   --user-rose:   #be123c;
 
-  --card-border: 1px solid rgba(24,32,51,.08);
+  --card-border: 1px solid rgba(24,32,51,.18);
 
   --radius: 14px;
   --shadow:    none;
@@ -269,13 +269,13 @@
   --panel-2: #EAF0E6;
 
   --text:    #1E2B1A;
-  --text-2:  #4A5D42;
-  --muted:   #738568;
-  --muted-2: #9BAA90;
+  --text-2:  #384D30;
+  --muted:   #546B4A;
+  --muted-2: #6E8462;
 
-  --border:  rgba(30,43,26,.08);
-  --line:    rgba(30,43,26,.08);
-  --line-2:  rgba(30,43,26,.12);
+  --border:  rgba(30,43,26,.18);
+  --line:    rgba(30,43,26,.16);
+  --line-2:  rgba(30,43,26,.22);
 
   --contact:    #5B8C5A;
   --green:      #2D8A4E;
@@ -303,7 +303,7 @@
   --user-gold:   #A67C37;
   --user-rose:   #A65068;
 
-  --card-border: 1px solid rgba(30,43,26,.08);
+  --card-border: 1px solid rgba(30,43,26,.18);
   --radius: 14px;
   --shadow:    none;
   --shadow-lg: 0 8px 24px rgba(0,0,0,.06);
@@ -324,13 +324,13 @@
   --panel-2: #F5EAED;
 
   --text:    #2D1A22;
-  --text-2:  #6B4A58;
-  --muted:   #997D8A;
-  --muted-2: #B9A0AC;
+  --text-2:  #53343F;
+  --muted:   #7A5B6A;
+  --muted-2: #8E6E7E;
 
-  --border:  rgba(45,26,34,.08);
-  --line:    rgba(45,26,34,.08);
-  --line-2:  rgba(45,26,34,.12);
+  --border:  rgba(45,26,34,.18);
+  --line:    rgba(45,26,34,.16);
+  --line-2:  rgba(45,26,34,.22);
 
   --contact:    #C06078;
   --green:      #3A8A5C;
@@ -358,7 +358,7 @@
   --user-gold:   #B88A3A;
   --user-rose:   #C06078;
 
-  --card-border: 1px solid rgba(45,26,34,.08);
+  --card-border: 1px solid rgba(45,26,34,.18);
   --radius: 14px;
   --shadow:    none;
   --shadow-lg: 0 8px 24px rgba(0,0,0,.06);
@@ -379,13 +379,13 @@
   --panel-2: #E4F0F6;
 
   --text:    #122A34;
-  --text-2:  #3C5E6E;
-  --muted:   #678899;
-  --muted-2: #94ADB9;
+  --text-2:  #2E4E5C;
+  --muted:   #4A6E80;
+  --muted-2: #5F8494;
 
-  --border:  rgba(18,42,52,.08);
-  --line:    rgba(18,42,52,.08);
-  --line-2:  rgba(18,42,52,.12);
+  --border:  rgba(18,42,52,.18);
+  --line:    rgba(18,42,52,.16);
+  --line-2:  rgba(18,42,52,.22);
 
   --contact:    #2E7D9B;
   --green:      #1E8A5E;
@@ -413,7 +413,7 @@
   --user-gold:   #C4881D;
   --user-rose:   #B0566A;
 
-  --card-border: 1px solid rgba(18,42,52,.08);
+  --card-border: 1px solid rgba(18,42,52,.18);
   --radius: 14px;
   --shadow:    none;
   --shadow-lg: 0 8px 24px rgba(0,0,0,.06);
@@ -434,13 +434,13 @@
   --panel-2: #F2ECE4;
 
   --text:    #2C2218;
-  --text-2:  #5C4D3D;
-  --muted:   #8A7A68;
-  --muted-2: #AFA196;
+  --text-2:  #4A3D2F;
+  --muted:   #6B5D4C;
+  --muted-2: #806E5C;
 
-  --border:  rgba(44,34,24,.08);
-  --line:    rgba(44,34,24,.08);
-  --line-2:  rgba(44,34,24,.12);
+  --border:  rgba(44,34,24,.18);
+  --line:    rgba(44,34,24,.16);
+  --line-2:  rgba(44,34,24,.22);
 
   --contact:    #B07845;
   --green:      #3B874E;
@@ -468,7 +468,7 @@
   --user-gold:   #B07845;
   --user-rose:   #A8526A;
 
-  --card-border: 1px solid rgba(44,34,24,.08);
+  --card-border: 1px solid rgba(44,34,24,.18);
   --radius: 14px;
   --shadow:    none;
   --shadow-lg: 0 8px 24px rgba(0,0,0,.06);
@@ -489,13 +489,13 @@
   --panel-2: #EDEBF5;
 
   --text:    #1E1830;
-  --text-2:  #4D4268;
-  --muted:   #7E7398;
-  --muted-2: #A89EBB;
+  --text-2:  #3A3258;
+  --muted:   #5C5278;
+  --muted-2: #706690;
 
-  --border:  rgba(30,24,48,.08);
-  --line:    rgba(30,24,48,.08);
-  --line-2:  rgba(30,24,48,.12);
+  --border:  rgba(30,24,48,.18);
+  --line:    rgba(30,24,48,.16);
+  --line-2:  rgba(30,24,48,.22);
 
   --contact:    #7C5CBA;
   --green:      #2E8A52;
@@ -523,7 +523,7 @@
   --user-gold:   #B5892E;
   --user-rose:   #AD5272;
 
-  --card-border: 1px solid rgba(30,24,48,.08);
+  --card-border: 1px solid rgba(30,24,48,.18);
   --radius: 14px;
   --shadow:    none;
   --shadow-lg: 0 8px 24px rgba(0,0,0,.06);
@@ -556,7 +556,7 @@
 [data-theme="light-lavender"] select {
   background: #FFFFFF !important;
   color: var(--text, #182033) !important;
-  border-color: var(--border, rgba(24,32,51,.10)) !important;
+  border-color: var(--border, rgba(24,32,51,.18)) !important;
 }
 [data-theme="light"] .form-input:focus,
 [data-theme="light"] input:focus:not([type="checkbox"]):not([type="radio"]):not([type="range"]),

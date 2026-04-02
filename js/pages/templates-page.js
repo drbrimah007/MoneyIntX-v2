@@ -6,7 +6,9 @@ import { esc, toast, openModal, closeModal, fmtDate, fmtRelative, TX_LABELS } fr
 import { supabase } from '../supabase.js';
 import { listContacts } from '../contacts.js';
 import { fmtMoney, createEntry } from '../entries.js';
-import { listTemplates, createTemplate, updateTemplate, copyPublicTemplate } from '../templates.js';
+import { listTemplates, createTemplate, updateTemplate, deleteTemplate, copyPublicTemplate, togglePublic } from '../templates.js';
+
+let _selectedTemplates = new Set();
 
 // Functions from other modules should be available
 // TX_LABELS, TX_COLORS, etc. on window
@@ -28,9 +30,21 @@ async function renderTemplatesPage(el) {
   if (templates.length === 0) {
     html += `<div class="card" style="text-align:center;padding:40px;"><p style="color:var(--muted);">No templates yet.</p></div>`;
   } else {
+    // Bulk action bar
+    if (_selectedTemplates.size > 0) {
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--accent);border-radius:8px;margin-bottom:12px;color:#fff;">
+        <span style="font-size:13px;font-weight:700;">${_selectedTemplates.size} selected</span>
+        <div style="display:flex;gap:6px;margin-left:auto;">
+          <button class="bs sm" onclick="bulkDeleteTemplatesPage()" style="background:rgba(255,255,255,.2);color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Delete</button>
+          <button class="bs sm" onclick="clearTemplateSelection()" style="background:rgba(255,255,255,.15);color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer;">✕ Clear</button>
+        </div>
+      </div>`;
+    }
+
     templates.forEach(t => {
       const fCount = (t.fields || []).length;
-      html += `<div class="card" style="margin-bottom:12px;">
+      html += `<div class="card" style="margin-bottom:12px;position:relative;">
+        <label style="position:absolute;top:10px;right:42px;cursor:pointer;" onclick="event.stopPropagation();"><input type="checkbox" ${_selectedTemplates.has(t.id)?'checked':''} onchange="toggleTemplateSel('${t.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></label>
         <div style="display:flex;justify-content:space-between;align-items:flex-start;">
           <div>
             <h3 style="font-size:16px;font-weight:700;">${esc(t.name)} ${t.is_public ? '<span class="badge badge-blue" style="font-size:10px;">Public</span>' : ''}</h3>
@@ -913,6 +927,29 @@ window.confirmDeleteTemplate = async function(id) {
   await deleteTemplate(id); toast('Deleted.', 'success');
   if (document.getElementById('bs-content') && window._bsNavigate) { window._bsNavigate('bs-templates'); return; }
   navTo('templates');
+};
+
+window.toggleTemplateSel = function(id, checked) {
+  if (checked) _selectedTemplates.add(id); else _selectedTemplates.delete(id);
+  renderTemplatesPage(document.getElementById('content'));
+};
+
+window.clearTemplateSelection = function() {
+  _selectedTemplates.clear();
+  renderTemplatesPage(document.getElementById('content'));
+};
+
+window.bulkDeleteTemplatesPage = async function() {
+  if (_selectedTemplates.size === 0) return;
+  if (!confirm(`Delete ${_selectedTemplates.size} template(s)? This cannot be undone.`)) return;
+  const ids = [..._selectedTemplates];
+  for (const id of ids) {
+    const { error } = await supabase.from('templates').delete().eq('id', id);
+    if (error) toast('Failed to delete: ' + error.message, 'error');
+  }
+  _selectedTemplates.clear();
+  toast(`${ids.length} template(s) deleted`, 'success');
+  renderTemplatesPage(document.getElementById('content'));
 };
 
 
