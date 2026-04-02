@@ -817,36 +817,25 @@ window._bsToggle = function(section, id, checked) {
   window._bsNavigate(_bsRoute(section));
 };
 
-// Bulk delete action (entries — soft delete)
+// Bulk delete action (entries — soft delete via RPC to bypass RLS WITH CHECK)
 window._bsBulkDelete = async function(section) {
   const sel = _bsSelected(section);
   if (sel.size === 0) return;
   if (!confirm(`Delete ${sel.size} item(s)? This cannot be undone.`)) return;
   const ids = [...sel];
-  let ok = 0, fail = 0;
-  for (const id of ids) {
-    const { error } = await supabase.from('entries').update({
-      archived_at: new Date().toISOString(),
-      status: 'voided',
-      deleted_at: new Date().toISOString()
-    }).eq('id', id);
-    if (error) { fail++; console.error('[_bsBulkDelete] Error:', error.message); } else ok++;
-  }
+  const { data, error } = await supabase.rpc('soft_delete_entries', { p_entry_ids: ids });
   window._bsSelectMode[section] = false;
   _bsClearSel(section);
-  if (fail > 0) toast(`${ok} deleted, ${fail} failed`, 'error');
-  else toast(`${ok} item(s) deleted`, 'success');
+  if (error) { toast('Delete failed: ' + error.message, 'error'); }
+  else if (data?.fail > 0) { toast(`${data.ok} deleted, ${data.fail} failed`, 'error'); }
+  else { toast(`${data?.ok || ids.length} item(s) deleted`, 'success'); }
   window._bsNavigate(_bsRoute(section));
 };
 
-// Single entry delete (soft delete)
+// Single entry delete (soft delete via RPC to bypass RLS WITH CHECK)
 window._bsDeleteEntry = async function(entryId, section) {
   if (!confirm('Delete this entry? This cannot be undone.')) return;
-  const { error } = await supabase.from('entries').update({
-    archived_at: new Date().toISOString(),
-    status: 'voided',
-    deleted_at: new Date().toISOString()
-  }).eq('id', entryId);
+  const { error } = await supabase.rpc('soft_delete_entry', { p_entry_id: entryId });
   if (error) { toast('Failed: ' + error.message, 'error'); return; }
   toast('Entry deleted', 'success');
   window._bsNavigate(_bsRoute(section));
