@@ -55,11 +55,13 @@ export function getCurrentPage() { return _currentPage; }
 
 // ── Modal helpers ─────────────────────────────────────────────────
 export function openModal(html, { maxWidth = '520px', id = 'modal' } = {}) {
+  // Close any open action dropdowns so modal sits cleanly on top
+  document.querySelectorAll('.action-dropdown.open').forEach(d => d.classList.remove('open'));
   closeModal(id);
   const wrap = document.createElement('div');
   wrap.id = id;
   wrap.style.cssText = `
-    position:fixed;inset:0;z-index:1100;
+    position:fixed;inset:0;z-index:9200;
     background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);
     display:flex;align-items:center;justify-content:center;
     padding:20px;animation:fadeIn 0.2s ease;

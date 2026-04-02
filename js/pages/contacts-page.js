@@ -85,10 +85,10 @@ export async function renderContacts(el, page = 1) {
           <div class="action-menu">
             <button class="action-menu-btn" onclick="toggleActionMenu(this)">⋮</button>
             <div class="action-dropdown">
-              <button onclick="openContactDetail('${c.id}')">👁 View</button>
-              <button onclick="openEditContactModal('${c.id}')">✏️ Edit</button>
-              <button onclick="closeModal();openNewEntryModal()">+ Entry</button>
-              <button onclick="confirmDeleteContact('${c.id}','${esc(c.name)}')" style="color:var(--red);">🗑 Delete</button>
+              <button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));openContactDetail('${c.id}')">👁 View</button>
+              <button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));openEditContactModal('${c.id}')">✏️ Edit</button>
+              <button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));closeModal();openNewEntryModal()">+ Entry</button>
+              <button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));confirmDeleteContact('${c.id}','${esc(c.name)}')" style="color:var(--red);">🗑 Delete</button>
             </div>
           </div>
         </td>

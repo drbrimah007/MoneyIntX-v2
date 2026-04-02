@@ -519,7 +519,8 @@ window.useTemplateForEntry = async function(templateId) {
     <div class="form-group"><label>Note</label><textarea id="tfe-note" rows="2"></textarea></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="saveTemplateEntry('${templateId}','${invNum}')">Save Entry</button>
+      <button class="bs sm" style="color:var(--amber,#f59e0b);border-color:var(--amber,#f59e0b);" onclick="saveTemplateEntry('${templateId}','${invNum}','draft')">Save Draft</button>
+      <button class="btn btn-primary btn-sm" onclick="saveTemplateEntry('${templateId}','${invNum}')">Create Entry</button>
     </div>
   `, { maxWidth: '560px' });
 
@@ -717,7 +718,8 @@ window.recalcTemplateFields = function() {
   if (amtField && !amtField._userEdited) amtField.value = finalTotalVal > 0 ? finalTotalVal.toFixed(2) : '';
 };
 
-window.saveTemplateEntry = async function(templateId, invNum) {
+window.saveTemplateEntry = async function(templateId, invNum, saveAs) {
+  const isDraft = saveAs === 'draft';
   const currentUser = getCurrentUser();
   const contactId = document.getElementById('tfe-contact').value;
   const txType = document.getElementById('tfe-type').value;
@@ -767,6 +769,7 @@ window.saveTemplateEntry = async function(templateId, invNum) {
       date: document.getElementById('tfe-date').value,
       note: document.getElementById('tfe-note').value.trim(),
       invoiceNumber: invNum, templateId, templateData: tplData,
+      status: isDraft ? 'draft' : 'posted',
       metadata: _bsMeta,
       businessId: _entryBizId
     });
@@ -798,7 +801,7 @@ window.saveTemplateEntry = async function(templateId, invNum) {
   const { data: tpl } = await supabase.from('templates').select('invoice_next_num').eq('id', templateId).single();
   if (tpl) await supabase.from('templates').update({ invoice_next_num: (tpl.invoice_next_num || 1) + 1 }).eq('id', templateId);
 
-  closeModal(); toast('Entry created from template!', 'success');
+  closeModal(); toast(isDraft ? 'Draft saved.' : 'Entry created from template!', 'success');
 
   // Navigate back to BS if we came from there, otherwise entries page
   if (window._bsActiveContext) {

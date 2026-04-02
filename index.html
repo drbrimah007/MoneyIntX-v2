@@ -1025,6 +1025,11 @@ window.updateNotifBadge = updateNotifBadge;
 if (!window._navHistory) window._navHistory = [];
 
 function navTo(page) {
+  // Close any open menus/dropdowns on navigation
+  const _nav = document.getElementById('nav');
+  if (_nav) _nav.classList.remove('open');
+  document.querySelectorAll('.action-dropdown.open').forEach(d => d.classList.remove('open'));
+
   const prev = window._currentPage;
   if (prev && prev !== page) window._navHistory.push(prev);
   if (window._navHistory.length > 20) window._navHistory.shift();
@@ -1487,6 +1492,11 @@ window.toggleEntryMoreMenu = function(btn) {
 };
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.action-menu')) {
+    document.querySelectorAll('.action-dropdown.open').forEach(d => d.classList.remove('open'));
+  }
+  // Close dropdown when any action button inside it is clicked (not the ⋮ toggle itself)
+  const actionBtn = e.target.closest('.action-dropdown button');
+  if (actionBtn) {
     document.querySelectorAll('.action-dropdown.open').forEach(d => d.classList.remove('open'));
   }
 });

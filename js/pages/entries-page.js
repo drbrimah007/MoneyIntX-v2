@@ -191,7 +191,10 @@ export async function renderEntries(el, page, forceRefresh) {
           ${cId ? `<span style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;" onclick="openContactDetail('${cId}')">
             <span style="width:24px;height:24px;border-radius:50%;background:${col};display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;color:#fff;">${esc(cName.charAt(0).toUpperCase())}</span>
             <span style="font-weight:600;color:${col};">${esc(cName)}</span>
-          </span>` : `<span style="color:var(--muted);">${esc(cName)}</span>`}
+          </span>` : `<span style="display:inline-flex;align-items:center;gap:6px;">
+            <span style="width:24px;height:24px;border-radius:50%;background:var(--bg3);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;color:var(--muted);">${esc(cName.charAt(0).toUpperCase())}</span>
+            <span style="font-weight:600;color:var(--muted);">${esc(cName)}</span>
+          </span>`}
         </td>
         <td style="font-weight:700;cursor:pointer;" onclick="openEntryDetail('${e.id}')">${amtHtml}</td>
         <td class="hide-mobile" style="max-width:90px;">${e.invoice_number ? `<span style="font-size:11px;font-family:monospace;color:var(--accent);font-weight:700;">${esc(e.invoice_number)}</span>` : e.entry_number ? `<span style="font-size:11px;font-family:monospace;color:var(--muted);font-weight:700;">#${String(e.entry_number).padStart(4,'0')}</span>` : '<span style="color:var(--muted-2);">—</span>'}</td>
@@ -343,7 +346,12 @@ window.openEntryDetail = async function(id, options) {
     `;
   } else {
     // STANDARD VIEW: Settlements at bottom, all options available
+    const isDraftEntry = entry.status === 'draft';
     modalContent = `
+      ${isDraftEntry ? `<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="font-size:13px;font-weight:700;color:var(--amber,#f59e0b);">📝 Draft — not yet posted</div>
+        <button class="btn btn-primary btn-sm" onclick="openEditEntryModal('${entry.id}')" style="white-space:nowrap;">Resume Editing</button>
+      </div>` : ''}
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
         <h3 style="margin:0;">Entry Detail</h3>
         <button class="btn btn-secondary btn-sm" onclick="closeModal()">✕</button>
@@ -544,19 +552,25 @@ window.confirmAdjustedSettlement = async function(settlementId, entryId, reviewM
 
 // ── Edit Entry Modal ──────────────────────────────────────────────
 window.openEditEntryModal = async function(id) {
+  try {
+  console.log('[openEditEntryModal] opening for', id);
   const entry = await getEntry(id);
   if (!entry) return toast('Entry not found.', 'error');
+  console.log('[openEditEntryModal] entry loaded, fetching contacts...');
   const contacts = await listContacts(getMyBusinessId());
   const contactOpts = contacts.map(c => `<option value="${c.id}" ${c.id === entry.contact_id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
   const statusOpts = ['draft','posted','sent','viewed','accepted','partially_settled','settled','fulfilled','overdue','disputed','voided','cancelled']
     .map(s => `<option value="${s}" ${s === entry.status ? 'selected' : ''}>${s.charAt(0).toUpperCase() + s.slice(1).replace('_',' ')}</option>`).join('');
   const typeOpts = Object.entries(TX_LABELS).map(([k,v]) => `<option value="${k}" ${k === entry.tx_type ? 'selected' : ''}>${v}</option>`).join('');
 
-  // ── Template entry: full field editing ───────────────────────────
+  // ── Template entry: full field editing (falls back to basic edit if template deleted) ──
   if (entry.template_id) {
     const tplRes = await supabase.from('templates').select('*').eq('id', entry.template_id).single();
     const tpl = tplRes.data;
-    if (!tpl) return toast('Template not found.', 'error');
+    if (!tpl) {
+      // Template was deleted — fall through to basic edit below
+      console.warn('[openEditEntryModal] template not found, using basic edit for entry', id);
+    } else {
 
     window._activeTpl = tpl;
     window._activeTplCurrency = entry.currency || tpl.currency || getCurrentProfile()?.default_currency || 'USD';
@@ -658,6 +672,7 @@ window.openEditEntryModal = async function(id) {
     // Trigger recalc to populate computed fields
     recalcTemplateFields();
     return;
+    } // end else (template exists)
   }
 
   // ── Basic (non-template) entry editing ───────────────────────────
@@ -677,6 +692,11 @@ window.openEditEntryModal = async function(id) {
       <button class="btn btn-primary btn-sm" onclick="saveEditEntry('${id}')">Save</button>
     </div>
   `, { maxWidth: '480px' });
+  console.log('[openEditEntryModal] edit modal opened');
+  } catch (err) {
+    console.error('[openEditEntryModal] FAILED:', err);
+    toast('Edit failed: ' + (err?.message || err), 'error');
+  }
 };
 
 window.saveEditEntry = async function(id) {
@@ -2024,7 +2044,8 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
     <input type="hidden" id="ne-category" value="${window._neCategory}">
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="bs sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary sm" id="ne-save-btn" onclick="saveNewEntry()">Save Entry</button>
+      <button class="bs sm" style="color:var(--amber,#f59e0b);border-color:var(--amber,#f59e0b);" onclick="saveNewEntry('draft')">Save Draft</button>
+      <button class="btn btn-primary sm" id="ne-save-btn" onclick="saveNewEntry()">Create Entry</button>
     </div>
   `, { maxWidth: '500px' });
 
@@ -2210,7 +2231,7 @@ window.neSelectTab = function(tabId) {
 
   // Update save button label
   const saveBtn = document.getElementById('ne-save-btn');
-  if (saveBtn) saveBtn.textContent = firstAction.email ? '📤 Send & Save' : 'Save Entry';
+  if (saveBtn) saveBtn.textContent = firstAction.email ? '📤 Send & Create' : 'Create Entry';
 };
 
 // Select an action within the current tab
@@ -2225,7 +2246,7 @@ window.neSelectCategory = function(category) {
   _neRenderExtraFields(action);
   _neToggleItems(); // ensure items section visibility
   const saveBtn = document.getElementById('ne-save-btn');
-  if (saveBtn) saveBtn.textContent = action.email ? '📤 Send & Save' : 'Save Entry';
+  if (saveBtn) saveBtn.textContent = action.email ? '📤 Send & Create' : 'Create Entry';
 };
 
 // Toggle Line Items section visibility based on current category
@@ -2326,7 +2347,8 @@ window.setEntryDirection = function(dir) {
   neSelectTab(tabId);
 };
 
-window.saveNewEntry = async function() {
+window.saveNewEntry = async function(saveAs) {
+  const isDraft = saveAs === 'draft';
   try {
   const contactId  = (document.getElementById('ne-contact')?.value || '').trim();
   const category   = document.getElementById('ne-category')?.value || 'owed_to_me';
@@ -2406,6 +2428,7 @@ window.saveNewEntry = async function() {
       invoiceNumber: invNumber || refNumber || '',
       metadata: _hasMeta,
       businessId: bizUuid,
+      status: isDraft ? 'draft' : 'posted',
       senderContext: _senderContext,
       senderBusinessName: _senderBizName,
       fromName: _fromName,
@@ -2436,8 +2459,8 @@ window.saveNewEntry = async function() {
     await supabase.from('entries').update(updates).eq('id', entry.id);
   }
 
-  // ── Schedule fulfillment reminder (advances only) ─────────────────────────
-  if (isAdvance && advRemind && advEndDate && entry?.id) {
+  // ── Schedule fulfillment reminder (advances only, skip for drafts) ────────
+  if (!isDraft && isAdvance && advRemind && advEndDate && entry?.id) {
     try {
       const endMs   = new Date(advEndDate + 'T09:00:00').getTime();
       const fireMs  = endMs - (advDays * 86400000);
@@ -2459,7 +2482,7 @@ window.saveNewEntry = async function() {
   }
 
   closeModal();
-  toast('Entry created.', 'success');
+  toast(isDraft ? 'Draft saved.' : 'Entry created.', 'success');
 
   // If created from Business Suite context, metadata already has business_id — return to BS
   if (window._bsActiveContext && entry?.id) {
@@ -2476,6 +2499,9 @@ window.saveNewEntry = async function() {
   } else {
     _invalidateEntries(); navTo('entries');
   }
+
+  // ── Drafts: skip auto-share and notifications entirely ──────────
+  if (isDraft) return;
 
   // ── Auto-share via SECURITY DEFINER RPC (handles unlinked contacts too) ──
   // Replaces the old client-side approach that:

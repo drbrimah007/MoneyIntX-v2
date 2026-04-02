@@ -1726,7 +1726,8 @@ window._bsReceiveBill = function() {
 
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="bs sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary sm" onclick="window._bsSaveReceivedBill()">Log Bill</button>
+      <button class="bs sm" style="color:var(--amber,#f59e0b);border-color:var(--amber,#f59e0b);" onclick="window._bsSaveReceivedBill('draft')">Save Draft</button>
+      <button class="btn btn-primary sm" onclick="window._bsSaveReceivedBill()">Create Bill</button>
     </div>
   `, { maxWidth: '520px' });
   // Apply preselected contact if returning from add-new flow
@@ -1786,7 +1787,8 @@ window._bsRbSearchContact = async function(query) {
 };
 
 // Save received bill as a bill_sent entry
-window._bsSaveReceivedBill = async function() {
+window._bsSaveReceivedBill = async function(saveAs) {
+  const isDraft = saveAs === 'draft';
   const supplierName = (document.getElementById('bs-rb-supplier')?.value || '').trim();
   const contactId = (document.getElementById('bs-rb-contact-id')?.value || '').trim();
   const amount = parseFloat(document.getElementById('bs-rb-amount')?.value) || 0;
@@ -1839,7 +1841,7 @@ window._bsSaveReceivedBill = async function() {
       date: billDate,
       note: description || '',
       invoiceNumber: refNum || '',
-      status: 'posted',
+      status: isDraft ? 'draft' : 'posted',
       metadata: Object.keys(metadata).length ? metadata : null,
       businessId: _bsBusinessId()
     });
@@ -1853,7 +1855,7 @@ window._bsSaveReceivedBill = async function() {
   // Update contact_name on the entry (createEntry doesn't set it)
   await supabase.from('entries').update({ contact_name: supplierName }).eq('id', entry.id);
   closeModal();
-  toast('Bill logged from ' + supplierName, 'success');
+  toast(isDraft ? 'Draft saved.' : 'Bill logged from ' + supplierName, 'success');
   window._bsNavigate('bs-bills');
 };
 
