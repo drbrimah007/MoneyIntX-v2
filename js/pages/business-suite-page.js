@@ -173,6 +173,15 @@ window.clearBsContext = function() {
   window._bsOpsRouted = false;
   // Hard-reset ledger panel state so foreign panels don't persist
   if (window._bpEngine?.resetPanelState) window._bpEngine.resetPanelState();
+  // Clear ALL BS transient state: selections, filters, pages, search
+  window._bsSel = {};
+  window._bsPg = {};
+  window._bsInvFilter = 'all';  window._bsInvSearch = '';
+  window._bsBillFilter = 'all'; window._bsBillSearch = '';
+  window._bsRecFilter = 'all';
+  window._bsTmplTab = 'mine';   window._bsTmplSearch = '';
+  window._bsPanelTab = 'mine';
+  window._bsMembersCache = [];
 };
 
 // ── Business Access Context (Layer 2: Permissions) ───────────────
@@ -500,11 +509,12 @@ async function _bsRenderDash(el) {
   // Use business_id for all data scoping
   const bizUuid = _bsBusinessId();
 
-  // Fetch business entries scoped to the business
+  // Fetch business entries — only those explicitly created in BS context
   const { data: entries } = await supabase
     .from('entries')
     .select('*')
     .eq('business_id', bizUuid)
+    .eq('sender_context', 'business')
     .in('tx_type', BS_ALL_BIZ_TYPES)
     .is('archived_at', null)
     .order('created_at', { ascending: false })
@@ -829,13 +839,12 @@ async function _bsRenderInvoices(el) {
     .from('entries')
     .select('*')
     .eq('business_id', bizUuid)
+    .eq('sender_context', 'business')
     .in('tx_type', BS_INVOICE_TYPES)
     .is('archived_at', null)
     .order('created_at', { ascending: false });
 
-  // Only show entries explicitly created in BS context (metadata.business_id present)
-  // Personal entries also have business_id column set but lack metadata.business_id
-  const inv = (data || []).filter(e => e.metadata?.business_id);
+  const inv = data || [];
   const unpaid = inv.filter(e => e.status !== 'settled' && e.status !== 'voided');
   const overdue = unpaid.filter(e => e.metadata?.due_date && new Date(e.metadata.due_date) < new Date());
   const totalUnpaid = unpaid.filter(e => (e.currency||'USD') === cur).reduce((s,e) => s+(e.amount||0), 0);
@@ -958,12 +967,12 @@ async function _bsRenderBills(el) {
     .from('entries')
     .select('*')
     .eq('business_id', bizUuid)
+    .eq('sender_context', 'business')
     .in('tx_type', BS_BILL_TYPES)
     .is('archived_at', null)
     .order('created_at', { ascending: false });
 
-  // Only show entries explicitly created in BS context
-  const bills = (data || []).filter(e => e.metadata?.business_id);
+  const bills = data || [];
   const unpaid = bills.filter(e => e.status !== 'settled' && e.status !== 'voided');
   const overdue = unpaid.filter(e => e.metadata?.due_date && new Date(e.metadata.due_date) < new Date());
   const totalUnpaid = unpaid.filter(e => (e.currency||'USD') === cur).reduce((s,e) => s+(e.amount||0), 0);
@@ -1078,6 +1087,7 @@ async function _bsRenderClients(el) {
     .from('entries')
     .select('contact_id, contact_name, amount, currency, status, tx_type, created_at')
     .eq('business_id', bizUuid)
+    .eq('sender_context', 'business')
     .in('tx_type', [...BS_INVOICE_TYPES, ...BS_BILL_TYPES, 'owed_to_me', 'i_owe', 'they_owe_you', 'you_owe_them'])
     .is('archived_at', null)
     .order('created_at', { ascending: false });
@@ -1220,6 +1230,7 @@ async function _bsRenderSuppliers(el) {
     .from('entries')
     .select('*')
     .eq('business_id', bizUuid)
+    .eq('sender_context', 'business')
     .in('tx_type', [...BS_BILL_TYPES, 'i_owe'])
     .is('archived_at', null)
     .order('created_at', { ascending: false });
@@ -3188,6 +3199,7 @@ window._bsExportData = async function() {
     .from('entries')
     .select('*')
     .eq('business_id', bizUuid)
+    .eq('sender_context', 'business')
     .in('tx_type', BS_ALL_BIZ_TYPES)
     .is('archived_at', null)
     .order('created_at', { ascending: false });

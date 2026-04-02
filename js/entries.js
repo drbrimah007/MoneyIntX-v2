@@ -88,7 +88,8 @@ export async function createEntry(userId, {
   contactId, txType, amount, currency = 'USD', note = '',
   date, invoiceNumber = '', templateId = null, templateData = {},
   status = 'posted', metadata = null, source = 'manual', recurringRuleId = null,
-  businessId = null
+  businessId = null,
+  senderContext = 'personal', senderBusinessName = '', fromName = '', fromEmail = ''
 }) {
   // Guard: every entry MUST have a contact
   if (!contactId) {
@@ -123,7 +124,7 @@ export async function createEntry(userId, {
     status,
     source: source || 'manual'
   };
-  // Always resolve business_id — required NOT NULL column
+  // Always resolve business_id — required NOT NULL column (tenant/workspace ID)
   if (businessId) {
     insertPayload.business_id = businessId;
   } else {
@@ -131,6 +132,11 @@ export async function createEntry(userId, {
     const { getActiveBusinessId } = await import('./pages/state.js');
     insertPayload.business_id = getActiveBusinessId();
   }
+  // Context discriminator: 'personal' or 'business' — frozen at creation time
+  insertPayload.sender_context = senderContext || 'personal';
+  if (senderBusinessName) insertPayload.sender_business_name = senderBusinessName;
+  if (fromName) insertPayload.from_name = fromName;
+  if (fromEmail) insertPayload.from_email = fromEmail;
   if (recurringRuleId) insertPayload.recurring_rule_id = recurringRuleId;
   if (templateId) insertPayload.template_id = templateId;
   if (templateId && templateData && Object.keys(templateData).length > 0) insertPayload.template_data = templateData;

@@ -2401,14 +2401,29 @@ window.saveNewEntry = async function() {
   let entry;
   try {
     const currentUser = getCurrentUser();
+    const profile = getCurrentProfile() || {};
     // Use active workspace business — BS context if inside BS, otherwise personal
     const bizUuid = getActiveBusinessId();
+    // Determine context: is this a business or personal action?
+    const isBsAction = !!(window._bsActiveContext && window._bsActiveBizId);
+    const _senderContext = isBsAction ? 'business' : 'personal';
+    const _senderBizName = isBsAction ? (window._getBsSenderName?.() || profile.company_name || '') : '';
+    const _fromName = isBsAction
+      ? (window._getBsSenderName?.() || profile.company_name || profile.display_name || 'Business')
+      : (profile.display_name || 'Someone');
+    const _fromEmail = isBsAction
+      ? (window._getBsSenderEmail?.() || currentUser.email)
+      : currentUser.email;
     entry = await createEntry(currentUser.id, {
       contactId, txType, amount: parseFloat(amount), currency, date,
       note: combinedNote,
       invoiceNumber: invNumber || refNumber || '',
       metadata: _hasMeta,
-      businessId: bizUuid
+      businessId: bizUuid,
+      senderContext: _senderContext,
+      senderBusinessName: _senderBizName,
+      fromName: _fromName,
+      fromEmail: _fromEmail
     });
   } catch (err) {
     console.error('[saveNewEntry] createEntry threw:', err);
@@ -2429,10 +2444,7 @@ window.saveNewEntry = async function() {
     const updates = { category, direction_sign: dirSign, outstanding_amount: Math.round(parseFloat(amount) * 100) };
     if (contactName) updates.contact_name = contactName;
     if (dueDate) updates.due_date = dueDate;
-    // Store business sender name on the entry when created from BS
-    if (window._bsActiveContext) {
-      updates.from_name = window._getBsSenderName?.() || '';
-    }
+    // from_name + sender_context already set by createEntry — no redundant update needed
     // Save repayment date as due_date for advances
     if (isAdvance && advEndDate) updates.due_date = advEndDate;
     await supabase.from('entries').update(updates).eq('id', entry.id);
@@ -2495,18 +2507,13 @@ window.saveNewEntry = async function() {
         .select('email').eq('id', contactId).single();
       const recipientEmail = cRow?.email?.trim() || '';
       if (recipientEmail) {
-        // Use BS identity ONLY when explicitly in BS context; otherwise personal name
-        const fromName = (window._bsActiveContext && window._bsActiveBizId)
-          ? (window._getBsSenderName?.() || getCurrentProfile()?.display_name || 'Business')
-          : (getCurrentProfile()?.display_name || 'Someone');
-        const fromEmail = (window._bsActiveContext && window._bsActiveBizId)
-          ? (window._getBsSenderEmail?.() || getCurrentUser().email)
-          : (getCurrentUser().email);
+        // Use stored identity from the entry itself — never re-derive
         const autoSnap = {
           amount: Math.round(parseFloat(amount) * 100), // cents — consistent with entries table & fmtMoney
           currency, tx_type: category,
           date, note, invoice_number: invNumber || '',
-          from_name: fromName, from_email: fromEmail,
+          from_name: entry.from_name || _fromName, from_email: entry.from_email || _fromEmail,
+          sender_context: entry.sender_context || _senderContext,
           formatted_amount: fmtMoney(toCents(parseFloat(amount)), currency)
         };
         const { data: shareResult, error: shareErr } = await supabase.rpc('auto_share_entry', {
@@ -2531,9 +2538,8 @@ window.saveNewEntry = async function() {
   if (!notifyOn) return;
   try {
     const contactName = window._neContacts?.find(c => c.id === contactId)?.name || 'Contact';
-    const fromName    = (window._bsActiveContext && window._bsActiveBizId)
-      ? (window._getBsSenderName?.() || getCurrentProfile()?.display_name || 'Business')
-      : (getCurrentProfile()?.display_name || 'Someone');
+    // Use stored identity from the entry — never re-derive
+    const fromName    = entry.from_name || _fromName;
     const txLabel     = TX_LABELS[category] || category;
     const amtLabel    = `${currency} ${parseFloat(amount).toLocaleString()}`;
     const entryId     = entry?.id;
