@@ -512,7 +512,7 @@ async function _bsRenderDash(el) {
   // Fetch business entries — only those explicitly created in BS context
   const { data: entries } = await supabase
     .from('entries')
-    .select('*')
+    .select('id,tx_type,amount,currency,status,contact_name,created_at,metadata,settled_amount')
     .eq('business_id', bizUuid)
     .eq('context_type', 'business')
     .in('tx_type', BS_ALL_BIZ_TYPES)
@@ -889,7 +889,7 @@ async function _bsRenderInvoices(el) {
 
   const { data } = await supabase
     .from('entries')
-    .select('*')
+    .select('id,tx_type,amount,currency,status,contact_name,invoice_number,entry_number,created_at,metadata,settled_amount')
     .eq('business_id', bizUuid)
     .eq('context_type', 'business')
     .in('tx_type', BS_INVOICE_TYPES)
@@ -959,9 +959,9 @@ async function _bsRenderInvoices(el) {
         </div>`
       : `
         ${_bsBulkBar('invoices', sel.size, [
-          { label: 'Delete', onclick: 'window._bsBulkDelete("invoices")' },
-          { label: 'Archive', onclick: 'window._bsBulkArchive("invoices")' },
-          { label: 'Mark Paid', onclick: 'window._bsBulkMarkPaid("invoices")' }
+          { label: 'Delete', onclick: "window._bsBulkDelete('invoices')" },
+          { label: 'Archive', onclick: "window._bsBulkArchive('invoices')" },
+          { label: 'Mark Paid', onclick: "window._bsBulkMarkPaid('invoices')" }
         ])}
         <div class="card"><div class="tbl-wrap"><table><thead><tr>${_bsInSelectMode('invoices') ? `<th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllInv(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th>` : ''}<th>Date</th><th>Client</th><th>Ref #</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due</th><th>Status</th><th style="width:120px;">Actions</th></tr></thead><tbody>
           ${pageItems.map(e => {
@@ -983,7 +983,6 @@ async function _bsRenderInvoices(el) {
             <td>${statusBadge(e.status || 'draft')}</td>
             <td style="white-space:nowrap;" onclick="event.stopPropagation();">
               ${!isPaid ? `<button class="bs sm" onclick="window._bsRecordPayment?.('${e.id}')||window._bsBulkMarkPaid?.('invoices')" style="font-size:11px;padding:3px 8px;cursor:pointer;color:var(--green,#5fd39a);">💰 Pay</button>` : ''}
-              <button class="bs sm" onclick="window._bsDeleteEntry('${e.id}','invoices')" style="font-size:11px;padding:3px 8px;cursor:pointer;color:var(--red,#d07878);">🗑</button>
             </td>
           </tr>`}).join('')}
         </tbody></table></div></div>
@@ -1025,7 +1024,7 @@ async function _bsRenderBills(el) {
 
   const { data } = await supabase
     .from('entries')
-    .select('*')
+    .select('id,tx_type,amount,currency,status,contact_name,invoice_number,entry_number,created_at,metadata,settled_amount')
     .eq('business_id', bizUuid)
     .eq('context_type', 'business')
     .in('tx_type', BS_BILL_TYPES)
@@ -1092,9 +1091,9 @@ async function _bsRenderBills(el) {
         </div>`
       : `
         ${_bsBulkBar('bills', sel.size, [
-          { label: 'Delete', onclick: 'window._bsBulkDelete("bills")' },
-          { label: 'Archive', onclick: 'window._bsBulkArchive("bills")' },
-          { label: 'Mark Paid', onclick: 'window._bsBulkMarkPaid("bills")' }
+          { label: 'Delete', onclick: "window._bsBulkDelete('bills')" },
+          { label: 'Archive', onclick: "window._bsBulkArchive('bills')" },
+          { label: 'Mark Paid', onclick: "window._bsBulkMarkPaid('bills')" }
         ])}
         <div class="card"><div class="tbl-wrap"><table><thead><tr>${_bsInSelectMode('bills') ? `<th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllBill(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th>` : ''}<th>Date</th><th>Supplier</th><th>Ref #</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due</th><th>Status</th><th style="width:120px;">Actions</th></tr></thead><tbody>
           ${pageItems.map(e => {
@@ -1115,7 +1114,6 @@ async function _bsRenderBills(el) {
             <td>${statusBadge(e.status || 'draft')}</td>
             <td style="white-space:nowrap;" onclick="event.stopPropagation();">
               ${!isPaid ? `<button class="bs sm" onclick="window._bsRecordPayment?.('${e.id}')" style="font-size:11px;padding:3px 8px;cursor:pointer;color:var(--green,#5fd39a);">💰 Pay</button>` : ''}
-              <button class="bs sm" onclick="window._bsDeleteEntry('${e.id}','bills')" style="font-size:11px;padding:3px 8px;cursor:pointer;color:var(--red,#d07878);">🗑</button>
             </td>
           </tr>`}).join('')}
         </tbody></table></div></div>
@@ -1153,7 +1151,7 @@ async function _bsRenderClients(el) {
   // Include ALL business transaction types so any interacted contact appears as a client
   const { data: invoices } = await supabase
     .from('entries')
-    .select('contact_id, contact_name, amount, currency, status, tx_type, created_at')
+    .select('contact_id,contact_name,amount,currency,status,tx_type,created_at')
     .eq('business_id', bizUuid)
     .eq('context_type', 'business')
     .in('tx_type', [...BS_INVOICE_TYPES, ...BS_BILL_TYPES, 'owed_to_me', 'i_owe', 'they_owe_you', 'you_owe_them'])
@@ -1239,7 +1237,7 @@ async function _bsRenderClients(el) {
         </div>`
       : `
         ${_bsBulkBar('clients', sel.size, [
-          { label: 'Delete', onclick: 'window._bsBulkDeleteContact("clients")' }
+          { label: 'Delete', onclick: "window._bsBulkDeleteContact('clients')" }
         ])}
         <div class="card"><div class="tbl-wrap"><table><thead><tr>${_bsInSelectMode('clients') ? `<th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllClient(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th>` : ''}<th>Client</th><th>Contact</th><th>Invoices</th><th>Total Billed</th><th>Outstanding</th><th>Last Invoice</th><th style="width:120px;">Actions</th></tr></thead><tbody>
           ${displayClients.map(c => `<tr style="cursor:pointer;" onclick="window._bsEditContact('${c.id}')">
@@ -1252,7 +1250,6 @@ async function _bsRenderClients(el) {
             <td style="color:var(--muted);font-size:12px;">${fmtRelative(c.lastDate)}</td>
             <td style="white-space:nowrap;" onclick="event.stopPropagation();">
               <button class="bs sm" onclick="window._bsQuickAction('invoice','${c.id}')" style="font-size:11px;padding:3px 8px;cursor:pointer;">🧾 Invoice</button>
-              <button class="bs sm" onclick="window._bsDeleteContact('${c.id}','clients')" style="font-size:11px;padding:3px 8px;cursor:pointer;color:var(--red,#d07878);">🗑</button>
             </td>
           </tr>`).join('')}
         </tbody></table></div></div>
@@ -1309,7 +1306,7 @@ async function _bsRenderSuppliers(el) {
   // Fetch ALL supplier bills (received bills, bills you owe) — business only
   const { data: bills } = await supabase
     .from('entries')
-    .select('*')
+    .select('id,tx_type,amount,currency,status,contact_id,contact_name,invoice_number,entry_number,created_at,metadata,settled_amount')
     .eq('business_id', bizUuid)
     .eq('context_type', 'business')
     .in('tx_type', [...BS_BILL_TYPES, 'i_owe'])
@@ -1479,9 +1476,9 @@ async function _bsRenderSuppliers(el) {
           </div>`
         : `
           ${_bsBulkBar('suppliers-bills', billSel.size, [
-            { label: 'Delete', onclick: 'window._bsBulkDelete("suppliers-bills")' },
-            { label: 'Archive', onclick: 'window._bsBulkArchive("suppliers-bills")' },
-            { label: 'Mark Paid', onclick: 'window._bsBulkMarkPaid("suppliers-bills")' }
+            { label: 'Delete', onclick: "window._bsBulkDelete('suppliers-bills')" },
+            { label: 'Archive', onclick: "window._bsBulkArchive('suppliers-bills')" },
+            { label: 'Mark Paid', onclick: "window._bsBulkMarkPaid('suppliers-bills')" }
           ])}
           <div class="card"><div class="tbl-wrap"><table><thead><tr>${_bsInSelectMode('suppliers-bills') ? `<th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllSupBill(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th>` : ''}<th>Date</th><th>Supplier</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
             ${billsPageItems.map(e => {
@@ -1496,7 +1493,6 @@ async function _bsRenderSuppliers(el) {
               <td>${statusBadge(e.status || 'draft')}</td>
               <td style="white-space:nowrap;" onclick="event.stopPropagation();">
                 ${!isPaid ? `<button class="bs sm" onclick="window._bsRecordPayment('${e.id}')" style="font-size:11px;color:var(--green,#5fd39a);" title="Record payment">💰 Pay</button>` : ''}
-                <button onclick="window._bsDeleteEntry('${e.id}','suppliers-bills')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px;" title="Delete">🗑</button>
               </td>
             </tr>`}).join('')}
           </tbody></table></div></div>
@@ -1512,7 +1508,7 @@ async function _bsRenderSuppliers(el) {
           </div>`
         : `
           ${_bsBulkBar('suppliers-dir', supSel.size, [
-            { label: 'Delete', onclick: 'window._bsBulkDeleteContact("suppliers-dir")' }
+            { label: 'Delete', onclick: "window._bsBulkDeleteContact('suppliers-dir')" }
           ])}
           <div class="card"><div class="tbl-wrap"><table><thead><tr>${_bsInSelectMode('suppliers-dir') ? `<th style="width:36px;"><input type="checkbox" onchange="window._bsSelAllSupDir(this.checked)" style="cursor:pointer;accent-color:var(--accent);"></th>` : ''}<th>Supplier</th><th>Contact</th><th>Bills</th><th>Total Billed</th><th>Outstanding</th><th>Last Bill</th><th style="width:100px;">Actions</th></tr></thead><tbody>
             ${displaySuppliers.map(c => `<tr style="cursor:pointer;" onclick="window._bsEditContact('${c.id}')">
@@ -1525,7 +1521,6 @@ async function _bsRenderSuppliers(el) {
               <td style="color:var(--muted);font-size:12px;">${fmtRelative(c.lastDate)}</td>
               <td style="white-space:nowrap;" onclick="event.stopPropagation();">
                 <button class="bs sm" onclick="window._bsEditContact('${c.id}')" style="font-size:11px;padding:3px 8px;cursor:pointer;">✏ Edit</button>
-                <button class="bs sm" onclick="window._bsDeleteContact('${c.id}','suppliers-dir')" style="font-size:11px;padding:3px 8px;cursor:pointer;color:var(--red,#d07878);">🗑</button>
               </td>
             </tr>`).join('')}
           </tbody></table></div></div>
@@ -1989,7 +1984,6 @@ async function _bsRenderRecurring(el) {
             <td><span class="badge ${r.active ? 'badge-green' : 'badge-gray'}">${r.active ? 'Active' : 'Paused'}</span></td>
             <td style="white-space:nowrap;">
               <button class="bs sm" onclick="event.stopPropagation();window._bsToggleRecurring('${r.id}',${!r.active})" style="font-size:11px;padding:3px 8px;cursor:pointer;">${r.active ? '⏸ Pause' : '▶ Resume'}</button>
-              <button class="bs sm" onclick="event.stopPropagation();window._bsDeleteRecurring('${r.id}')" style="font-size:11px;padding:3px 8px;cursor:pointer;color:var(--red,#d07878);">🗑</button>
             </td>
           </tr>`).join('')}
         </tbody></table></div></div>`
@@ -2190,7 +2184,6 @@ async function _bsRenderPanels(el) {
               <div style="display:flex;gap:6px;margin-top:10px;">
                 <button class="bs sm" onclick="if(window._bpEngine?.openPanel)window._bpEngine.openPanel('${p.id}');" style="font-size:12px;">Open</button>
                 <button class="bs sm" onclick="if(window._bpEngine?.openEditPanelModal)window._bpEngine.openEditPanelModal('${p.id}');" style="font-size:12px;">✏ Edit</button>
-                <button class="bs sm" onclick="event.stopPropagation();window._bsDeletePanel('${p.id}','${esc(p.title)}')" style="font-size:12px;color:var(--red,#d07878);">🗑 Delete</button>
               </div>
             </div>
           `).join('')}
@@ -2344,7 +2337,6 @@ async function _bsRenderTemplates(el) {
               <div style="margin-top:12px;display:flex;gap:6px;">
                 <button class="btn btn-primary btn-sm" onclick="window._bsActiveContext=true;window._bsActiveBizId=window._getBizId?.()??'';if(window.useTemplateForEntry)window.useTemplateForEntry('${t.id}')">Use</button>
                 <button class="btn btn-secondary btn-sm" onclick="if(window.openEditTemplate)window.openEditTemplate('${t.id}')">Edit</button>
-                <button class="bs sm" onclick="event.stopPropagation();window._bsDeleteTemplate('${t.id}','${esc(t.name)}')" style="font-size:12px;color:var(--red,#d07878);cursor:pointer;">🗑</button>
               </div>
             </div>
           `).join('')}
@@ -2564,7 +2556,7 @@ async function _bsRenderInvestments(el) {
 
   const { data: investments } = await supabase
     .from('investments')
-    .select('*, members:investment_members(*), transactions:investment_transactions(*)')
+    .select('id,name,description,currency,created_at,archived_at, members:investment_members(id), transactions:investment_transactions(id)')
     .eq('user_id', user.id)
     .is('archived_at', null)
     .order('created_at', { ascending: false });
@@ -2628,7 +2620,6 @@ async function _bsRenderInvestments(el) {
               </div>
               <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
                 <div style="font-size:11px;color:var(--muted);">Created ${fmtRelative(i.created_at)}</div>
-                <button class="bs sm" onclick="event.stopPropagation();window._bsDeleteInvestment('${i.id}','${esc(i.name)}')" style="font-size:11px;color:var(--red,#d07878);cursor:pointer;">🗑 Delete</button>
               </div>
             </div>`;
           }).join('')}

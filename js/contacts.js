@@ -4,7 +4,7 @@ import { supabase } from './supabase.js';
 export async function listContacts(businessId, { archived = false } = {}) {
   let query = supabase
     .from('contacts')
-    .select('*')
+    .select('id,name,email,phone,tags,archived_at,linked_user_id,business_id')
     .eq('business_id', businessId)
     .order('name');
   if (!archived) query = query.is('archived_at', null);
