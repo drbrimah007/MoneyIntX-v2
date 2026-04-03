@@ -29,6 +29,11 @@ export async function renderContacts(el, page = 1) {
   const ledgerMap = {};
   (ledger || []).forEach(l => { ledgerMap[l.contact_id] = l; });
 
+  // Filter out business_client contacts from personal view (they live in BS Clients)
+  if (!window._bsContext?.businessId) {
+    contacts = contacts.filter(c => !(c.tags || []).includes('business_client'));
+  }
+
   // Expose contacts globally for re-renders
   window._allContacts = contacts;
   window._allLedgerMap = ledgerMap;
