@@ -117,13 +117,24 @@ export async function listArchivedRows(panelId) {
 
 /** Returns all members for a panel (owner-only query) */
 export async function listPanelMembers(panelId) {
+  // Step 1: Get panel member rows (FK points to auth.users, not public.users)
   const { data, error } = await supabase
     .from('business_panel_members')
-    .select('*, member:member_user_id(id, email, display_name)')
+    .select('*')
     .eq('panel_id', panelId)
     .order('added_at', { ascending: true });
   if (error) console.error('[listPanelMembers]', error.message);
-  return data || [];
+  if (!data || data.length === 0) return [];
+  // Step 2: Resolve user profiles from public.users
+  const memberUserIds = data.map(m => m.member_user_id).filter(Boolean);
+  const { data: users } = await supabase
+    .from('users')
+    .select('id, email, display_name')
+    .in('id', memberUserIds);
+  const userMap = {};
+  (users || []).forEach(u => { userMap[u.id] = u; });
+  // Attach resolved user profile as .member
+  return data.map(m => ({ ...m, member: userMap[m.member_user_id] || null }));
 }
 
 /** Look up a user by email (for invite flow) */
@@ -199,14 +210,23 @@ export async function listSharedPanels(userId) {
  */
 export async function listEligibleMembers(businessId, excludeUserId) {
   if (businessId) {
-    // Get business members → resolve their user profiles
+    // Step 1: Get business member user_ids (FK points to auth.users, not public.users,
+    // so PostgREST FK joins won't work — must do two-step query)
     const { data: bm, error } = await supabase
       .from('business_members')
-      .select('user_id, user:user_id(id, email, display_name)')
+      .select('user_id')
       .eq('business_id', businessId)
       .neq('user_id', excludeUserId);
     if (error) console.error('[listEligibleMembers]', error.message);
-    return (bm || []).map(r => r.user).filter(Boolean).sort((a, b) => (a.display_name || a.email || '').localeCompare(b.display_name || b.email || ''));
+    const memberIds = (bm || []).map(r => r.user_id).filter(Boolean);
+    if (memberIds.length === 0) return [];
+    // Step 2: Resolve user profiles from public.users
+    const { data: users, error: usersErr } = await supabase
+      .from('users')
+      .select('id, email, display_name')
+      .in('id', memberIds);
+    if (usersErr) console.error('[listEligibleMembers users]', usersErr.message);
+    return (users || []).sort((a, b) => (a.display_name || a.email || '').localeCompare(b.display_name || b.email || ''));
   }
   // Fallback: user's contacts that have matching user accounts (by email)
   const { data: contacts } = await supabase
