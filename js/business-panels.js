@@ -192,12 +192,39 @@ export async function listSharedPanels(userId) {
 }
 
 /** List all registered users (for member picker) */
-export async function listAllUsers(excludeUserId) {
-  const { data, error } = await supabase
+/**
+ * List users eligible to be added as ledger members.
+ * Returns business members of the same business (not all site users).
+ * Falls back to user's contacts with linked accounts if no business context.
+ */
+export async function listEligibleMembers(businessId, excludeUserId) {
+  if (businessId) {
+    // Get business members → resolve their user profiles
+    const { data: bm, error } = await supabase
+      .from('business_members')
+      .select('user_id, user:user_id(id, email, display_name)')
+      .eq('business_id', businessId)
+      .neq('user_id', excludeUserId);
+    if (error) console.error('[listEligibleMembers]', error.message);
+    return (bm || []).map(r => r.user).filter(Boolean).sort((a, b) => (a.display_name || a.email || '').localeCompare(b.display_name || b.email || ''));
+  }
+  // Fallback: user's contacts that have matching user accounts (by email)
+  const { data: contacts } = await supabase
+    .from('contacts')
+    .select('email')
+    .eq('user_id', excludeUserId)
+    .not('email', 'is', null);
+  if (!contacts || contacts.length === 0) return [];
+  const emails = contacts.map(c => c.email.toLowerCase().trim()).filter(Boolean);
+  const { data: users } = await supabase
     .from('users')
     .select('id, email, display_name')
-    .neq('id', excludeUserId)
-    .order('display_name');
-  if (error) console.error('[listAllUsers]', error.message);
-  return data || [];
+    .in('email', emails)
+    .neq('id', excludeUserId);
+  return (users || []).sort((a, b) => (a.display_name || a.email || '').localeCompare(b.display_name || b.email || ''));
+}
+
+/** @deprecated Use listEligibleMembers instead */
+export async function listAllUsers(excludeUserId) {
+  return listEligibleMembers(null, excludeUserId);
 }

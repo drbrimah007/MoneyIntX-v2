@@ -7,7 +7,7 @@ import {
   listRows, addRow, updateRow, deleteRow,
   archiveSessionRows, listArchivedRows,
   listPanelMembers, findUserByEmail, addPanelMember, updatePanelMember, removePanelMember,
-  getMyMembership, listSharedPanels, listAllUsers
+  getMyMembership, listSharedPanels, listEligibleMembers
 } from './business-panels.js';
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -2068,58 +2068,74 @@ async function _bpDeletePanel(panelId) {
 async function openMembersModal() {
   const p = _curPanel;
   if (!p) return;
-  const [members, allUsers] = await Promise.all([
+  const [members, eligibleUsers] = await Promise.all([
     listPanelMembers(p.id),
-    listAllUsers(_userId)
+    listEligibleMembers(p.business_id, _userId)
   ]);
 
+  // ── Members list (with inline edit permissions + remove) ──
   const memberRows = members.length ? members.map(m => `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
-      <div>
-        <div style="font-size:13px;font-weight:600;">${esc(m.member?.display_name || m.member?.email || '?')}</div>
-        <div style="font-size:11px;color:var(--muted);">${esc(m.member?.email || '')}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);gap:8px;">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+        <div style="width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">
+          ${esc((m.member?.display_name || m.member?.email || '?')[0].toUpperCase())}
+        </div>
+        <div style="min-width:0;">
+          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(m.member?.display_name || m.member?.email || '?')}</div>
+          <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(m.member?.email || '')}</div>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;">
-          <input type="checkbox" class="bpm-canadd" data-mid="${m.id}" ${m.can_add ? 'checked' : ''} style="width:auto;">
-          Add rows
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+        <label style="font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer;">
+          <input type="checkbox" class="bpm-canadd" data-mid="${m.id}" ${m.can_add ? 'checked' : ''} style="width:auto;"> Add
         </label>
-        <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;">
-          <input type="checkbox" class="bpm-canedit" data-mid="${m.id}" ${m.can_edit ? 'checked' : ''} style="width:auto;">
-          Edit rows
+        <label style="font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer;">
+          <input type="checkbox" class="bpm-canedit" data-mid="${m.id}" ${m.can_edit ? 'checked' : ''} style="width:auto;"> Edit
         </label>
-        <button class="bs sm" style="color:var(--red);font-size:11px;" onclick="window._bpEngine._bpmRemove('${m.id}')">✕</button>
+        <button class="bs sm" style="color:var(--red);font-size:11px;padding:2px 6px;" onclick="window._bpEngine._bpmRemove('${m.id}')" title="Remove member">✕</button>
       </div>
-    </div>`).join('') : `<p style="color:var(--muted);font-size:13px;padding:12px 0;">No members yet. Add someone below.</p>`;
+    </div>`).join('') : '';
 
   // Build existing member IDs set so we can hide them from the picker
   const existingMemberUserIds = new Set(members.map(m => m.member_user_id));
-  const availableUsers = allUsers.filter(u => !existingMemberUserIds.has(u.id));
+  const availableUsers = eligibleUsers.filter(u => !existingMemberUserIds.has(u.id));
 
   const userOptions = availableUsers.length
-    ? `<option value="">— Select a site user —</option>` + availableUsers.map(u =>
+    ? `<option value="">— Select a member —</option>` + availableUsers.map(u =>
         `<option value="${u.id}">${esc(u.display_name || u.email)} — ${esc(u.email)}</option>`).join('')
-    : `<option value="">All users are already members</option>`;
+    : `<option value="">No eligible users available</option>`;
 
   const html = `<div class="modal-bg" id="bpMembersBg" onclick="if(event.target===this)this.remove()">
     <div class="modal" style="max-width:560px;" onclick="event.stopPropagation()">
       <div class="modal-title">👥 Ledger Members — ${esc(p.title)}</div>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Members can view this ledger. Control whether they can add or edit rows.</p>
-      <div id="bpm-list">${memberRows}</div>
-      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Members can view this ledger. Control whether they can add or edit rows.</p>
+
+      <!-- Current Members -->
+      <div style="margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Current Members (${members.length})</div>
+        <div id="bpm-list" style="background:var(--bg2);border-radius:10px;border:1px solid var(--border);overflow:hidden;">
+          ${memberRows || `<p style="color:var(--muted);font-size:13px;padding:16px;text-align:center;margin:0;">No members yet. Add someone below.</p>`}
+        </div>
+        ${members.length > 0 ? `<div style="text-align:right;margin-top:8px;">
+          <button class="btn btn-primary btn-sm" onclick="window._bpEngine._bpmSaveAll()">Save Permissions</button>
+        </div>` : ''}
+      </div>
+
+      <!-- Add Member -->
+      <div style="padding-top:14px;border-top:1px solid var(--border);">
         <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">Add Member</div>
 
-        <!-- Option 1: Pick from site users -->
+        <!-- Option 1: Pick from business members -->
         <div style="margin-bottom:14px;">
-          <label style="font-size:12px;color:var(--muted);margin-bottom:6px;display:block;">From site users:</label>
+          <label style="font-size:12px;color:var(--muted);margin-bottom:6px;display:block;">From business members:</label>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <select id="bpm-user-pick" style="flex:1;min-width:0;">
               ${userOptions}
             </select>
-            <label style="font-size:12px;display:flex;align-items:center;gap:4px;white-space:nowrap;">
+            <label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap;">
               <input type="checkbox" id="bpm-canadd-pick" checked style="width:auto;"> Add rows
             </label>
-            <label style="font-size:12px;display:flex;align-items:center;gap:4px;white-space:nowrap;">
+            <label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap;">
               <input type="checkbox" id="bpm-canedit-pick" style="width:auto;"> Edit rows
             </label>
             <button class="btn btn-primary btn-sm" onclick="window._bpEngine._bpmAddByUserId('${p.id}')">Add</button>
@@ -2131,10 +2147,10 @@ async function openMembersModal() {
           <label style="font-size:12px;color:var(--muted);margin-bottom:6px;display:block;">Or by email:</label>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <input id="bpm-email" placeholder="user@example.com" style="flex:1;min-width:120px;" type="email">
-            <label style="font-size:12px;display:flex;align-items:center;gap:4px;white-space:nowrap;">
+            <label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap;">
               <input type="checkbox" id="bpm-canadd-new" checked style="width:auto;"> Add rows
             </label>
-            <label style="font-size:12px;display:flex;align-items:center;gap:4px;white-space:nowrap;">
+            <label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap;">
               <input type="checkbox" id="bpm-canedit-new" style="width:auto;"> Edit rows
             </label>
             <button class="btn btn-primary btn-sm" onclick="window._bpEngine._bpmAdd('${p.id}')">Add</button>
@@ -2144,7 +2160,6 @@ async function openMembersModal() {
       </div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;border-top:1px solid var(--border);padding-top:14px;">
         <button class="bs" onclick="document.getElementById('bpMembersBg').remove()">Close</button>
-        <button class="btn btn-primary" onclick="window._bpEngine._bpmSaveAll()">Save Permissions</button>
       </div>
     </div>
   </div>`;
