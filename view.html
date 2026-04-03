@@ -63,20 +63,6 @@ async function loadRecord() {
   const token = params.get('t');
   if (!token) { card.innerHTML = '<p style="text-align:center;color:var(--red);padding:20px;">No token provided.</p>'; return; }
 
-  // Clear any stale/broken auth state so the query runs as anon role.
-  // Without this, guests with leftover tokens get stuck in a broken auth
-  // state (neither anon nor authenticated) and the query silently fails.
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      // No valid session — force sign out to clear any stale refresh tokens
-      await supabase.auth.signOut({ scope: 'local' });
-    }
-  } catch (_) {
-    // Auth check itself failed — sign out to reset to clean anon state
-    await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
-  }
-
   // Query share_tokens only — no JOIN to entries/contacts
   // This allows anonymous (not-logged-in) users to view the record via entry_snapshot
   const { data: share, error } = await supabase
@@ -147,11 +133,17 @@ async function loadRecord() {
     ${note ? `<div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:20px;font-size:14px;">${esc(note)}</div>` : ''}
 
     <div style="display:flex;flex-direction:column;gap:10px;">
-      ${share.status !== 'confirmed' ? `<button class="btn btn-green" onclick="confirmRecord('${share.id}','${token}')">Confirm & Track</button>` : `<button class="btn btn-outline" disabled>Already Confirmed</button>`}
-      ${share.status !== 'confirmed' ? `<button class="btn btn-outline" onclick="dismissRecord('${share.id}')">Dismiss</button>` : ''}
+      ${share.status !== 'confirmed' ? `<button class="btn btn-green" id="btn-confirm">Confirm & Track</button>` : `<button class="btn btn-outline" disabled>Already Confirmed</button>`}
+      ${share.status !== 'confirmed' ? `<button class="btn btn-outline" id="btn-dismiss">Dismiss</button>` : ''}
       <a href="/" style="text-align:center;color:var(--accent);font-size:13px;margin-top:8px;">Open Money IntX →</a>
     </div>
   `;
+
+  // Attach click handlers via addEventListener (inline onclick on innerHTML doesn't fire reliably)
+  const confirmBtn = card.querySelector('#btn-confirm');
+  if (confirmBtn) confirmBtn.addEventListener('click', () => window.confirmRecord(share.id, token));
+  const dismissBtn = card.querySelector('#btn-dismiss');
+  if (dismissBtn) dismissBtn.addEventListener('click', () => window.dismissRecord(share.id));
 }
 
 window.confirmRecord = async function(shareId, shareToken) {
