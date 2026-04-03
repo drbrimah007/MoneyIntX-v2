@@ -802,7 +802,8 @@ window.saveTemplateEntry = async function(templateId, invNum, saveAs) {
       invoiceNumber: invNum, templateId, templateData: tplData,
       status: isDraft ? 'draft' : 'posted',
       metadata: _bsMeta,
-      businessId: _entryBizId
+      businessId: _entryBizId,
+      senderContext: (window._bsActiveContext && window._bsActiveBizId) ? 'business' : 'personal'
     });
   } catch (err) {
     toast('Failed to create entry: ' + (err.message || 'Unknown error'), 'error');

@@ -1203,6 +1203,7 @@ async function _bsRenderClients(el) {
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${clients.length} client${clients.length!==1?'s':''} · ${fmtMoney(totalReceivable, cur)} total receivable</p>
       </div>
       <div style="display:flex;gap:6px;">
+        <button class="btn btn-secondary btn-sm" onclick="openNewContactModal()">+ Add Client</button>
         <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('invoice')">+ Invoice Client</button>
       </div>
     </div>
