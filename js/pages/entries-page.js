@@ -643,7 +643,12 @@ window.openEditEntryModal = async function(id) {
       <div class="form-group"><label>Note</label><textarea id="ee-note" rows="2">${esc(entry.note || '')}</textarea></div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
         <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-primary btn-sm" onclick="saveEditTemplateEntry('${id}','${entry.template_id}')">Save Changes</button>
+        ${entry.status === 'draft' ? `
+          <button class="btn btn-secondary btn-sm" onclick="saveEditTemplateEntry('${id}','${entry.template_id}', true)">Save Draft</button>
+          <button class="btn btn-primary btn-sm" onclick="saveEditTemplateEntry('${id}','${entry.template_id}', false)">Create Entry</button>
+        ` : `
+          <button class="btn btn-primary btn-sm" onclick="saveEditTemplateEntry('${id}','${entry.template_id}')">Save Changes</button>
+        `}
       </div>
     `, { maxWidth: '560px' });
 
@@ -691,7 +696,12 @@ window.openEditEntryModal = async function(id) {
     <div class="form-group"><label>Note</label><textarea id="ee-note" rows="2">${esc(entry.note || '')}</textarea></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="saveEditEntry('${id}')">Save</button>
+      ${entry.status === 'draft' ? `
+        <button class="btn btn-secondary btn-sm" onclick="saveEditEntry('${id}', true)">Save Draft</button>
+        <button class="btn btn-primary btn-sm" onclick="saveEditEntry('${id}', false)">Create Entry</button>
+      ` : `
+        <button class="btn btn-primary btn-sm" onclick="saveEditEntry('${id}')">Save</button>
+      `}
     </div>
   `, { maxWidth: '480px' });
   console.log('[openEditEntryModal] edit modal opened');
@@ -701,13 +711,17 @@ window.openEditEntryModal = async function(id) {
   }
 };
 
-window.saveEditEntry = async function(id) {
+// keepDraft: true = save as draft, false = post/create, undefined = use status dropdown
+window.saveEditEntry = async function(id, keepDraft) {
+  const status = keepDraft === true ? 'draft'
+               : keepDraft === false ? 'posted'
+               : document.getElementById('ee-status').value;
   const result = await updateEntry(id, {
     contact_id: document.getElementById('ee-contact').value,
     tx_type: document.getElementById('ee-type').value,
     amount: parseFloat(document.getElementById('ee-amount').value),
     date: document.getElementById('ee-date').value,
-    status: document.getElementById('ee-status').value,
+    status,
     note: document.getElementById('ee-note').value.trim()
   });
   if (!result) {
@@ -715,14 +729,17 @@ window.saveEditEntry = async function(id) {
     return; // Keep modal open so user can retry
   }
   closeModal();
-  toast('Entry updated.', 'success');
+  toast(keepDraft === true ? 'Draft saved.' : keepDraft === false ? 'Entry created!' : 'Entry updated.', 'success');
   _navAfterAction();
 };
 
-window.saveEditTemplateEntry = async function(entryId, templateId) {
+// keepDraft: true = save as draft, false = post/create, undefined = use status dropdown
+window.saveEditTemplateEntry = async function(entryId, templateId, keepDraft) {
   const contactId = document.getElementById('ee-contact').value;
   const txType = document.getElementById('ee-type').value;
-  const status = document.getElementById('ee-status').value;
+  const status = keepDraft === true ? 'draft'
+               : keepDraft === false ? 'posted'
+               : document.getElementById('ee-status').value;
   const date = document.getElementById('ee-date').value;
   const note = document.getElementById('ee-note').value.trim();
   const currency = document.getElementById('ee-currency')?.value || window._activeTplCurrency || 'USD';
@@ -761,12 +778,16 @@ window.saveEditTemplateEntry = async function(entryId, templateId) {
   }
   if (!amount || amount <= 0) return toast('Enter an amount.', 'error');
 
-  await updateEntry(entryId, {
+  const result = await updateEntry(entryId, {
     contact_id: contactId, tx_type: txType, amount, currency,
     date, status, note, template_data: tplData
   });
+  if (!result) {
+    toast('Save failed — please try again.', 'error');
+    return;
+  }
   closeModal();
-  toast('Entry updated.', 'success');
+  toast(keepDraft === true ? 'Draft saved.' : keepDraft === false ? 'Entry created!' : 'Entry updated.', 'success');
   _navAfterAction();
 };
 
