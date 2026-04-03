@@ -3,13 +3,13 @@
 // bypassing RLS using the service role key.
 // Called by impersonateUser() in the frontend.
 
-import { createClient } from '@supabase/supabase-js';
+const { createClient } = require('@supabase/supabase-js');
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://nczneamvffmzdbeuvloo.supabase.co';
 const ANON_KEY    = process.env.SUPABASE_ANON_KEY || 'sb_publishable_fzv-ZnSvv6p-Udo8ygJN9g_VekzqguV';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type');
