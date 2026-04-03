@@ -526,6 +526,9 @@ window.useTemplateForEntry = async function(templateId) {
     </div>
   `, { maxWidth: '560px' });
 
+  // Store fields reference so saveTemplateEntry can collect field data
+  window._tplFields = fields;
+
   // Add initial paired rows
   fields.filter(f => f.type === 'paired').forEach(f => addPairedRow(f.id));
 };
@@ -725,7 +728,33 @@ window.saveTemplateEntry = async function(templateId, invNum, saveAs) {
   const currentUser = getCurrentUser();
   const contactId = document.getElementById('tfe-contact').value;
   const txType = document.getElementById('tfe-type').value;
-  const amount = parseFloat(document.getElementById('tfe-amount').value);
+
+  // For templates with calculated totals, run recalc first to ensure amount is current
+  recalcTemplateFields();
+  let amount = parseFloat(document.getElementById('tfe-amount').value);
+
+  // If amount is still empty, try pulling from the isFinalTotal computed field
+  if (!amount || amount <= 0) {
+    const tpl = window._activeTpl;
+    if (tpl?.fields) {
+      const finalField = tpl.fields.find(f => f.isFinalTotal);
+      if (finalField) {
+        const el = document.getElementById('tf-' + finalField.id);
+        if (el) amount = parseFloat(el.dataset?.computed) || 0;
+      }
+      // Fallback: sum all computed fields
+      if (!amount || amount <= 0) {
+        tpl.fields.forEach(f => {
+          const el = document.getElementById('tf-' + f.id);
+          if (el?.dataset?.computed) {
+            const v = parseFloat(el.dataset.computed) || 0;
+            if (v > amount) amount = v; // use largest computed value
+          }
+        });
+      }
+    }
+  }
+
   if (!contactId) return toast('Please search and select a contact.', 'error');
   if (!amount || amount <= 0) return toast('Enter an amount.', 'error');
 
