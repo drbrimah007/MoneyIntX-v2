@@ -1213,10 +1213,16 @@ async function _bsRenderClients(el) {
     }
   });
 
-  // Enrich with contact details
+  // Enrich with contact details + include contacts with no entries yet
   const clients = Object.entries(clientMap).map(([id, c]) => {
     const contact = contacts.find(ct => ct.id === id);
     return { id, ...c, email: contact?.email || '', phone: contact?.phone || '' };
+  });
+  // Add contacts that have no entries yet — they were added via "+ Add Client"
+  contacts.forEach(ct => {
+    if (!clientMap[ct.id]) {
+      clients.push({ id: ct.id, name: ct.name, email: ct.email || '', phone: ct.phone || '', total: 0, unpaid: 0, count: 0, lastDate: ct.created_at });
+    }
   });
   clients.sort((a,b) => b.unpaid - a.unpaid);
   const cur = getCurrentProfile()?.default_currency || 'USD';

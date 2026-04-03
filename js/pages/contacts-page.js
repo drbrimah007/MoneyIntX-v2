@@ -88,6 +88,7 @@ export async function renderContacts(el, page = 1) {
               <button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));openContactDetail('${c.id}')">👁 View</button>
               ${window._impersonating ? '' : `<button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));openEditContactModal('${c.id}')">✏️ Edit</button>
               <button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));closeModal();openNewEntryModal()">+ Entry</button>
+              ${getMyBusinessId() ? `<button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));moveContactToBs('${c.id}','${esc(c.name)}')">🏢 Move to BS</button>` : ''}
               <button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));confirmDeleteContact('${c.id}','${esc(c.name)}')" style="color:var(--red);">🗑 Delete</button>`}
             </div>
           </div>
@@ -426,6 +427,20 @@ window.saveNewContact = async function(returnCallback) {
   closeModal();
   toast('Contact added.', 'success');
   if (typeof returnCallback === 'function') { returnCallback(newContact); return; }
+  navTo('contacts');
+};
+
+window.moveContactToBs = async function(id, name) {
+  if (window._guardImpersonation?.('move contacts')) return;
+  const bizId = getMyBusinessId();
+  if (!bizId) return toast('No business found.', 'error');
+  // Update contact business_id to the user's business
+  const { error } = await supabase
+    .from('contacts')
+    .update({ business_id: bizId, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) return toast('Move failed: ' + error.message, 'error');
+  toast(`${name} moved to Business Suite.`, 'success');
   navTo('contacts');
 };
 
