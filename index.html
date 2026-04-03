@@ -1343,7 +1343,31 @@ window.printInvoice = async function(entryId) {
   if (!entry) return;
   const contact = entry.contact || {};
   const settlements = entry.settlements || [];
-  const html = generateInvoiceHTML(entry, contact, currentProfile, settlements);
+
+  // If business entry, use business profile for "From" section
+  let senderProfile = currentProfile;
+  if (entry.context_type === 'business' && entry.business_id) {
+    try {
+      const { data: biz } = await supabase.from('businesses')
+        .select('name, email, phone, address, logo_url, website')
+        .eq('id', entry.business_id).single();
+      if (biz) {
+        senderProfile = {
+          ...currentProfile,
+          company_name:    biz.name    || currentProfile?.company_name,
+          display_name:    biz.name    || currentProfile?.display_name,
+          company_email:   biz.email   || currentProfile?.company_email,
+          email:           biz.email   || currentProfile?.email,
+          company_phone:   biz.phone   || currentProfile?.company_phone,
+          phone:           biz.phone   || '',
+          company_address: biz.address || currentProfile?.company_address,
+          logo_url:        biz.logo_url || currentProfile?.logo_url
+        };
+      }
+    } catch(_) {}
+  }
+
+  const html = generateInvoiceHTML(entry, contact, senderProfile, settlements);
   openInvoiceWindow(html);
 };
 

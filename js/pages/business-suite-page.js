@@ -798,6 +798,18 @@ window._bsSaveClient = async function() {
   window._bsNavigate('bs-clients');
 };
 
+// Move personal contact → business client (add 'business_client' tag)
+window._bsMoveContactToBiz = async function(contactId, contactName) {
+  const { data: ct } = await supabase.from('contacts').select('tags').eq('id', contactId).single();
+  const tags = Array.from(new Set([...(ct?.tags || []), 'business_client']));
+  const { error } = await supabase.from('contacts')
+    .update({ tags, updated_at: new Date().toISOString() })
+    .eq('id', contactId);
+  if (error) return toast('Move failed: ' + error.message, 'error');
+  toast(`${contactName} is now a business client.`, 'success');
+  window._bsNavigate('bs-clients');
+};
+
 window._bsQuickAction = function(type) {
   window._bsActiveContext = true;
   window._bsActiveBizId = _bsDataBizId();
@@ -1260,12 +1272,14 @@ async function _bsRenderClients(el) {
   // Enrich with contact details + include contacts with no entries yet
   const clients = Object.entries(clientMap).map(([id, c]) => {
     const contact = contacts.find(ct => ct.id === id);
-    return { id, ...c, email: contact?.email || '', phone: contact?.phone || '' };
+    const tags = contact?.tags || [];
+    const isBizClient = tags.includes('business_client');
+    return { id, ...c, email: contact?.email || '', phone: contact?.phone || '', tags, isBizClient };
   });
   // Add contacts tagged as 'business_client' that have no entries yet
   contacts.forEach(ct => {
     if (!clientMap[ct.id] && (ct.tags || []).includes('business_client')) {
-      clients.push({ id: ct.id, name: ct.name, email: ct.email || '', phone: ct.phone || '', total: 0, unpaid: 0, count: 0, lastDate: ct.created_at });
+      clients.push({ id: ct.id, name: ct.name, email: ct.email || '', phone: ct.phone || '', total: 0, unpaid: 0, count: 0, lastDate: ct.created_at, tags: ct.tags || [], isBizClient: true });
     }
   });
   clients.sort((a,b) => b.unpaid - a.unpaid);
@@ -1342,7 +1356,10 @@ async function _bsRenderClients(el) {
             <td style="font-weight:700;color:${c.unpaid > 0 ? 'var(--green,#7fe0d0)' : 'var(--muted)'};">${fmtMoney(c.unpaid, cur)}</td>
             <td style="color:var(--muted);font-size:12px;">${fmtRelative(c.lastDate)}</td>
             <td style="white-space:nowrap;" onclick="event.stopPropagation();">
-              <button class="bs sm" onclick="window._bsQuickAction('invoice','${c.id}')" style="font-size:11px;padding:3px 8px;cursor:pointer;">🧾 Invoice</button>
+              ${c.isBizClient
+                ? `<button class="bs sm" onclick="window._bsQuickAction('invoice','${c.id}')" style="font-size:11px;padding:3px 8px;cursor:pointer;">🧾 Invoice</button>`
+                : `<button class="bs sm" onclick="window._bsMoveContactToBiz('${c.id}','${esc(c.name)}')" style="font-size:11px;padding:3px 8px;cursor:pointer;color:var(--accent);">→ Move from Personal</button>`
+              }
             </td>
           </tr>`).join('')}
         </tbody></table></div></div>
