@@ -1952,7 +1952,7 @@ window.openNewEntryModal = async function(defaultDirection, preselectedContactId
     <div id="ne-action-row" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">${actionRowHtml}</div>
     <div class="form-group" ${templates.length === 0 ? 'style="display:none;"' : ''}>
       <label style="color:var(--muted);">Or use a template</label>
-      <select id="ne-template" onchange="if(this.value){closeModal();useTemplateForEntry(this.value);}">
+      <select id="ne-template" onchange="var _tid=this.value;if(_tid){closeModal();useTemplateForEntry(_tid);}">
         <option value="">— Select template —</option>
         ${templates.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}
       </select>

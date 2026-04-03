@@ -812,9 +812,9 @@ async function enterApp(user) {
       });
   }
 
-  // ── Auto-claim shared record from view.html signup flow ─────────
-  // If user came from a shared link → signed up, claim the pending share token
-  // Uses SECURITY DEFINER RPC because the user can't SELECT unclaimed share_tokens via RLS
+  // ── Auto-claim & confirm shared record from view.html signup flow ─────────
+  // If user came from a shared link → signed up/logged in, claim AND auto-confirm
+  // so the record immediately appears in their ledger (no extra steps).
   try {
     const pendingClaim = localStorage.getItem('mxi_pending_claim');
     if (pendingClaim) {
@@ -823,12 +823,32 @@ async function enterApp(user) {
         p_token: pendingClaim, p_user_id: user.id
       });
       if (claimResult?.ok) {
-        console.log('[enterApp] Auto-claimed share token:', pendingClaim);
-        // Navigate to entries after app loads so user sees the pending share
-        setTimeout(() => {
-          toast('A shared record is waiting for you — check Shared With Me below.', 'success');
-          navTo('entries');
-        }, 800);
+        console.log('[enterApp] Auto-claimed share token:', pendingClaim, '→ now auto-confirming');
+        // Auto-confirm: create mirror entry so the amount loads into their account
+        try {
+          const shareId = claimResult.share_id;
+          const newEntry = await confirmShare(shareId, user.id);
+          if (newEntry) {
+            console.log('[enterApp] Auto-confirmed share → mirror entry:', newEntry.id);
+            setTimeout(() => {
+              toast('A shared record has been added to your entries!', 'success');
+              navTo('entries');
+            }, 800);
+          } else {
+            console.warn('[enterApp] confirmShare returned null — share may already exist');
+            setTimeout(() => {
+              toast('A shared record is waiting for you — check your entries.', 'success');
+              navTo('entries');
+            }, 800);
+          }
+        } catch(confirmErr) {
+          console.error('[enterApp] Auto-confirm failed:', confirmErr);
+          // Fallback: at least navigate so user can confirm manually
+          setTimeout(() => {
+            toast('A shared record is waiting — check Shared With Me.', 'success');
+            navTo('entries');
+          }, 800);
+        }
       } else {
         console.log('[enterApp] Claim result:', claimResult, claimErr?.message);
       }

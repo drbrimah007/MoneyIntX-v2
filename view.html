@@ -141,13 +141,13 @@ async function loadRecord() {
 }
 
 window.confirmRecord = async function(shareId, shareToken) {
-  // This page is for external viewers only.
-  // Registered platform users should open Money IntX and confirm via "Shared With Me".
+  const card = document.getElementById('view-card');
   const { data: { session } } = await supabase.auth.getSession();
+
   if (!session) {
-    // Store the share token so the app can auto-claim it after signup/login
+    // ── Not logged in: store token + show signup/login ──
     try { localStorage.setItem('mxi_pending_claim', shareToken); } catch(e) {}
-    document.getElementById('view-card').innerHTML = `
+    card.innerHTML = `
       <div style="text-align:center;padding:30px;">
         <img src="https://moneyinteractions.com/money.png" style="height:36px;margin-bottom:12px;" alt="Money IntX">
         <p style="font-size:18px;font-weight:700;margin-bottom:8px;">Sign up to track this record</p>
@@ -159,19 +159,54 @@ window.confirmRecord = async function(shareId, shareToken) {
     return;
   }
 
-  // Logged-in user: mark as viewed/acknowledged and redirect to app
-  await supabase.from('share_tokens')
-    .update({ status: 'sent', recipient_id: session.user.id })
-    .eq('id', shareId)
-    .eq('status', 'created'); // only update if still in created state
-
-  document.getElementById('view-card').innerHTML = `
+  // ── Logged-in user: claim + auto-confirm in one step ──
+  card.innerHTML = `
     <div style="text-align:center;padding:30px;">
-      <div style="font-size:40px;margin-bottom:12px;">✅</div>
-      <p style="font-size:18px;font-weight:700;margin-bottom:8px;">You're all set!</p>
-      <p style="font-size:14px;color:#8892a4;margin-bottom:20px;">Open Money IntX and go to <strong>Shared With Me</strong> to confirm or dismiss this record.</p>
-      <a href="/" style="display:inline-block;padding:10px 24px;background:#6c63ff;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">Open Money IntX →</a>
+      <div style="font-size:36px;margin-bottom:12px;">⏳</div>
+      <p style="font-size:16px;font-weight:600;color:var(--muted);">Adding to your account...</p>
     </div>`;
+
+  try {
+    const userId = session.user.id;
+
+    // Step 1: Claim the share token (set recipient_id)
+    await supabase.from('share_tokens')
+      .update({ status: 'sent', recipient_id: userId })
+      .eq('id', shareId);
+
+    // Step 2: Auto-confirm — create mirror entry in their ledger
+    // Import confirmShare inline since view.html doesn't have the full module
+    const { confirmShare } = await import('./js/sharing.js');
+    const newEntry = await confirmShare(shareId, userId);
+
+    if (newEntry) {
+      card.innerHTML = `
+        <div style="text-align:center;padding:30px;">
+          <div style="font-size:40px;margin-bottom:12px;">✅</div>
+          <p style="font-size:18px;font-weight:700;margin-bottom:8px;">Record added to your account!</p>
+          <p style="font-size:14px;color:#8892a4;margin-bottom:20px;">The entry has been created in your ledger. Open Money IntX to view it.</p>
+          <a href="/" style="display:inline-block;padding:10px 24px;background:#6c63ff;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">Open Money IntX →</a>
+        </div>`;
+    } else {
+      // Mirror might already exist (e.g. auto-mirror trigger)
+      card.innerHTML = `
+        <div style="text-align:center;padding:30px;">
+          <div style="font-size:40px;margin-bottom:12px;">✅</div>
+          <p style="font-size:18px;font-weight:700;margin-bottom:8px;">You're all set!</p>
+          <p style="font-size:14px;color:#8892a4;margin-bottom:20px;">This record is in your account. Open Money IntX to view it.</p>
+          <a href="/" style="display:inline-block;padding:10px 24px;background:#6c63ff;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">Open Money IntX →</a>
+        </div>`;
+    }
+  } catch(err) {
+    console.error('[confirmRecord] Error:', err);
+    card.innerHTML = `
+      <div style="text-align:center;padding:30px;">
+        <div style="font-size:40px;margin-bottom:12px;">⚠️</div>
+        <p style="font-size:16px;font-weight:600;margin-bottom:8px;">Something went wrong</p>
+        <p style="font-size:14px;color:#8892a4;margin-bottom:20px;">Please open Money IntX and check <strong>Shared With Me</strong> to confirm this record.</p>
+        <a href="/" style="display:inline-block;padding:10px 24px;background:#6c63ff;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">Open Money IntX →</a>
+      </div>`;
+  }
 };
 
 window.dismissRecord = async function(shareId) {

@@ -450,10 +450,12 @@ window.doSaveTemplate = async function(id) {
 
 // ── Use Template for Entry ────────────────────────────────────────
 window.useTemplateForEntry = async function(templateId) {
+  console.log('[useTemplateForEntry] Loading template:', templateId);
   const currentUser = getCurrentUser();
   const currentProfile = getCurrentProfile();
   const tpl = await supabase.from('templates').select('*').eq('id', templateId).single();
-  if (!tpl.data) return;
+  if (!tpl.data) { console.error('[useTemplateForEntry] Template not found for id:', templateId); return; }
+  console.log('[useTemplateForEntry] Loaded:', tpl.data.name, '(id:', tpl.data.id, ')');
   const t = tpl.data;
   // Store for calculator engine
   window._activeTpl = t;
