@@ -27,10 +27,12 @@ function _cacheSet(key, data) { _cache[key] = { ts: Date.now(), data }; }
 export function invalidateEntryCache(userId) { delete _cache['entries_' + userId]; }
 
 // ── List entries ──────────────────────────────────────────────────
-export async function listEntries(userId, { status, txType, contactId, limit, offset = 0, orderBy = 'updated_at', ascending = false } = {}) {
+// businessId: pass a UUID to scope to that business, pass 'personal' to
+// get only personal-context entries, or omit/null for backwards compat (all).
+export async function listEntries(userId, { status, txType, contactId, limit, offset = 0, orderBy = 'updated_at', ascending = false, businessId } = {}) {
   // For full list (no filters, no explicit limit), use cache
   const useCache = !status && !txType && !contactId && !limit && !offset;
-  const cacheKey = 'entries_' + userId;
+  const cacheKey = 'entries_' + userId + (businessId ? '_biz_' + businessId : '');
   if (useCache) {
     const cached = _cacheGet(cacheKey);
     if (cached) return cached;
@@ -42,6 +44,15 @@ export async function listEntries(userId, { status, txType, contactId, limit, of
     .eq('user_id', userId)
     .is('archived_at', null)
     .order(orderBy, { ascending });
+
+  // ── Business scope filter ──
+  // Uses context_type (frozen at creation) because createEntry always sets
+  // business_id even for personal entries (it's a required workspace column).
+  if (businessId === 'personal') {
+    query = query.eq('context_type', 'personal');
+  } else if (businessId) {
+    query = query.eq('context_type', 'business').eq('business_id', businessId);
+  }
 
   if (status) query = query.eq('status', status);
   if (txType) query = query.eq('tx_type', txType);
@@ -57,17 +68,25 @@ export async function listEntries(userId, { status, txType, contactId, limit, of
 }
 
 // ── Recent entries (dashboard) — uses cache when available ────────
-export async function recentEntries(userId, limit = 15) {
+// businessId: same as listEntries — 'personal' for personal-only
+export async function recentEntries(userId, limit = 15, businessId) {
   // Reuse full entry cache if available (avoid duplicate query)
-  const all = _cacheGet('entries_' + userId);
+  const ck = 'entries_' + userId + (businessId ? '_biz_' + businessId : '');
+  const all = _cacheGet(ck);
   if (all) return all.slice(0, limit);
-  const { data, error } = await supabase
+  let query = supabase
     .from('entries')
     .select('*, contact:contacts(id, name, email, linked_user_id)')
     .eq('user_id', userId)
     .is('archived_at', null)
     .order('created_at', { ascending: false })
     .limit(limit);
+  if (businessId === 'personal') {
+    query = query.eq('context_type', 'personal');
+  } else if (businessId) {
+    query = query.eq('context_type', 'business').eq('business_id', businessId);
+  }
+  const { data, error } = await query;
   if (error) console.error('[recentEntries]', error.message);
   return data || [];
 }

@@ -48,13 +48,11 @@ export async function renderDash(el) {
     let pendingShares;
     [totals, recent, contacts, unread, pendingShares] = await Promise.all([
       getDashboardTotals(currentUser.id),
-      recentEntries(currentUser.id, 15),
+      recentEntries(currentUser.id, 15, 'personal'),
       listContacts(getMyBusinessId()),
       getUnreadCount(currentUser.id),
       listReceivedShares(currentUser.id).catch(() => [])
     ]);
-    // Exclude Business Suite entries from personal dashboard
-    recent = (recent || []).filter(e => !e.metadata?.business_id);
     // Cache contacts for entry modal
     window._allContacts = contacts;
     [ledger, currencyRows] = await Promise.all([

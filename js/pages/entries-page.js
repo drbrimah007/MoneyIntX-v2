@@ -67,7 +67,8 @@ export async function renderEntries(el, page, forceRefresh) {
       } else {
         const currentUser = getCurrentUser();
         const promises = [];
-        promises.push(needEntries ? listEntries(currentUser.id) : Promise.resolve(null));
+        // Scope to personal entries only (no business_id) — BS has its own entry views
+        promises.push(needEntries ? listEntries(currentUser.id, { businessId: 'personal' }) : Promise.resolve(null));
         promises.push(needShares  ? listReceivedShares(currentUser.id).catch(() => []) : Promise.resolve(null));
         const [entriesResult, sharesResult] = await Promise.all(promises);
         if (entriesResult !== null) _entriesAll = _dedupById(entriesResult);
@@ -701,7 +702,7 @@ window.openEditEntryModal = async function(id) {
 };
 
 window.saveEditEntry = async function(id) {
-  await updateEntry(id, {
+  const result = await updateEntry(id, {
     contact_id: document.getElementById('ee-contact').value,
     tx_type: document.getElementById('ee-type').value,
     amount: parseFloat(document.getElementById('ee-amount').value),
@@ -709,6 +710,10 @@ window.saveEditEntry = async function(id) {
     status: document.getElementById('ee-status').value,
     note: document.getElementById('ee-note').value.trim()
   });
+  if (!result) {
+    toast('Save failed — please try again.', 'error');
+    return; // Keep modal open so user can retry
+  }
   closeModal();
   toast('Entry updated.', 'success');
   _navAfterAction();
