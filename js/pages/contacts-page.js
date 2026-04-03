@@ -434,10 +434,13 @@ window.moveContactToBs = async function(id, name) {
   if (window._guardImpersonation?.('move contacts')) return;
   const bizId = getMyBusinessId();
   if (!bizId) return toast('No business found.', 'error');
-  // Update contact business_id to the user's business
+  // Get current contact to merge tags
+  const { data: ct } = await supabase.from('contacts').select('tags').eq('id', id).single();
+  const tags = Array.from(new Set([...(ct?.tags || []), 'business_client']));
+  // Update contact: set business_id and add business_client tag
   const { error } = await supabase
     .from('contacts')
-    .update({ business_id: bizId, updated_at: new Date().toISOString() })
+    .update({ business_id: bizId, tags, updated_at: new Date().toISOString() })
     .eq('id', id);
   if (error) return toast('Move failed: ' + error.message, 'error');
   toast(`${name} moved to Business Suite.`, 'success');

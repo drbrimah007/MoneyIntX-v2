@@ -754,6 +754,50 @@ function _bsTxLabel(type) {
 
 // Quick action — opens new entry modal with business presets
 // Sets _bsActiveContext so saveNewEntry knows to return to BS (not personal entries)
+// ── Add Client from BS — tags contact as business_client ──
+window._bsAddClient = function() {
+  openModal(`
+    <h3 style="margin-bottom:16px;">Add Business Client</h3>
+    <div class="form-group"><label>Name *</label><input type="text" id="nc-name" placeholder="Client name"></div>
+    <div class="form-group"><label>Email</label><input type="email" id="nc-email" placeholder="email@example.com"></div>
+    <div class="form-group"><label>Phone</label><input type="tel" id="nc-phone" placeholder="+1 555 000 0000"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('modal')?.remove()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="window._bsSaveClient()">Save</button>
+    </div>
+  `);
+};
+
+window._bsSaveClient = async function() {
+  const currentUser = getCurrentUser();
+  const bizUuid = _bsBusinessId();
+  const name = document.getElementById('nc-name').value.trim();
+  const email = document.getElementById('nc-email').value.trim().toLowerCase();
+  if (!name) return toast('Name is required.', 'error');
+  // Check duplicate email in this business
+  if (email) {
+    const { data: dup } = await supabase.from('contacts')
+      .select('id,name').eq('business_id', bizUuid).eq('email', email).maybeSingle();
+    if (dup) return toast(`Email already used by "${dup.name}".`, 'error');
+  }
+  const { data: newContact, error } = await supabase
+    .from('contacts')
+    .insert({
+      business_id: bizUuid,
+      user_id:     currentUser.id,
+      name,
+      email:       email || '',
+      phone:       document.getElementById('nc-phone').value.trim() || '',
+      tags:        ['business_client']
+    })
+    .select()
+    .single();
+  if (error) return toast('Failed: ' + error.message, 'error');
+  closeModal();
+  toast('Client added.', 'success');
+  window._bsNavigate('bs-clients');
+};
+
 window._bsQuickAction = function(type) {
   window._bsActiveContext = true;
   window._bsActiveBizId = _bsDataBizId();
@@ -1218,9 +1262,9 @@ async function _bsRenderClients(el) {
     const contact = contacts.find(ct => ct.id === id);
     return { id, ...c, email: contact?.email || '', phone: contact?.phone || '' };
   });
-  // Add contacts that have no entries yet — they were added via "+ Add Client"
+  // Add contacts tagged as 'business_client' that have no entries yet
   contacts.forEach(ct => {
-    if (!clientMap[ct.id]) {
+    if (!clientMap[ct.id] && (ct.tags || []).includes('business_client')) {
       clients.push({ id: ct.id, name: ct.name, email: ct.email || '', phone: ct.phone || '', total: 0, unpaid: 0, count: 0, lastDate: ct.created_at });
     }
   });
@@ -1251,7 +1295,7 @@ async function _bsRenderClients(el) {
         <p style="color:var(--muted);font-size:13px;margin-top:2px;">${clients.length} client${clients.length!==1?'s':''} · ${fmtMoney(totalReceivable, cur)} total receivable</p>
       </div>
       <div style="display:flex;gap:6px;">
-        <button class="btn btn-secondary btn-sm" onclick="openNewContactModal()">+ Add Client</button>
+        <button class="btn btn-secondary btn-sm" onclick="window._bsAddClient()">+ Add Client</button>
         <button class="btn btn-primary btn-sm" onclick="window._bsQuickAction('invoice')">+ Invoice Client</button>
       </div>
     </div>
