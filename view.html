@@ -63,6 +63,20 @@ async function loadRecord() {
   const token = params.get('t');
   if (!token) { card.innerHTML = '<p style="text-align:center;color:var(--red);padding:20px;">No token provided.</p>'; return; }
 
+  // Clear any stale/broken auth state so the query runs as anon role.
+  // Without this, guests with leftover tokens get stuck in a broken auth
+  // state (neither anon nor authenticated) and the query silently fails.
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      // No valid session — force sign out to clear any stale refresh tokens
+      await supabase.auth.signOut({ scope: 'local' });
+    }
+  } catch (_) {
+    // Auth check itself failed — sign out to reset to clean anon state
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+  }
+
   // Query share_tokens only — no JOIN to entries/contacts
   // This allows anonymous (not-logged-in) users to view the record via entry_snapshot
   const { data: share, error } = await supabase
