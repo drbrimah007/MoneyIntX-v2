@@ -166,6 +166,14 @@ export async function createEntry(userId, {
   if (templateId && templateData && Object.keys(templateData).length > 0) insertPayload.template_data = templateData;
   if (metadata) insertPayload.metadata = metadata;
 
+  // Resolve contact_name so it's always stored on the entry (denormalized for display)
+  if (contactId) {
+    try {
+      const { data: cRow } = await supabase.from('contacts').select('name').eq('id', contactId).single();
+      if (cRow?.name) insertPayload.contact_name = cRow.name;
+    } catch(_) {}
+  }
+
   const { data, error } = await supabase
     .from('entries')
     .insert(insertPayload)

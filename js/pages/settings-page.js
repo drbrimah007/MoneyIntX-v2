@@ -206,12 +206,14 @@ async function renderSettings(el) {
       if (tipRow?.value && Array.isArray(tipRow.value)) currentTips = tipRow.value;
     } catch(_) {}
 
-    // Load current site logo from app_settings
+    // Load current site logo from app_settings → user profile fallbacks
     let currentSiteLogo = '';
     try {
       const { data: logoRow } = await supabase.from('app_settings').select('value').eq('key','site_logo').maybeSingle();
       if (logoRow?.value) currentSiteLogo = logoRow.value;
     } catch(_) {}
+    if (!currentSiteLogo && p.site_logo_url) currentSiteLogo = p.site_logo_url;
+    if (!currentSiteLogo && p.logo_url) currentSiteLogo = p.logo_url;
 
     html += `<div class="card" style="margin-top:12px;border-color:rgba(251,191,36,.3);">
       <h3 style="font-size:16px;font-weight:700;margin-bottom:4px;">🛠 Admin: Platform Branding</h3>

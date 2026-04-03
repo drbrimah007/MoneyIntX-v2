@@ -141,6 +141,10 @@ window.setBsContext = function(wsData) {
     ownerLogo: wsData.business_logo || null,
     ownerBizId: _getBizDisplayId(wsData.business_id),
     businessCurrency: wsData.business_currency || 'USD',
+    businessEmail: wsData.business_email || '',
+    businessPhone: wsData.business_phone || '',
+    businessWebsite: wsData.business_website || '',
+    businessAddress: wsData.business_address || '',
     role: wsData.role || 'owner',
     permissions: wsData.permissions || {},
     scopes: wsData.scopes || {},
@@ -512,7 +516,7 @@ async function _bsRenderDash(el) {
   // Fetch business entries — only those explicitly created in BS context
   const { data: entries } = await supabase
     .from('entries')
-    .select('id,tx_type,amount,currency,status,contact_name,created_at,metadata,settled_amount')
+    .select('id,tx_type,amount,currency,status,contact_name,contact_id,created_at,metadata,settled_amount,reminder_count,contact:contacts(name)')
     .eq('business_id', bizUuid)
     .eq('context_type', 'business')
     .in('tx_type', BS_ALL_BIZ_TYPES)
@@ -520,7 +524,11 @@ async function _bsRenderDash(el) {
     .order('created_at', { ascending: false })
     .limit(50);
 
-  const biz = entries || [];
+  // Resolve display name from join, falling back to stored contact_name
+  const biz = (entries || []).map(e => ({
+    ...e,
+    contact_name: e.contact?.name || e.contact_name || e.metadata?.client_name || e.metadata?.supplier_name || ''
+  }));
   const invoicesSent = biz.filter(e => BS_INVOICE_TYPES.includes(e.tx_type));
   const billsSent = biz.filter(e => BS_BILL_TYPES.includes(e.tx_type));
   const totalOutstanding = invoicesSent
@@ -675,7 +683,10 @@ async function _bsRenderDash(el) {
       </div>` : '';
     })()}
 
-    <h3 style="font-size:16px;font-weight:700;margin-bottom:12px;">Recent Business Activity</h3>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h3 style="font-size:16px;font-weight:700;margin:0;">Recent Business Activity</h3>
+      <a onclick="window._bsNavigate('bs-invoices')" style="font-size:13px;cursor:pointer;color:var(--accent);font-weight:600;">View all →</a>
+    </div>
     ${biz.length === 0
       ? `<div class="card" style="text-align:center;padding:40px;">
           <div style="font-size:40px;margin-bottom:12px;">📊</div>
@@ -692,7 +703,7 @@ async function _bsRenderDash(el) {
             <td><span style="color:${TX_COLORS[e.tx_type]||'var(--text)'};font-weight:600;font-size:13px;">${esc(_bsTxLabel(e.tx_type))}</span></td>
             <td style="font-weight:600;font-size:13px;">${esc(e.contact_name || '—')}</td>
             <td style="font-weight:700;">${fmtMoney(e.amount, e.currency)}</td>
-            <td>${statusBadge(e.status || 'draft')}</td>
+            <td>${statusBadge(e.status || 'draft')}${e.reminder_count > 0 ? `<span class="badge badge-red" style="margin-left:4px;">🚩${e.reminder_count}</span>` : ''}</td>
           </tr>`).join('')}
         </tbody></table></div></div>`
     }
@@ -889,14 +900,18 @@ async function _bsRenderInvoices(el) {
 
   const { data } = await supabase
     .from('entries')
-    .select('id,tx_type,amount,currency,status,contact_name,invoice_number,entry_number,created_at,metadata,settled_amount')
+    .select('id,tx_type,amount,currency,status,contact_name,contact_id,invoice_number,entry_number,created_at,metadata,settled_amount,reminder_count,contact:contacts(name)')
     .eq('business_id', bizUuid)
     .eq('context_type', 'business')
     .in('tx_type', BS_INVOICE_TYPES)
     .is('archived_at', null)
     .order('created_at', { ascending: false });
 
-  const inv = data || [];
+  // Resolve display name: prefer contact join, fall back to contact_name column
+  const inv = (data || []).map(e => ({
+    ...e,
+    contact_name: e.contact?.name || e.contact_name || e.metadata?.client_name || ''
+  }));
   const unpaid = inv.filter(e => e.status !== 'settled' && e.status !== 'voided');
   const overdue = unpaid.filter(e => e.metadata?.due_date && new Date(e.metadata.due_date) < new Date());
   const totalUnpaid = unpaid.filter(e => (e.currency||'USD') === cur).reduce((s,e) => s+(e.amount||0), 0);
@@ -980,7 +995,7 @@ async function _bsRenderInvoices(el) {
             <td style="font-size:13px;font-weight:600;color:${remaining > 0 && !isPaid ? 'var(--text)' : 'var(--muted-2)'};">${isPaid ? '0' : fmtMoney(remaining, e.currency)}</td>
             <td style="color:${isOverdue?'var(--red,#d07878)':'var(--muted)'};font-size:13px;font-weight:${isOverdue?'600':'400'};">${fmtDate(e.metadata?.due_date)}${isOverdue?' ⚠':''}
             </td>
-            <td>${statusBadge(e.status || 'draft')}</td>
+            <td>${statusBadge(e.status || 'draft')}${e.reminder_count > 0 ? `<span class="badge badge-red" style="margin-left:4px;">🚩${e.reminder_count}</span>` : ''}</td>
             <td style="white-space:nowrap;" onclick="event.stopPropagation();">
               ${!isPaid ? `<button class="bs sm" onclick="window._bsRecordPayment?.('${e.id}')||window._bsBulkMarkPaid?.('invoices')" style="font-size:11px;padding:3px 8px;cursor:pointer;color:var(--green,#5fd39a);">💰 Pay</button>` : ''}
             </td>
@@ -1024,14 +1039,17 @@ async function _bsRenderBills(el) {
 
   const { data } = await supabase
     .from('entries')
-    .select('id,tx_type,amount,currency,status,contact_name,invoice_number,entry_number,created_at,metadata,settled_amount')
+    .select('id,tx_type,amount,currency,status,contact_name,contact_id,invoice_number,entry_number,created_at,metadata,settled_amount,reminder_count,contact:contacts(name)')
     .eq('business_id', bizUuid)
     .eq('context_type', 'business')
     .in('tx_type', BS_BILL_TYPES)
     .is('archived_at', null)
     .order('created_at', { ascending: false });
 
-  const bills = data || [];
+  const bills = (data || []).map(e => ({
+    ...e,
+    contact_name: e.contact?.name || e.contact_name || e.metadata?.supplier_name || ''
+  }));
   const unpaid = bills.filter(e => e.status !== 'settled' && e.status !== 'voided');
   const overdue = unpaid.filter(e => e.metadata?.due_date && new Date(e.metadata.due_date) < new Date());
   const totalUnpaid = unpaid.filter(e => (e.currency||'USD') === cur).reduce((s,e) => s+(e.amount||0), 0);
@@ -1111,7 +1129,7 @@ async function _bsRenderBills(el) {
             <td style="font-size:13px;color:${settled > 0 ? 'var(--green,#6ec77a)' : 'var(--muted-2)'};">${settled > 0 ? fmtMoney(settled, e.currency) : '—'}</td>
             <td style="font-size:13px;font-weight:600;color:${remaining > 0 && !isPaid ? 'var(--text)' : 'var(--muted-2)'};">${isPaid ? '0' : fmtMoney(remaining, e.currency)}</td>
             <td style="color:${isOverdue?'var(--red,#d07878)':'var(--muted)'};font-size:13px;font-weight:${isOverdue?'600':'400'};">${fmtDate(e.metadata?.due_date)}${isOverdue?' ⚠':''}</td>
-            <td>${statusBadge(e.status || 'draft')}</td>
+            <td>${statusBadge(e.status || 'draft')}${e.reminder_count > 0 ? `<span class="badge badge-red" style="margin-left:4px;">🚩${e.reminder_count}</span>` : ''}</td>
             <td style="white-space:nowrap;" onclick="event.stopPropagation();">
               ${!isPaid ? `<button class="bs sm" onclick="window._bsRecordPayment?.('${e.id}')" style="font-size:11px;padding:3px 8px;cursor:pointer;color:var(--green,#5fd39a);">💰 Pay</button>` : ''}
             </td>
@@ -2763,8 +2781,19 @@ window._bsCopyPanel = async function(panelId) {
 // SECTION: Branding — Invoice customization & business identity
 // ══════════════════════════════════════════════════════════════════
 function _bsRenderBranding(el) {
-  const p = getCurrentProfile() || {};
-  const bizId = window._bsContext?.ownerBizId || 'BIZ-000000';
+  // Read branding from the business context (businesses table), NOT user profile
+  const ctx = window._bsContext || {};
+  const p = {
+    logo_url:         ctx.ownerLogo || '',
+    company_name:     ctx.ownerName || '',
+    company_email:    ctx.businessEmail || '',
+    company_phone:    ctx.businessPhone || '',
+    company_website:  ctx.businessWebsite || '',
+    company_address:  ctx.businessAddress || '',
+    default_currency: ctx.businessCurrency || 'USD',
+    display_name:     ctx.ownerName || ''
+  };
+  const bizId = ctx.ownerBizId || 'BIZ-000000';
 
   el.innerHTML = `
     <div style="margin-bottom:24px;">
@@ -2900,25 +2929,41 @@ window._bsUploadLogo = async function(input) {
 };
 
 window._bsSaveBranding = async function() {
-  const uid = getCurrentUser().id;
-  const updates = {
-    logo_url:         (document.getElementById('bs-brand-logo-url')?.value || '').trim(),
-    company_name:     (document.getElementById('bs-brand-name')?.value || '').trim(),
-    company_email:    (document.getElementById('bs-brand-email')?.value || '').trim(),
-    company_phone:    (document.getElementById('bs-brand-phone')?.value || '').trim(),
-    company_website:  (document.getElementById('bs-brand-website')?.value || '').trim(),
-    company_address:  (document.getElementById('bs-brand-addr')?.value || '').trim(),
-    default_currency: (document.getElementById('bs-brand-currency')?.value || 'USD'),
+  const bizId = window._bsContext?.businessId;
+  if (!bizId) { toast('No active business', 'error'); return; }
+
+  const logoUrl    = (document.getElementById('bs-brand-logo-url')?.value || '').trim();
+  const name       = (document.getElementById('bs-brand-name')?.value || '').trim();
+  const email      = (document.getElementById('bs-brand-email')?.value || '').trim();
+  const phone      = (document.getElementById('bs-brand-phone')?.value || '').trim();
+  const website    = (document.getElementById('bs-brand-website')?.value || '').trim();
+  const address    = (document.getElementById('bs-brand-addr')?.value || '').trim();
+  const currency   = (document.getElementById('bs-brand-currency')?.value || 'USD');
+
+  // Save to the businesses table (the source of truth for BS branding)
+  const { error } = await supabase.from('businesses').update({
+    logo_url:         logoUrl,
+    name:             name,
+    email:            email,
+    phone:            phone,
+    website:          website,
+    address:          address,
+    default_currency: currency,
     updated_at:       new Date().toISOString()
-  };
-  const { error } = await supabase.from('users').update(updates).eq('id', uid);
+  }).eq('id', bizId);
   if (error) { toast('Failed to save: ' + error.message, 'error'); return; }
-  // Refresh profile in state
-  const { data: fresh } = await supabase.from('users').select('*').eq('id', uid).single();
-  if (fresh) {
-    const { setCurrentProfile } = await import('./state.js');
-    setCurrentProfile(fresh);
+
+  // Update in-memory BS context so re-render shows new values immediately
+  if (window._bsContext) {
+    window._bsContext.ownerName       = name || 'Business Suite';
+    window._bsContext.ownerLogo       = logoUrl || null;
+    window._bsContext.businessEmail   = email;
+    window._bsContext.businessPhone   = phone;
+    window._bsContext.businessWebsite = website;
+    window._bsContext.businessAddress = address;
+    window._bsContext.businessCurrency = currency;
   }
+
   toast('Branding saved', 'success');
   // Re-render to show updated preview
   _bsRenderBranding(document.getElementById('bs-content'));
@@ -2926,7 +2971,7 @@ window._bsSaveBranding = async function() {
   const hdr = document.querySelector('.bs-sidebar-header');
   if (hdr) {
     hdr.innerHTML = `
-      <div style="font-size:18px;font-weight:800;letter-spacing:-.02em;color:var(--text);">${esc(updates.company_name || 'Business Suite')}</div>
+      <div style="font-size:18px;font-weight:800;letter-spacing:-.02em;color:var(--text);">${esc(name || 'Business Suite')}</div>
       <div style="font-size:11px;color:var(--muted);margin-top:2px;">${window._bsContext?.ownerBizId || 'BIZ-000000'}</div>
     `;
   }
@@ -3079,10 +3124,10 @@ async function _bsRenderOperatives(el) {
 window._bsAddOperative = function() {
   openModal(`
     <div class="modal-title">Add Operative</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Search for an existing Money IntX member by name or email. They must already have an account on the platform.</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Search your contacts or enter an exact email to invite a team member. They must already have an account on the platform.</p>
     <div class="form-group">
       <label>Search Member *</label>
-      <input type="text" id="bs-op-search" placeholder="Search by name or email…" autocomplete="off" style="width:100%;"
+      <input type="text" id="bs-op-search" placeholder="Search contacts or enter email…" autocomplete="off" style="width:100%;"
         oninput="window._bsSearchMembers(this.value)">
       <div id="bs-op-search-results" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:4px;display:none;"></div>
       <input type="hidden" id="bs-op-user-id" value="">
@@ -3115,21 +3160,46 @@ window._bsAddOperative = function() {
 window._bsSearchMembers = async function(query) {
   const resultsEl = document.getElementById('bs-op-search-results');
   if (!resultsEl) return;
-  if (!query || query.length < 2) { resultsEl.style.display = 'none'; return; }
+  if (!query || query.length < 3) { resultsEl.style.display = 'none'; return; }
 
-  // Search users by display_name or email
-  const { data } = await supabase
-    .from('users')
-    .select('id, display_name, email, avatar_url')
-    .or(`display_name.ilike.%${query}%,email.ilike.%${query}%`)
-    .neq('id', getCurrentUser().id)
-    .limit(10);
+  // Only search among the owner's own contacts who have linked_user_id (platform users)
+  // This prevents exposing all platform users to any business owner
+  const bizOwnerId = window._bsContext?.ownerId || getCurrentUser().id;
+  const { data: contactUsers } = await supabase
+    .from('contacts')
+    .select('linked_user_id')
+    .eq('user_id', bizOwnerId)
+    .not('linked_user_id', 'is', null);
+  const linkedIds = (contactUsers || []).map(c => c.linked_user_id).filter(Boolean);
 
-  const users = data || [];
+  // Also search by exact email match (for inviting users not yet in contacts)
+  const isEmail = query.includes('@');
+  let users = [];
+  if (linkedIds.length > 0) {
+    const { data } = await supabase
+      .from('users')
+      .select('id, display_name, email, avatar_url')
+      .in('id', linkedIds)
+      .or(`display_name.ilike.%${query}%,email.ilike.%${query}%`)
+      .neq('id', getCurrentUser().id)
+      .limit(10);
+    users = data || [];
+  }
+  // If searching by email and no match found in contacts, allow exact email lookup
+  if (isEmail && users.length === 0) {
+    const { data } = await supabase
+      .from('users')
+      .select('id, display_name, email, avatar_url')
+      .ilike('email', query.trim())
+      .neq('id', getCurrentUser().id)
+      .limit(5);
+    users = data || [];
+  }
+
   const existingIds = new Set(_bsMembersCache.filter(o => o.user_id).map(o => o.user_id));
 
   if (users.length === 0) {
-    resultsEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--muted);font-size:12px;">No members found. They must have a Money IntX account first.</div>';
+    resultsEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--muted);font-size:12px;">No match found. Try entering their full email address, or add them as a contact first.</div>';
     resultsEl.style.display = 'block';
     return;
   }

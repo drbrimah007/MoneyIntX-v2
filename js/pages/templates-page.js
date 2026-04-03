@@ -108,6 +108,8 @@ function _tplFmt(val, currency) {
   const sym = CURRENCY_SYMBOLS[currency] || currency || '$';
   return sym + Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+// Expose globally so entries-page can use it when editing template-based drafts
+window._tplFmt = _tplFmt;
 function currencySelectHtml(selected) {
   return CURRENCIES.map(c => `<option value="${c}" ${(selected||'USD')===c?'selected':''}>${c}</option>`).join('');
 }

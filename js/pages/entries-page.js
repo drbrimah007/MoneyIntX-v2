@@ -12,6 +12,22 @@ import { supabase } from '../supabase.js';
 import { sendNotificationEmail } from '../email.js';
 import { renderDash } from './dashboard.js';
 
+// ── Template helpers (shared with templates-page.js) ─────────────
+// These are defined locally in templates-page.js but also needed here
+// for editing template-based entries. We define fallbacks + local aliases.
+const _CURRENCIES = ['USD','EUR','GBP','NGN','CAD','AUD','JPY','KES','ZAR','GHS','INR','CNY','BRL','MXN','AED','SAR','QAR','KWD','EGP','MAD','TZS','UGX','ETB','XOF'];
+const _CURRENCY_SYMBOLS = { USD:'$', EUR:'€', GBP:'£', NGN:'₦', CAD:'C$', AUD:'A$', JPY:'¥', KES:'KSh', ZAR:'R', GHS:'₵', INR:'₹', CNY:'¥', BRL:'R$', MXN:'$', AED:'د.إ', SAR:'﷼', QAR:'﷼', KWD:'د.ك', EGP:'E£', MAD:'MAD', TZS:'TSh', UGX:'USh', ETB:'Br', XOF:'CFA' };
+
+function _tplFmt(val, currency) {
+  const sym = _CURRENCY_SYMBOLS[currency] || currency || '$';
+  return sym + Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+window._tplFmt = _tplFmt; // expose globally too
+
+function currencySelectHtml(selected) {
+  return _CURRENCIES.map(c => `<option value="${c}" ${(selected||'USD')===c?'selected':''}>${c}</option>`).join('');
+}
+
 let _entriesAll = [];
 let _pendingSharesAll = null; // null = not yet loaded; [] = loaded but empty
 let _entriesPage = 1;
@@ -429,7 +445,9 @@ window.openEntryDetail = async function(id, options) {
         ${['invoice_sent','bill_sent','invoice','bill'].includes(_ecat) && !isTerminal ? `<button class="bs sm" onclick="closeModal();openNotifyInvoiceModal('${entry.id}')" style="color:#60a5fa;">✉️ Email</button>` : ''}
         <button class="bs sm" onclick="printInvoice('${entry.id}')">Print</button>
         <button class="bs sm" onclick="duplicateEntry('${entry.id}');closeModal();">Duplicate</button>
-        ${(!entry.metadata?.moved_from_personal && (!window.getSession || entry.business_id === window.getSession().businessId)) ? `<button class="bs sm" onclick="migrateEntryToBS('${entry.id}');closeModal();" style="color:var(--accent);">→ Move to BS</button>` : `<button class="bs sm" onclick="migrateEntryToPersonal('${entry.id}');closeModal();" style="color:var(--accent);">← Move to Personal</button>`}
+        ${entry.context_type === 'business'
+          ? `<button class="bs sm" onclick="migrateEntryToPersonal('${entry.id}');closeModal();" style="color:var(--accent);">← Move to Personal</button>`
+          : `<button class="bs sm" onclick="migrateEntryToBS('${entry.id}');closeModal();" style="color:var(--accent);">→ Move to BS</button>`}
         <button class="bs sm" onclick="toggleNoLedger('${entry.id}',${!entry.no_ledger});closeModal();">${entry.no_ledger ? 'Restore Ledger' : 'Rm Ledger'}</button>
         <button class="bs sm" onclick="handleVoidEntry('${entry.id}');closeModal();" style="color:var(--amber);">Void</button>
         <button class="bs sm" onclick="confirmDeleteEntry('${entry.id}');closeModal();" style="color:var(--red);">Delete</button>
@@ -672,12 +690,12 @@ window.openEditEntryModal = async function(id) {
           container.appendChild(row);
         });
       } else {
-        addPairedRow(f.id);
+        window.addPairedRow(f.id);
       }
     });
 
     // Trigger recalc to populate computed fields
-    recalcTemplateFields();
+    if (window.recalcTemplateFields) window.recalcTemplateFields();
     return;
     } // end else (template exists)
   }
