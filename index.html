@@ -1352,13 +1352,9 @@ window.impersonateUser = async function(userId, name) {
   }
   banner.innerHTML = `<span>⏳ Loading data for ${esc(name)}…</span>`;
   try {
-    const session = (await supabase.auth.getSession()).data.session;
-    const jwt = session?.access_token;
-    const res = await fetch(`/api/admin-view?userId=${encodeURIComponent(userId)}`, {
-      headers: { 'Authorization': `Bearer ${jwt}`, 'Content-Type': 'application/json' }
-    });
-    const snap = await res.json();
-    if (!snap.ok) throw new Error(snap.error || 'Admin view endpoint error');
+    const { data: snap, error: rpcErr } = await supabase.rpc('admin_view_user', { target_user_id: userId });
+    if (rpcErr) throw new Error(rpcErr.message || 'Admin view RPC error');
+    if (!snap || !snap.ok) throw new Error(snap?.error || 'No data returned');
     window._impersonatedData = snap;
     window._impersonating = { id: userId, profile: snap.user };
     currentUser = { id: userId, email: snap.user?.email };
