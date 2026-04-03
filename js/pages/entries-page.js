@@ -2472,6 +2472,7 @@ window.saveNewEntry = async function(saveAs) {
       contactId, txType, amount: parseFloat(amount), currency, date,
       note: combinedNote,
       invoiceNumber: invNumber || refNumber || '',
+      category,
       metadata: _hasMeta,
       businessId: bizUuid,
       status: isDraft ? 'draft' : 'posted',

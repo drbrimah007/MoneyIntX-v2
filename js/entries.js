@@ -107,7 +107,7 @@ export async function createEntry(userId, {
   contactId, txType, amount, currency = 'USD', note = '',
   date, invoiceNumber = '', templateId = null, templateData = {},
   status = 'posted', metadata = null, source = 'manual', recurringRuleId = null,
-  businessId = null,
+  businessId = null, category = null,
   senderContext = 'personal', senderBusinessName = '', fromName = '', fromEmail = ''
 }) {
   // Guard: every entry MUST have a contact
@@ -141,7 +141,8 @@ export async function createEntry(userId, {
     invoice_number: invoiceNumber,
     entry_number: nextNum,
     status,
-    source: source || 'manual'
+    source: source || 'manual',
+    category: category || txType
   };
   // Always resolve business_id — required NOT NULL column (tenant/workspace ID)
   if (businessId) {
