@@ -1340,6 +1340,15 @@ window._impersonating = null;
 window._originalUser = null;
 window._impersonatedData = null;
 
+// Global guard: block write actions during impersonation
+window._guardImpersonation = function(actionLabel) {
+  if (window._impersonating) {
+    toast('View-only mode — cannot ' + (actionLabel || 'perform actions') + ' while viewing another user.', 'error');
+    return true; // blocked
+  }
+  return false; // allowed
+};
+
 window.impersonateUser = async function(userId, name) {
   if (!confirm(`View as ${name}?\nThis will load their real data bypassing RLS.`)) return;
   window._originalUser = { id: currentUser.id, profile: currentProfile };

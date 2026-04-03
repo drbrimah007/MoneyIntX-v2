@@ -37,7 +37,7 @@ export async function renderContacts(el, page = 1) {
     <h2 style="margin:0;">Contacts <span style="font-size:14px;font-weight:500;color:var(--muted);">(${contacts.length})</span></h2>
     <div style="display:flex;gap:6px;align-items:center;">
       <input type="search" id="contacts-search" placeholder="Search…" oninput="filterAndRenderContacts(this.value)" style="width:160px;padding:6px 10px;font-size:13px;">
-      <button class="btn btn-primary btn-sm" onclick="openNewContactModal()">+ Add</button>
+      ${window._impersonating ? '' : '<button class="btn btn-primary btn-sm" onclick="openNewContactModal()">+ Add</button>'}
       <button class="bs sm" onclick="doExportContacts()" title="Export Contacts CSV">📥</button>
     </div>
   </div>`;
@@ -86,9 +86,9 @@ export async function renderContacts(el, page = 1) {
             <button class="action-menu-btn" onclick="toggleActionMenu(this)">⋮</button>
             <div class="action-dropdown">
               <button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));openContactDetail('${c.id}')">👁 View</button>
-              <button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));openEditContactModal('${c.id}')">✏️ Edit</button>
+              ${window._impersonating ? '' : `<button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));openEditContactModal('${c.id}')">✏️ Edit</button>
               <button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));closeModal();openNewEntryModal()">+ Entry</button>
-              <button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));confirmDeleteContact('${c.id}','${esc(c.name)}')" style="color:var(--red);">🗑 Delete</button>
+              <button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));confirmDeleteContact('${c.id}','${esc(c.name)}')" style="color:var(--red);">🗑 Delete</button>`}
             </div>
           </div>
         </td>
@@ -356,6 +356,7 @@ window.showCPTab = function(tab, contactId) {
 
 // ── Edit Contact Modal ────────────────────────────────────────────
 window.openEditContactModal = async function(id) {
+  if (window._guardImpersonation?.('edit contacts')) return;
   const { data: c } = await supabase.from('contacts').select('*').eq('id', id).single();
   if (!c) return;
   closeModal();
@@ -387,6 +388,7 @@ window.saveEditContact = async function(id) {
 };
 
 window.openNewContactModal = function() {
+  if (window._guardImpersonation?.('create contacts')) return;
   openModal(`
     <h3 style="margin-bottom:16px;">New Contact</h3>
     <div class="form-group"><label>Name *</label><input type="text" id="nc-name" placeholder="Contact name"></div>
@@ -428,6 +430,7 @@ window.saveNewContact = async function(returnCallback) {
 };
 
 window.confirmDeleteContact = async function(id, name) {
+  if (window._guardImpersonation?.('delete contacts')) return;
   if (!confirm('Delete ' + name + '?')) return;
   await deleteContact(id);
   toast('Contact deleted.', 'success');

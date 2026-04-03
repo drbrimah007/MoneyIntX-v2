@@ -100,8 +100,8 @@ export async function renderEntries(el, page, forceRefresh) {
     <h2 style="margin:0;">Entries <span style="font-size:13px;font-weight:400;color:var(--muted);">(${filtered.length})</span></h2>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;flex:1;min-width:200px;">
       <input type="search" id="entries-search" placeholder="Search…" value="${esc(_entriesFilter)}" oninput="filterEntriesNow(this.value)" style="flex:1;min-width:120px;max-width:220px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;">
-      <button class="btn sm" onclick="openNewEntryModal()">+ Add</button>
-      <button class="bs sm${_sm?' on':''}" onclick="toggleSelectMode()" title="Select mode">☑</button>
+      ${window._impersonating ? '' : '<button class="btn sm" onclick="openNewEntryModal()">+ Add</button>'}
+      ${window._impersonating ? '' : `<button class="bs sm${_sm?' on':''}" onclick="toggleSelectMode()" title="Select mode">☑</button>`}
       <button class="bs sm" onclick="doExportEntries()" title="Export CSV">📥</button>
     </div>
   </div>`;
@@ -552,6 +552,7 @@ window.confirmAdjustedSettlement = async function(settlementId, entryId, reviewM
 
 // ── Edit Entry Modal ──────────────────────────────────────────────
 window.openEditEntryModal = async function(id) {
+  if (window._guardImpersonation?.('edit entries')) return;
   try {
   console.log('[openEditEntryModal] opening for', id);
   const entry = await getEntry(id);
@@ -1907,6 +1908,7 @@ const NE_TABS = [
 ];
 
 window.openNewEntryModal = async function(defaultDirection, preselectedContactId) {
+  if (window._guardImpersonation?.('create entries')) return;
   // Use active business (BS context if inside BS, otherwise personal)
   const activeBiz = getActiveBusinessId();
   const [contacts, templates] = await Promise.all([

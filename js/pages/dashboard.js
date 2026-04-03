@@ -92,12 +92,13 @@ export async function renderDash(el) {
     </div>`
   ).join('');
 
+  const _viewOnly = !!window._impersonating;
   let html = `<div class="page-header">
-    <div><h2>Dashboard</h2><p style="font-size:13px;color:var(--muted);margin-top:2px;">Welcome back, ${esc(userName)} 👋</p></div>
-    <div style="display:flex;gap:8px;">
+    <div><h2>Dashboard</h2><p style="font-size:13px;color:var(--muted);margin-top:2px;">${_viewOnly ? `👁 Viewing as ${esc(userName)} — read-only` : `Welcome back, ${esc(userName)} 👋`}</p></div>
+    ${_viewOnly ? '' : `<div style="display:flex;gap:8px;">
       <button class="btn btn-primary btn-sm" onclick="openNewEntryModal()">+ Entry</button>
       <button class="btn btn-secondary btn-sm" onclick="openNewContactModal()">+ Contact</button>
-    </div>
+    </div>`}
   </div>`;
 
   // ── Primary currency hero card ─────────────────────────────────
@@ -193,9 +194,9 @@ export async function renderDash(el) {
 
   // (Currency ledgers now embedded inside hero card — no separate section needed)
 
-  // Quick Actions — canvas-style pill tab strip
+  // Quick Actions — canvas-style pill tab strip (hidden during impersonation)
   const _qaBtnBase = 'display:inline-flex;align-items:center;gap:6px;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;border:1px solid;letter-spacing:.01em;transition:filter .15s;';
-  html += `<div style="margin-bottom:14px;overflow-x:auto;padding-bottom:2px;">
+  if (!_viewOnly) html += `<div style="margin-bottom:14px;overflow-x:auto;padding-bottom:2px;">
     <div style="display:flex;gap:8px;min-width:max-content;">
       <button onclick="openNewEntryModal('owe-me')"
         style="${_qaBtnBase}background:rgba(95,211,154,.10);border-color:rgba(95,211,154,.18);color:#5FD39A;"
@@ -250,7 +251,7 @@ export async function renderDash(el) {
     </div>
   </div>`;
 
-  // Top contacts by balance
+  // Top contacts by balance (quick-actions block is skipped entirely when _viewOnly)
   const topContacts = (ledger || [])
     .filter(l => Math.abs(l.net_balance || 0) > 0)
     .sort((a,b) => Math.abs(b.net_balance||0) - Math.abs(a.net_balance||0))
@@ -338,7 +339,7 @@ export async function renderDash(el) {
   if (recent.length === 0) {
     html += `<div style="text-align:center;padding:32px;"><div style="font-size:36px;margin-bottom:8px;">📋</div>
       <p style="color:var(--muted);font-size:14px;">No entries yet.</p>
-      <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="openNewEntryModal()">Create First Entry</button>
+      ${_viewOnly ? '' : '<button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="openNewEntryModal()">Create First Entry</button>'}
     </div>`;
   } else {
     html += `<div class="tbl-wrap"><table><thead><tr>
