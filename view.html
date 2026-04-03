@@ -63,19 +63,16 @@ async function loadRecord() {
   const token = params.get('t');
   if (!token) { card.innerHTML = '<p style="text-align:center;color:var(--red);padding:20px;">No token provided.</p>'; return; }
 
-  // Query share_tokens only — no JOIN to entries/contacts
-  // This allows anonymous (not-logged-in) users to view the record via entry_snapshot
-  const { data: share, error } = await supabase
-    .from('share_tokens')
-    .select('*')
-    .eq('token', token)
-    .single();
+  // Use SECURITY DEFINER RPC to bypass RLS — the token itself is the auth.
+  // Direct table queries fail for: (a) anon users if the key doesn't carry
+  // the anon role, (b) authenticated users who aren't sender/recipient.
+  const { data: share, error } = await supabase.rpc('get_share_by_token', { p_token: token });
 
   if (error || !share) { card.innerHTML = '<p style="text-align:center;color:var(--red);padding:20px;">Record not found or expired.</p>'; return; }
 
-  // Mark as viewed
+  // Mark as viewed (also via RPC to bypass RLS)
   if (share.status === 'created' || share.status === 'sent') {
-    await supabase.from('share_tokens').update({ status:'viewed', viewed_at:new Date().toISOString() }).eq('id', share.id);
+    await supabase.rpc('mark_share_viewed', { p_share_id: share.id });
   }
 
   // All display data comes from the snapshot stored at share-time
