@@ -227,12 +227,23 @@ export async function confirmShare(tokenId, recipientId) {
         linked_entry_id:  token.entry_id,     // ← set at insert time so trigger skips
         source:           'share_accept',     // ← trigger MUST skip for this source
         status:           'posted',
-        settled_amount:   0
+        settled_amount:   0,
+        context_type:     'personal',         // mirror entries land in personal context
+        context_id:       recipientId,        // required NOT NULL — use recipient's user id
+        sender_context:   'personal'
       })
       .select()
       .single();
     if (error) console.error('[confirmShare]', error.message);
     newEntry = created;
+  }
+
+  // Update share token with confirmed_entry_id for audit trail
+  if (newEntry) {
+    await supabase.from('share_tokens')
+      .update({ confirmed_entry_id: newEntry.id })
+      .eq('id', tokenId)
+      .catch(() => {});
   }
 
   // Bidirectionally link both entries via SECURITY DEFINER RPC (bypasses RLS)

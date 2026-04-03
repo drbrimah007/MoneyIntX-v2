@@ -308,6 +308,7 @@ export async function renderBusinessSuite(el) {
 
   if (!targetBizId) {
     // No business selected — resolve user's own business via RPC
+    // my_business_id now checks both owned + member businesses
     const { data: myBiz, error: myBizErr } = await supabase.rpc('my_business_id');
     if (myBizErr || !myBiz) {
       console.error('[BS] Could not resolve own business:', myBizErr?.message);
@@ -316,6 +317,14 @@ export async function renderBusinessSuite(el) {
     }
     targetBizId = myBiz;
   }
+
+  // Fetch all businesses the user belongs to (for switcher UI)
+  let _allMyBizzes = [];
+  try {
+    const { data: bizList } = await supabase.rpc('my_businesses');
+    _allMyBizzes = bizList || [];
+  } catch(_) {}
+  window._bsAllBusinesses = _allMyBizzes;
 
   // Call resolve_workspace RPC — single call gets business info + role + permissions
   const { data: wsData, error: wsErr } = await supabase.rpc('resolve_workspace', { p_business_id: targetBizId });
@@ -401,6 +410,12 @@ export async function renderBusinessSuite(el) {
             ${opBadge}
           </div>
         </div>
+        ${_allMyBizzes.length > 1 ? `
+        <div style="padding:4px 12px 8px;">
+          <select onchange="window._bsSwitchBusiness(this.value)" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:12px;font-weight:600;cursor:pointer;">
+            ${_allMyBizzes.map(b => `<option value="${b.business_id}" ${b.business_id === targetBizId ? 'selected' : ''}>${esc(b.business_name)}${b.is_owner ? '' : ' (Team)'}</option>`).join('')}
+          </select>
+        </div>` : ''}
         <div class="bs-sidebar-nav" id="bs-sidebar-nav">
           ${sidebarHtml}
           <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;">
@@ -451,6 +466,15 @@ export async function renderBusinessSuite(el) {
 }
 
 // ── Section Navigation ────────────────────────────────────────────
+// Switch to a different business (from the sidebar dropdown)
+window._bsSwitchBusiness = function(bizId) {
+  if (!bizId || bizId === window._bsContext?.businessId) return;
+  clearBsContext();
+  window._bsContext = { businessId: bizId, isActive: false };
+  try { sessionStorage.setItem('mxi_bs_operative_biz', bizId); } catch(_) {}
+  if (_bsEl) renderBusinessSuite(_bsEl);
+};
+
 window._bsNavigate = function(section) {
   if (section === 'bs-back') {
     const wasOwn = window._bsContext?.role === 'owner';

@@ -358,7 +358,7 @@ window.openEntryDetail = async function(id, options) {
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
         <button class="bs sm" onclick="openEditEntryModal('${entry.id}')">Edit</button>
-        <button class="bs sm" onclick="printInvoice('${entry.id}')">Print</button>
+        <button class="bs sm" onclick="printInvoice('${entry.id}')">View / Print</button>
       </div>
     `;
   } else {
@@ -443,7 +443,7 @@ window.openEntryDetail = async function(id, options) {
         <button class="bs sm" onclick="closeModal();openShareModal('${entry.id}')">Share</button>
         ${!isTerminal ? `<button class="bs sm" onclick="closeModal();openSendReminderModal('${entry.id}')">Remind</button>` : ''}
         ${['invoice_sent','bill_sent','invoice','bill'].includes(_ecat) && !isTerminal ? `<button class="bs sm" onclick="closeModal();openNotifyInvoiceModal('${entry.id}')" style="color:#60a5fa;">✉️ Email</button>` : ''}
-        <button class="bs sm" onclick="printInvoice('${entry.id}')">Print</button>
+        <button class="bs sm" onclick="printInvoice('${entry.id}')">View / Print</button>
         <button class="bs sm" onclick="duplicateEntry('${entry.id}');closeModal();">Duplicate</button>
         ${entry.context_type === 'business'
           ? `<button class="bs sm" onclick="migrateEntryToPersonal('${entry.id}');closeModal();" style="color:var(--accent);">← Move to Personal</button>`
