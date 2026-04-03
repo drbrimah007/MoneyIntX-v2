@@ -97,7 +97,10 @@ async function renderSettings(el) {
     </div>
     <div class="form-row">
       <div class="form-group"><label>Company Phone</label><input type="text" id="s-comphone" value="${esc(p.company_phone || '')}"></div>
-      <div class="form-group"><label>Company Address</label><input type="text" id="s-comaddr" value="${esc(p.company_address || '')}"></div>
+      <div class="form-group"><label>Company Website</label><input type="url" id="s-comwebsite" value="${esc(p.company_website || '')}" placeholder="https://yourcompany.com"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="grid-column:span 2;"><label>Company Address</label><input type="text" id="s-comaddr" value="${esc(p.company_address || '')}"></div>
     </div>
     <button class="btn btn-primary btn-sm" onclick="saveInvoiceInfo()">Save Invoice Info</button>
   </div>`;
@@ -332,6 +335,7 @@ window.saveInvoiceInfo = async function() {
     company_name:    document.getElementById('s-company').value.trim(),
     company_email:   document.getElementById('s-comemail').value.trim(),
     company_phone:   document.getElementById('s-comphone').value.trim(),
+    company_website: document.getElementById('s-comwebsite').value.trim(),
     company_address: document.getElementById('s-comaddr').value.trim(),
     updated_at:      new Date().toISOString()
   }).eq('id', currentUser.id);

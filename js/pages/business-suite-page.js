@@ -2787,6 +2787,7 @@ function _bsRenderBranding(el) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;color:var(--muted);">
         <div>Email: <span style="color:var(--text);font-weight:500;">${esc(p.company_email || '—')}</span></div>
         <div>Phone: <span style="color:var(--text);font-weight:500;">${esc(p.company_phone || '—')}</span></div>
+        <div>Website: <span style="color:var(--text);font-weight:500;">${p.company_website ? `<a href="${esc(p.company_website)}" target="_blank" style="color:var(--accent);">${esc(p.company_website)}</a>` : '—'}</span></div>
         <div style="grid-column:span 2;">Address: <span style="color:var(--text);font-weight:500;">${esc(p.company_address || '—')}</span></div>
       </div>
     </div>
@@ -2814,7 +2815,8 @@ function _bsRenderBranding(el) {
         <div class="form-group"><label>Business Name</label><input type="text" id="bs-brand-name" value="${esc(p.company_name || '')}" placeholder="Your Company Ltd."></div>
         <div class="form-group"><label>Business Email</label><input type="email" id="bs-brand-email" value="${esc(p.company_email || '')}" placeholder="billing@company.com"></div>
         <div class="form-group"><label>Business Phone</label><input type="text" id="bs-brand-phone" value="${esc(p.company_phone || '')}" placeholder="+1 234 567 8900"></div>
-        <div class="form-group"><label>Business Address</label><input type="text" id="bs-brand-addr" value="${esc(p.company_address || '')}" placeholder="123 Main St, City"></div>
+        <div class="form-group"><label>Website</label><input type="url" id="bs-brand-website" value="${esc(p.company_website || '')}" placeholder="https://yourcompany.com"></div>
+        <div class="form-group" style="grid-column:span 2;"><label>Business Address</label><input type="text" id="bs-brand-addr" value="${esc(p.company_address || '')}" placeholder="123 Main St, City"></div>
         <div class="form-group">
           <label>Default Currency</label>
           <select id="bs-brand-currency" style="width:100%;">
@@ -2837,6 +2839,7 @@ function _bsRenderBranding(el) {
             <div style="font-size:16px;font-weight:800;color:#1a1a1a;">${esc(p.company_name || 'Your Business')}</div>
             <div style="font-size:11px;color:#666;">${esc(p.company_address || 'Business Address')}</div>
             <div style="font-size:11px;color:#666;">${esc(p.company_email || 'email@business.com')} · ${esc(p.company_phone || 'Phone')}</div>
+            ${p.company_website ? `<div style="font-size:11px;color:#4338ca;">${esc(p.company_website)}</div>` : ''}
           </div>
           <div style="text-align:right;">
             <div style="font-size:20px;font-weight:800;color:#4338ca;">INVOICE</div>
@@ -2902,6 +2905,7 @@ window._bsSaveBranding = async function() {
     company_name:     (document.getElementById('bs-brand-name')?.value || '').trim(),
     company_email:    (document.getElementById('bs-brand-email')?.value || '').trim(),
     company_phone:    (document.getElementById('bs-brand-phone')?.value || '').trim(),
+    company_website:  (document.getElementById('bs-brand-website')?.value || '').trim(),
     company_address:  (document.getElementById('bs-brand-addr')?.value || '').trim(),
     default_currency: (document.getElementById('bs-brand-currency')?.value || 'USD'),
     updated_at:       new Date().toISOString()
