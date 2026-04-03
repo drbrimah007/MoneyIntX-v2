@@ -447,7 +447,7 @@ window.openEntryDetail = async function(id, options) {
         <button class="bs sm" onclick="duplicateEntry('${entry.id}');closeModal();">Duplicate</button>
         ${entry.context_type === 'business'
           ? `<button class="bs sm" onclick="migrateEntryToPersonal('${entry.id}');closeModal();" style="color:var(--accent);">← Move to Personal</button>`
-          : `<button class="bs sm" onclick="migrateEntryToBS('${entry.id}');closeModal();" style="color:var(--accent);">→ Move to BS</button>`}
+          : `<button class="bs sm" onclick="closeModal();migrateEntryToBS('${entry.id}');" style="color:var(--accent);">→ Move to BS</button>`}
         <button class="bs sm" onclick="toggleNoLedger('${entry.id}',${!entry.no_ledger});closeModal();">${entry.no_ledger ? 'Restore Ledger' : 'Rm Ledger'}</button>
         <button class="bs sm" onclick="handleVoidEntry('${entry.id}');closeModal();" style="color:var(--amber);">Void</button>
         <button class="bs sm" onclick="confirmDeleteEntry('${entry.id}');closeModal();" style="color:var(--red);">Delete</button>
@@ -1363,40 +1363,77 @@ window.handleArchiveEntry = async function(id, action) {
 // ── Migrate Entry between Personal ↔ Business Suite ──────────────────
 // Move = reassign the actual business_id column (atomic, no duplication)
 window.migrateEntryToBS = async function(id) {
-  // Get the active BS business_id from session or BS context
-  const bizId = window._bsContext?.businessId || (window.getSession ? window.getSession().businessId : null);
-  if (!bizId) return toast('No active business found. Please open Business Suite first.', 'error');
-  const bizName = window._bsContext?.ownerName || '';
-  const { data: entry } = await supabase.from('entries').select('metadata, business_id').eq('id', id).single();
+  // Fetch user's businesses (owned + member)
+  let businesses = [];
+  try {
+    const { data } = await supabase.rpc('my_businesses');
+    if (data) businesses = data;
+  } catch(_) {}
+  // Fallback: just the session business
+  if (businesses.length === 0) {
+    const fallbackId = window._bsContext?.businessId || (window.getSession ? window.getSession().businessId : null);
+    if (fallbackId) businesses = [{ id: fallbackId, name: 'Business' }];
+  }
+  if (businesses.length === 0) return toast('No business found.', 'error');
+
+  // If only one business, move directly
+  if (businesses.length === 1) {
+    return _doMoveEntryToBiz(id, businesses[0].id, businesses[0].name);
+  }
+
+  // Multiple businesses — show chooser
+  openModal(`
+    <h3 style="margin-bottom:12px;">Move to Business</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Choose which workspace to handle this entry in:</p>
+    ${businesses.map(b => `
+      <button class="btn btn-secondary" onclick="closeModal();window._doMoveEntryToBiz('${id}','${b.id}','${esc(b.name)}')"
+        style="display:block;width:100%;text-align:left;padding:14px 16px;margin-bottom:8px;border-radius:10px;font-size:14px;font-weight:600;">
+        🏢 ${esc(b.name)}
+      </button>`).join('')}
+    <button class="bs sm" onclick="closeModal()" style="margin-top:8px;">Cancel</button>
+  `);
+};
+
+window._doMoveEntryToBiz = async function(entryId, bizId, bizName) {
+  const { data: entry } = await supabase.from('entries').select('metadata, contact_id').eq('id', entryId).single();
   if (!entry) return toast('Entry not found.', 'error');
   const meta = entry.metadata || {};
   meta.moved_from_personal = true;
   meta.moved_at = new Date().toISOString();
   if (bizName) meta.business_name = bizName;
-  // Update the actual business_id column — this is what RLS checks
   const { error } = await supabase.from('entries').update({
     business_id: bizId,
+    context_type: 'business',
+    context_id: bizId,
     metadata: meta
-  }).eq('id', id);
+  }).eq('id', entryId);
   if (error) return toast('Move failed: ' + error.message, 'error');
+
+  // Also tag the associated contact as business_client so it shows in BS Clients
+  if (entry.contact_id) {
+    const { data: ct } = await supabase.from('contacts').select('tags').eq('id', entry.contact_id).single().catch(() => ({}));
+    if (ct) {
+      const tags = Array.from(new Set([...(ct.tags || []), 'business_client']));
+      await supabase.from('contacts').update({ tags, business_id: bizId }).eq('id', entry.contact_id).catch(() => {});
+    }
+  }
+
   _invalidateEntries();
-  toast('Entry moved to Business Suite.', 'success');
+  toast(`Entry moved to ${bizName || 'Business Suite'}.`, 'success');
   _navAfterAction();
 };
 
 window.migrateEntryToPersonal = async function(id) {
-  // Move back to user's personal business
-  const personalBizId = window.getSession ? window.getSession().businessId : null;
-  if (!personalBizId) return toast('Could not resolve personal workspace.', 'error');
-  const { data: entry } = await supabase.from('entries').select('metadata, business_id').eq('id', id).single();
+  const currentUser = getCurrentUser();
+  const { data: entry } = await supabase.from('entries').select('metadata').eq('id', id).single();
   if (!entry) return toast('Entry not found.', 'error');
   const meta = entry.metadata || {};
   delete meta.moved_from_personal;
   delete meta.business_name;
   meta.moved_to_personal_at = new Date().toISOString();
-  // Update the actual business_id column to user's own business
   const { error } = await supabase.from('entries').update({
-    business_id: personalBizId,
+    context_type: 'personal',
+    context_id: currentUser.id,
     metadata: meta
   }).eq('id', id);
   if (error) return toast('Move failed: ' + error.message, 'error');

@@ -97,18 +97,9 @@ export async function confirmShare(tokenId, recipientId) {
     .single();
   if (!token?.entry) return null;
 
-  // ── Resolve recipient context: business or personal ──
-  // If the recipient_email matches a business they own/belong to → business context
-  // Otherwise → personal context
-  const recipientEmail = token.recipient_email || '';
-  let rCtx = { context_type: 'personal', context_id: recipientId, business_id: null };
-  try {
-    const { data: ctxData } = await supabase.rpc('resolve_recipient_context', {
-      p_user_id: recipientId,
-      p_email:   recipientEmail
-    });
-    if (ctxData) rCtx = ctxData;
-  } catch (_) { /* RPC not deployed — fallback to personal */ }
+  // ── Recipient context: ALWAYS personal by default ──
+  // No auto-routing. Recipient can move the entry to a business workspace later.
+  const rCtx = { context_type: 'personal', context_id: recipientId, business_id: null };
 
   // Resolve sender display name + email from snapshot or sender profile
   const snap = token.entry_snapshot || {};
@@ -258,13 +249,6 @@ export async function confirmShare(tokenId, recipientId) {
       .update({ confirmed_entry_id: newEntry.id })
       .eq('id', tokenId)
       .catch(() => {});
-  }
-
-  // If mirror landed in business context, tag the auto-created contact as business_client
-  if (contactId && rCtx.context_type === 'business') {
-    const { data: ctRow } = await supabase.from('contacts').select('tags').eq('id', contactId).single().catch(() => ({}));
-    const tags = Array.from(new Set([...(ctRow?.tags || []), 'business_client']));
-    await supabase.from('contacts').update({ tags }).eq('id', contactId).catch(() => {});
   }
 
   // Bidirectionally link both entries via SECURITY DEFINER RPC (bypasses RLS)
