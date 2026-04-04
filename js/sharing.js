@@ -4,17 +4,20 @@ import { toCents } from './entries.js';
 import { getCurrentProfile } from './pages/state.js';
 
 // ── Create share token ────────────────────────────────────────────
-export async function createShareToken(senderId, entryId, { recipientEmail = '', recipientId = null, entrySnapshot = {} } = {}) {
+export async function createShareToken(senderId, entryId, { recipientEmail = '', recipientId = null, entrySnapshot = {}, targetBusinessId = null } = {}) {
+  const insert = {
+    sender_id: senderId,
+    entry_id: entryId,
+    recipient_email: recipientEmail,
+    recipient_id: recipientId || null,
+    entry_snapshot: entrySnapshot,
+    status: recipientId ? 'sent' : 'created'   // auto-sent if recipient known
+  };
+  // If sender explicitly targets a recipient's business, store it
+  if (targetBusinessId) insert.target_business_id = targetBusinessId;
   const { data, error } = await supabase
     .from('share_tokens')
-    .insert({
-      sender_id: senderId,
-      entry_id: entryId,
-      recipient_email: recipientEmail,
-      recipient_id: recipientId || null,
-      entry_snapshot: entrySnapshot,
-      status: recipientId ? 'sent' : 'created'   // auto-sent if recipient known
-    })
+    .insert(insert)
     .select()
     .single();
   if (error) console.error('[createShareToken]', error.message);
@@ -97,9 +100,17 @@ export async function confirmShare(tokenId, recipientId) {
     .single();
   if (!token?.entry) return null;
 
-  // ── Recipient context: ALWAYS personal by default ──
-  // No auto-routing. Recipient can move the entry to a business workspace later.
-  const rCtx = { context_type: 'personal', context_id: recipientId, business_id: null };
+  // ── Recipient context ──
+  // Default: personal. But if sender explicitly targeted a business_id, use it.
+  // This is NOT guessing — the sender intentionally chose the business target.
+  let rCtx = { context_type: 'personal', context_id: recipientId, business_id: null };
+  if (token.target_business_id) {
+    rCtx = {
+      context_type: 'business',
+      context_id:   token.target_business_id,
+      business_id:  token.target_business_id
+    };
+  }
 
   // Resolve sender display name + email from snapshot or sender profile
   const snap = token.entry_snapshot || {};
@@ -165,15 +176,21 @@ export async function confirmShare(tokenId, recipientId) {
     if (!contactId) {
       const contactName = fromName || snap.from_name || 'Unknown';
       const contactEmail = fromEmail || '';
+      const contactInsert = {
+        user_id:        recipientId,
+        name:           contactName,
+        email:          contactEmail,
+        linked_user_id: token.sender_id,
+        tags:           ['shared']
+      };
+      // If delivering to a business context, tag + assign business_id on the contact
+      if (rCtx.context_type === 'business' && rCtx.business_id) {
+        contactInsert.business_id = rCtx.business_id;
+        contactInsert.tags = ['shared', 'business_client'];
+      }
       const { data: newContact, error: cErr } = await supabase
         .from('contacts')
-        .insert({
-          user_id:        recipientId,
-          name:           contactName,
-          email:          contactEmail,
-          linked_user_id: token.sender_id,
-          tags:           ['shared']
-        })
+        .insert(contactInsert)
         .select('id')
         .single();
       if (newContact) {

@@ -107,8 +107,8 @@ export async function confirmShare(tokenId, recipientId) {
     'invoice_received': 'invoice_sent',
     'bill_sent':        'bill_received',
     'bill_received':    'bill_sent',
-    'invoice':          'bill',
-    'bill':             'invoice',
+    'invoice':          'invoice_received',
+    'bill':             'bill_received',
     'advance_paid':     'advance_received',
     'advance_received': 'advance_paid'
   };

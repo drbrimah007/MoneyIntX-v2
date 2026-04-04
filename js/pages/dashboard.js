@@ -57,7 +57,7 @@ export async function renderDash(el) {
     window._allContacts = contacts;
     [ledger, currencyRows] = await Promise.all([
       getLedgerSummary(currentUser.id),
-      getCurrencyLedger(currentUser.id)
+      getCurrencyLedger(currentUser.id, 'personal', currentUser.id)
     ]);
   }
 

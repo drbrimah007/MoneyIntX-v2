@@ -40,7 +40,7 @@ export async function listEntries(userId, { status, txType, contactId, limit, of
 
   let query = supabase
     .from('entries')
-    .select('*, contact:contacts(id, name, email, linked_user_id)')
+    .select('*, contact:contacts(id, name, email, linked_user_id, linked_business_id, preferred_target_type)')
     .eq('user_id', userId)
     .is('archived_at', null)
     .order(orderBy, { ascending });
@@ -76,7 +76,7 @@ export async function recentEntries(userId, limit = 15, businessId) {
   if (all) return all.slice(0, limit);
   let query = supabase
     .from('entries')
-    .select('*, contact:contacts(id, name, email, linked_user_id)')
+    .select('*, contact:contacts(id, name, email, linked_user_id, linked_business_id, preferred_target_type)')
     .eq('user_id', userId)
     .is('archived_at', null)
     .order('created_at', { ascending: false })
@@ -95,7 +95,7 @@ export async function recentEntries(userId, limit = 15, businessId) {
 export async function getEntry(id) {
   const { data, error } = await supabase
     .from('entries')
-    .select('*, contact:contacts(id, name, email, linked_user_id), settlements(*)')
+    .select('*, contact:contacts(id, name, email, linked_user_id, linked_business_id, preferred_target_type), settlements(*)')
     .eq('id', id)
     .single();
   if (error) console.error('[getEntry]', error.message);
@@ -178,7 +178,7 @@ export async function createEntry(userId, {
   const { data, error } = await supabase
     .from('entries')
     .insert(insertPayload)
-    .select('*, contact:contacts(id, name, email, linked_user_id)')
+    .select('*, contact:contacts(id, name, email, linked_user_id, linked_business_id, preferred_target_type)')
     .single();
   if (error) {
     console.error('[createEntry]', error.message, error.details, error.hint);
@@ -231,12 +231,16 @@ export async function restoreEntry(id) {
 }
 
 // ── List archived/deleted entries (admin only) ────────────────────
-export async function listArchivedEntries(userId) {
-  const { data, error } = await supabase.from('entries')
+export async function listArchivedEntries(userId, contextType = null, contextId = null) {
+  let q = supabase.from('entries')
     .select('*, contact:contacts(id, name)')
     .eq('user_id', userId)
-    .not('archived_at', 'is', null)
-    .order('archived_at', { ascending: false });
+    .not('archived_at', 'is', null);
+  // Context isolation: if context provided, scope to that context
+  if (contextType && contextId) {
+    q = q.eq('context_type', contextType).eq('context_id', contextId);
+  }
+  const { data, error } = await q.order('archived_at', { ascending: false });
   if (error) console.error('[listArchivedEntries]', error.message);
   return data || [];
 }
@@ -298,25 +302,30 @@ export async function getLedgerSummary(userId) {
 // (view may not be deployed). Computes per-currency totals in JavaScript.
 // Returns ALL currencies the user has any entries in, even if balance is zero,
 // so the hero always shows the correct default currency (never hides it).
-export async function getCurrencyLedger(userId) {
+export async function getCurrencyLedger(userId, contextType = null, contextId = null) {
   const TERMINAL = new Set(['voided', 'cancelled', 'settled', 'fulfilled']);
 
-  // First try the fast DB view (if deployed)
-  try {
-    const { data: vData, error: vErr } = await supabase
-      .from('currency_ledger')
-      .select('currency, owed_to_me, i_owe, active_count')
-      .eq('user_id', userId);
-    // View exists and returned data — use it (no active_count filter so all currencies appear)
-    if (!vErr && Array.isArray(vData)) return vData;
-  } catch (_) { /* view not deployed — fall through */ }
+  // First try the fast DB view (if deployed) — view is user-level, not context-scoped
+  if (!contextType) {
+    try {
+      const { data: vData, error: vErr } = await supabase
+        .from('currency_ledger')
+        .select('currency, owed_to_me, i_owe, active_count')
+        .eq('user_id', userId);
+      if (!vErr && Array.isArray(vData)) return vData;
+    } catch (_) { /* view not deployed — fall through */ }
+  }
 
   // Fallback: query entries table directly and compute in JS
-  const { data, error } = await supabase
-    .from('entries')
+  let q = supabase.from('entries')
     .select('currency, tx_type, amount, settled_amount, status, no_ledger')
     .eq('user_id', userId)
     .is('archived_at', null);
+  // Context isolation: scope to specific context if provided
+  if (contextType && contextId) {
+    q = q.eq('context_type', contextType).eq('context_id', contextId);
+  }
+  const { data, error } = await q;
 
   if (error) {
     console.error('[getCurrencyLedger fallback]', error.message);

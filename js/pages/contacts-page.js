@@ -29,9 +29,10 @@ export async function renderContacts(el, page = 1) {
   const ledgerMap = {};
   (ledger || []).forEach(l => { ledgerMap[l.contact_id] = l; });
 
-  // Filter out business_client contacts from personal view (they live in BS Clients)
+  // Personal view: show only contacts without a business_id (true personal contacts)
+  // Business contacts are separate records with business_id set — they live in BS Clients
   if (!window._bsContext?.businessId) {
-    contacts = contacts.filter(c => !(c.tags || []).includes('business_client'));
+    contacts = contacts.filter(c => !c.business_id);
   }
 
   // Expose contacts globally for re-renders
@@ -93,7 +94,7 @@ export async function renderContacts(el, page = 1) {
               <button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));openContactDetail('${c.id}')">👁 View</button>
               ${window._impersonating ? '' : `<button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));openEditContactModal('${c.id}')">✏️ Edit</button>
               <button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));closeModal();openNewEntryModal()">+ Entry</button>
-              ${getMyBusinessId() ? `<button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));moveContactToBs('${c.id}','${esc(c.name)}')">🏢 Move to BS</button>` : ''}
+              ${getMyBusinessId() ? `<button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));importContactToBs('${c.id}','${esc(c.name)}')">📥 Import to Business</button>` : ''}
               <button onclick="document.querySelectorAll('.action-dropdown.open').forEach(d=>d.classList.remove('open'));confirmDeleteContact('${c.id}','${esc(c.name)}')" style="color:var(--red);">🗑 Delete</button>`}
             </div>
           </div>
@@ -344,7 +345,7 @@ window.showCPTab = function(tab, contactId) {
     const c = d.c;
     el.innerHTML = `
       <div style="background:var(--bg2);border-radius:12px;overflow:hidden;">
-        ${[['Name',c.name],['Email',c.email||'—'],['Phone',c.phone||'—'],['Address',c.address||'—'],['Notes',c.notes||'—']].map(([k,v])=>`
+        ${[['Name',c.name],['Email',c.email||'—'],['Phone',c.phone||'—'],['Details',c.address||'—'],['Notes',c.notes||'—']].map(([k,v])=>`
           <div style="display:flex;justify-content:space-between;padding:11px 16px;border-bottom:1px solid var(--border);gap:12px;">
             <span style="font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;min-width:60px;">${k}</span>
             <span style="font-size:13px;text-align:right;">${esc(v)}</span>
@@ -371,7 +372,7 @@ window.openEditContactModal = async function(id) {
     <div class="form-group"><label>Name *</label><input type="text" id="ec-name" value="${esc(c.name)}"></div>
     <div class="form-group"><label>Email</label><input type="email" id="ec-email" value="${esc(c.email || '')}"></div>
     <div class="form-group"><label>Phone</label><input type="tel" id="ec-phone" value="${esc(c.phone || '')}"></div>
-    <div class="form-group"><label>Address</label><input type="text" id="ec-address" value="${esc(c.address || '')}"></div>
+    <div class="form-group"><label>Details</label><textarea id="ec-address" rows="2" placeholder="Address, website, DBA, or any details…" style="width:100%;resize:vertical;">${esc(c.address || '')}</textarea></div>
     <div class="form-group"><label>Notes</label><textarea id="ec-notes" rows="2">${esc(c.notes || '')}</textarea></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
@@ -435,20 +436,40 @@ window.saveNewContact = async function(returnCallback) {
   navTo('contacts');
 };
 
-window.moveContactToBs = async function(id, name) {
-  if (window._guardImpersonation?.('move contacts')) return;
+// Non-destructive: create a business copy of this personal contact
+window.importContactToBs = async function(id, name) {
+  if (window._guardImpersonation?.('import contacts')) return;
   const bizId = getMyBusinessId();
-  if (!bizId) return toast('No business found.', 'error');
-  // Get current contact to merge tags
-  const { data: ct } = await supabase.from('contacts').select('tags').eq('id', id).single();
-  const tags = Array.from(new Set([...(ct?.tags || []), 'business_client']));
-  // Update contact: set business_id and add business_client tag
-  const { error } = await supabase
-    .from('contacts')
-    .update({ business_id: bizId, tags, updated_at: new Date().toISOString() })
-    .eq('id', id);
-  if (error) return toast('Move failed: ' + error.message, 'error');
-  toast(`${name} moved to Business Suite.`, 'success');
+  if (!bizId) return toast('No activated business found.', 'error');
+
+  // Fetch full personal contact
+  const { data: orig } = await supabase.from('contacts').select('*').eq('id', id).single();
+  if (!orig) return toast('Contact not found.', 'error');
+
+  // Check if a business copy already exists
+  if (orig.email) {
+    const { data: existing } = await supabase.from('contacts')
+      .select('id').eq('business_id', bizId).ilike('email', orig.email).maybeSingle();
+    if (existing) return toast(`${name} already exists in Business Suite.`, 'error');
+  }
+
+  // Create business copy — personal original untouched
+  const { error } = await supabase.from('contacts').insert({
+    user_id: orig.user_id,
+    business_id: bizId,
+    name: orig.name,
+    email: orig.email || '',
+    phone: orig.phone || '',
+    address: orig.address || '',
+    notes: orig.notes || '',
+    linked_user_id: orig.linked_user_id,
+    linked_business_id: orig.linked_business_id,
+    tags: ['business_client'],
+    start_toy: 0,
+    start_yot: 0
+  });
+  if (error) return toast('Import failed: ' + error.message, 'error');
+  toast(`${name} imported to Business Suite. Personal contact preserved.`, 'success');
   navTo('contacts');
 };
 

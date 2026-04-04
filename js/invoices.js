@@ -235,14 +235,14 @@ export function generateInvoiceHTML(entry, contact, profile, settlements = []) {
         <p><strong>${escHtml(company)}</strong></p>
         ${companyEmail ? `<p>${escHtml(companyEmail)}</p>` : ''}
         ${companyPhone ? `<p>${escHtml(companyPhone)}</p>` : ''}
-        ${companyAddr ? `<p style="white-space:pre-line;">${escHtml(companyAddr)}</p>` : ''}
+        ${companyAddr ? `<p style="white-space:pre-line;color:#475569;">${escHtml(companyAddr)}</p>` : ''}
       </div>
       <div class="inv-party" style="text-align:right;">
         <h4>To</h4>
         <p><strong>${escHtml(contact?.name || '—')}</strong></p>
         ${contact?.email ? `<p>${escHtml(contact.email)}</p>` : ''}
         ${contact?.phone ? `<p>${escHtml(contact.phone)}</p>` : ''}
-        ${contact?.address ? `<p style="white-space:pre-line;">${escHtml(contact.address)}</p>` : ''}
+        ${contact?.address ? `<p style="white-space:pre-line;color:#475569;">${escHtml(contact.address)}</p>` : ''}
       </div>
     </div>
     <table class="inv-table">

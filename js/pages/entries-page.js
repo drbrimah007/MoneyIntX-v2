@@ -446,8 +446,8 @@ window.openEntryDetail = async function(id, options) {
         <button class="bs sm" onclick="printInvoice('${entry.id}')">View / Print</button>
         <button class="bs sm" onclick="duplicateEntry('${entry.id}');closeModal();">Duplicate</button>
         ${entry.context_type === 'business'
-          ? `<button class="bs sm" onclick="migrateEntryToPersonal('${entry.id}');closeModal();" style="color:var(--accent);">← Move to Personal</button>`
-          : `<button class="bs sm" onclick="closeModal();migrateEntryToBS('${entry.id}');" style="color:var(--accent);">→ Move to BS</button>`}
+          ? `<button class="bs sm" onclick="copyEntryToPersonal('${entry.id}');closeModal();" style="color:var(--accent);">📋 Copy to Personal</button>`
+          : `<button class="bs sm" onclick="closeModal();importEntryToBusiness('${entry.id}');" style="color:var(--accent);">📥 Import to Business</button>`}
         <button class="bs sm" onclick="toggleNoLedger('${entry.id}',${!entry.no_ledger});closeModal();">${entry.no_ledger ? 'Restore Ledger' : 'Rm Ledger'}</button>
         <button class="bs sm" onclick="handleVoidEntry('${entry.id}');closeModal();" style="color:var(--amber);">Void</button>
         <button class="bs sm" onclick="confirmDeleteEntry('${entry.id}');closeModal();" style="color:var(--red);">Delete</button>
@@ -1362,31 +1362,28 @@ window.handleArchiveEntry = async function(id, action) {
 
 // ── Migrate Entry between Personal ↔ Business Suite ──────────────────
 // Move = reassign the actual business_id column (atomic, no duplication)
-window.migrateEntryToBS = async function(id) {
-  // Fetch user's businesses (owned + member)
+// ── Import entry TO business (non-destructive copy — personal original stays) ──
+window.importEntryToBusiness = async function(id) {
   let businesses = [];
   try {
     const { data } = await supabase.rpc('my_businesses');
     if (data) businesses = data;
   } catch(_) {}
-  // Fallback: just the session business
   if (businesses.length === 0) {
     const fallbackId = window._bsContext?.businessId || (window.getSession ? window.getSession().businessId : null);
     if (fallbackId) businesses = [{ id: fallbackId, name: 'Business' }];
   }
-  if (businesses.length === 0) return toast('No business found.', 'error');
+  if (businesses.length === 0) return toast('No activated business found.', 'error');
 
-  // If only one business, move directly
   if (businesses.length === 1) {
-    return _doMoveEntryToBiz(id, businesses[0].id, businesses[0].name);
+    return _doImportEntryToBiz(id, businesses[0].id, businesses[0].name);
   }
 
-  // Multiple businesses — show chooser
   openModal(`
-    <h3 style="margin-bottom:12px;">Move to Business</h3>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">Choose which workspace to handle this entry in:</p>
+    <h3 style="margin-bottom:12px;">Import to Business</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">A copy will be created in the chosen business workspace. The personal original stays.</p>
     ${businesses.map(b => `
-      <button class="btn btn-secondary" onclick="closeModal();window._doMoveEntryToBiz('${id}','${b.id}','${esc(b.name)}')"
+      <button class="btn btn-secondary" onclick="closeModal();window._doImportEntryToBiz('${id}','${b.id}','${esc(b.name)}')"
         style="display:block;width:100%;text-align:left;padding:14px 16px;margin-bottom:8px;border-radius:10px;font-size:14px;font-weight:600;">
         🏢 ${esc(b.name)}
       </button>`).join('')}
@@ -1394,51 +1391,92 @@ window.migrateEntryToBS = async function(id) {
   `);
 };
 
-window._doMoveEntryToBiz = async function(entryId, bizId, bizName) {
-  const { data: entry } = await supabase.from('entries').select('metadata, contact_id').eq('id', entryId).single();
-  if (!entry) return toast('Entry not found.', 'error');
-  const meta = entry.metadata || {};
-  meta.moved_from_personal = true;
-  meta.moved_at = new Date().toISOString();
-  if (bizName) meta.business_name = bizName;
-  const { error } = await supabase.from('entries').update({
-    business_id: bizId,
+window._doImportEntryToBiz = async function(entryId, bizId, bizName) {
+  // Fetch original entry fully
+  const { data: orig } = await supabase.from('entries').select('*').eq('id', entryId).single();
+  if (!orig) return toast('Entry not found.', 'error');
+
+  // Build business copy — new ID, new context, linked back to original
+  const copy = {
+    user_id: orig.user_id,
+    contact_id: orig.contact_id,
+    contact_name: orig.contact_name,
+    tx_type: orig.tx_type,
+    amount: orig.amount,
+    currency: orig.currency,
+    date: orig.date,
+    note: orig.note,
+    invoice_number: orig.invoice_number,
+    status: orig.status,
+    category: orig.category,
     context_type: 'business',
     context_id: bizId,
-    metadata: meta
-  }).eq('id', entryId);
-  if (error) return toast('Move failed: ' + error.message, 'error');
-
-  // Also tag the associated contact as business_client so it shows in BS Clients
-  if (entry.contact_id) {
-    const { data: ct } = await supabase.from('contacts').select('tags').eq('id', entry.contact_id).single().catch(() => ({}));
-    if (ct) {
-      const tags = Array.from(new Set([...(ct.tags || []), 'business_client']));
-      await supabase.from('contacts').update({ tags, business_id: bizId }).eq('id', entry.contact_id).catch(() => {});
+    business_id: bizId,
+    sender_context: 'business',
+    sender_business_name: bizName || '',
+    from_name: bizName || orig.from_name || '',
+    from_email: orig.from_email || '',
+    metadata: {
+      ...(orig.metadata || {}),
+      imported_from_personal: true,
+      source_entry_id: entryId,
+      imported_at: new Date().toISOString(),
+      business_name: bizName
     }
-  }
+  };
+
+  const { data: newEntry, error } = await supabase.from('entries').insert(copy).select('id').single();
+  if (error) return toast('Import failed: ' + error.message, 'error');
+
+  // Mark original with metadata linking to the business copy (for reference, not removal)
+  const origMeta = orig.metadata || {};
+  origMeta.has_business_copy = true;
+  origMeta.business_copy_id = newEntry.id;
+  origMeta.business_copy_biz = bizId;
+  await supabase.from('entries').update({ metadata: origMeta }).eq('id', entryId).catch(() => {});
 
   _invalidateEntries();
-  toast(`Entry moved to ${bizName || 'Business Suite'}.`, 'success');
+  toast(`Imported to ${bizName || 'Business Suite'}. Personal original preserved.`, 'success');
   _navAfterAction();
 };
 
-window.migrateEntryToPersonal = async function(id) {
+// ── Copy entry TO personal (non-destructive — business original stays) ──
+window.copyEntryToPersonal = async function(id) {
   const currentUser = getCurrentUser();
-  const { data: entry } = await supabase.from('entries').select('metadata').eq('id', id).single();
-  if (!entry) return toast('Entry not found.', 'error');
-  const meta = entry.metadata || {};
-  delete meta.moved_from_personal;
-  delete meta.business_name;
-  meta.moved_to_personal_at = new Date().toISOString();
-  const { error } = await supabase.from('entries').update({
+  const { data: orig } = await supabase.from('entries').select('*').eq('id', id).single();
+  if (!orig) return toast('Entry not found.', 'error');
+
+  const copy = {
+    user_id: currentUser.id,
+    contact_id: orig.contact_id,
+    contact_name: orig.contact_name,
+    tx_type: orig.tx_type,
+    amount: orig.amount,
+    currency: orig.currency,
+    date: orig.date,
+    note: orig.note,
+    invoice_number: orig.invoice_number,
+    status: orig.status,
+    category: orig.category,
     context_type: 'personal',
     context_id: currentUser.id,
-    metadata: meta
-  }).eq('id', id);
-  if (error) return toast('Move failed: ' + error.message, 'error');
+    business_id: null,
+    sender_context: 'personal',
+    from_name: orig.from_name || '',
+    from_email: orig.from_email || '',
+    metadata: {
+      ...(orig.metadata || {}),
+      copied_from_business: true,
+      source_entry_id: id,
+      copied_at: new Date().toISOString()
+    }
+  };
+
+  const { error } = await supabase.from('entries').insert(copy).select('id').single();
+  if (error) return toast('Copy failed: ' + error.message, 'error');
+
   _invalidateEntries();
-  toast('Entry moved to Personal.', 'success');
+  toast('Copied to Personal. Business original preserved.', 'success');
   _navAfterAction();
 };
 
@@ -1449,6 +1487,8 @@ window.openShareModal = async function(id) {
   const cName = entry.contact?.name || 'Contact';
   const cEmail = entry.contact?.email || '';
   const linkedUserId = entry.contact?.linked_user_id || null;  // ← PRIMARY ID
+  const linkedBusinessId = entry.contact?.linked_business_id || null;
+  const preferredTarget = entry.contact?.preferred_target_type || 'personal';
   const txLabel = TX_LABELS[entry.tx_type] || entry.tx_type;
   const amtStr = fmtMoney(entry.amount, entry.currency);
 
@@ -1458,6 +1498,15 @@ window.openShareModal = async function(id) {
     <p style="color:var(--muted);font-size:13px;">Generating share link…</p>
   `, { maxWidth: '460px' });
 
+  // ── Fetch recipient's ACTIVATED businesses (for "Deliver to" picker) ──
+  let recipientBusinesses = [];
+  if (linkedUserId) {
+    try {
+      const { data: bizList } = await supabase.rpc('get_user_businesses', { p_user_id: linkedUserId });
+      if (bizList && bizList.length) recipientBusinesses = bizList;  // only activated businesses returned
+    } catch(_) {}
+  }
+
   // Generate share token immediately
   const _shareSenderName = window._getBsSenderName?.() || getCurrentProfile()?.display_name || '';
   const _shareSenderEmail = window._getBsSenderEmail?.() || getCurrentUser().email;
@@ -1465,14 +1514,20 @@ window.openShareModal = async function(id) {
     amount: entry.amount, currency: entry.currency, tx_type: entry.tx_type,
     date: entry.date, note: entry.note, invoice_number: entry.invoice_number,
     status: entry.status, from_name: _shareSenderName,
-    from_email: _shareSenderEmail
+    from_email: _shareSenderEmail,
+    context_type: entry.context_type || 'personal',
+    business_id: entry.business_id || null,
+    sender_context: entry.context_type || 'personal'
   };
+
+  // Store chosen target business (default: personal / null)
+  window._shareTargetBusinessId = null;
 
   // Re-use existing token if one exists
   let url = '';
   let tokenObj = null;
   try {
-    const { data: existing } = await supabase.from('share_tokens').select('id, token, recipient_id').eq('entry_id', id).maybeSingle();
+    const { data: existing } = await supabase.from('share_tokens').select('id, token, recipient_id, target_business_id').eq('entry_id', id).maybeSingle();
     if (existing?.token) {
       url = window.location.origin + '/view?t=' + existing.token;
       tokenObj = existing;
@@ -1487,11 +1542,36 @@ window.openShareModal = async function(id) {
         recipientEmail: cEmail,
         recipientId: linkedUserId,      // ← set at creation time
         entrySnapshot: snapshot
+        // targetBusinessId is set AFTER user picks via the "Deliver to" picker
       });
       if (tokenObj?.token) url = getShareUrl(tokenObj.token);
     }
   } catch(_) {}
   if (!url) { closeModal(); return toast('Could not generate share link.', 'error'); }
+
+  // ── Handler: update target_business_id on the share token when user changes picker ──
+  window._updateShareTarget = async function(bizId) {
+    window._shareTargetBusinessId = bizId || null;
+    if (tokenObj?.id) {
+      await supabase.from('share_tokens')
+        .update({ target_business_id: bizId || null })
+        .eq('id', tokenObj.id)
+        .catch(() => {});
+    }
+    // Also save the choice on the contact for future sends
+    if (entry.contact_id) {
+      const contactUpdate = {
+        linked_business_id: bizId || null,
+        preferred_target_type: bizId ? 'business' : 'personal'
+      };
+      await supabase.from('contacts').update(contactUpdate).eq('id', entry.contact_id).catch(() => {});
+    }
+  };
+
+  // Auto-set target if contact has linked_business_id and that business is in the activated list
+  if (linkedBusinessId && recipientBusinesses.some(b => b.id === linkedBusinessId) && preferredTarget !== 'personal') {
+    window._updateShareTarget(linkedBusinessId);
+  }
 
   // Notify linked recipient — use linked_user_id (primary), fallback to email lookup
   const recipientUserId = linkedUserId || tokenObj?.recipient_id;
@@ -1539,6 +1619,17 @@ window.openShareModal = async function(id) {
         <div style="font-size:13px;color:var(--muted);">${esc(txLabel)} — ${amtStr}</div>
       </div>
     </div>
+
+    ${recipientBusinesses.length > 0 ? `
+    <div style="background:var(--bg3);border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;">DELIVER TO</div>
+      <select id="share-target-biz" onchange="window._updateShareTarget(this.value)" style="width:100%;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;font-family:inherit;">
+        <option value=""${!linkedBusinessId ? ' selected' : ''}>📱 Personal (default)</option>
+        ${recipientBusinesses.map(b => `<option value="${b.id}"${b.id === linkedBusinessId ? ' selected' : ''}>🏢 ${esc(b.name)}</option>`).join('')}
+      </select>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">Choose where this record lands in ${esc(cName)}'s account</div>
+    </div>
+    ` : ''}
 
     <div style="background:var(--bg3);border-radius:10px;padding:10px 12px;margin-bottom:10px;">
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;">SHARE LINK</div>

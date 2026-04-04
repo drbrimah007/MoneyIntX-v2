@@ -798,15 +798,39 @@ window._bsSaveClient = async function() {
   window._bsNavigate('bs-clients');
 };
 
-// Move personal contact → business client (add 'business_client' tag)
-window._bsMoveContactToBiz = async function(contactId, contactName) {
-  const { data: ct } = await supabase.from('contacts').select('tags').eq('id', contactId).single();
-  const tags = Array.from(new Set([...(ct?.tags || []), 'business_client']));
-  const { error } = await supabase.from('contacts')
-    .update({ tags, updated_at: new Date().toISOString() })
-    .eq('id', contactId);
-  if (error) return toast('Move failed: ' + error.message, 'error');
-  toast(`${contactName} is now a business client.`, 'success');
+// Import personal contact → create business copy (non-destructive — personal original stays)
+window._bsImportContactToBiz = async function(contactId, contactName) {
+  const bizId = _bsBusinessId();
+  if (!bizId) return toast('No active business.', 'error');
+
+  // Fetch the personal contact fully
+  const { data: orig } = await supabase.from('contacts').select('*').eq('id', contactId).single();
+  if (!orig) return toast('Contact not found.', 'error');
+
+  // Check if a business copy already exists for this email in this business
+  if (orig.email) {
+    const { data: existing } = await supabase.from('contacts')
+      .select('id').eq('business_id', bizId).ilike('email', orig.email).maybeSingle();
+    if (existing) return toast(`${contactName} already exists in this business.`, 'error');
+  }
+
+  // Create business copy
+  const { error } = await supabase.from('contacts').insert({
+    user_id: orig.user_id,
+    business_id: bizId,
+    name: orig.name,
+    email: orig.email || '',
+    phone: orig.phone || '',
+    address: orig.address || '',
+    notes: orig.notes || '',
+    linked_user_id: orig.linked_user_id,
+    linked_business_id: orig.linked_business_id,
+    tags: ['business_client'],
+    start_toy: 0,
+    start_yot: 0
+  });
+  if (error) return toast('Import failed: ' + error.message, 'error');
+  toast(`${contactName} imported to business. Personal contact preserved.`, 'success');
   window._bsNavigate('bs-clients');
 };
 
@@ -1270,11 +1294,12 @@ async function _bsRenderClients(el) {
   });
 
   // Enrich with contact details + include contacts with no entries yet
+  // IMPORTANT: prefer live contact name over entry snapshot (entry.contact_name is stale)
   const clients = Object.entries(clientMap).map(([id, c]) => {
     const contact = contacts.find(ct => ct.id === id);
     const tags = contact?.tags || [];
     const isBizClient = tags.includes('business_client');
-    return { id, ...c, email: contact?.email || '', phone: contact?.phone || '', tags, isBizClient };
+    return { id, ...c, name: contact?.name || c.name, email: contact?.email || '', phone: contact?.phone || '', tags, isBizClient };
   });
   // Add contacts tagged as 'business_client' that have no entries yet
   contacts.forEach(ct => {
@@ -1358,7 +1383,7 @@ async function _bsRenderClients(el) {
             <td style="white-space:nowrap;" onclick="event.stopPropagation();">
               ${c.isBizClient
                 ? `<button class="bs sm" onclick="window._bsQuickAction('invoice','${c.id}')" style="font-size:11px;padding:3px 8px;cursor:pointer;">🧾 Invoice</button>`
-                : `<button class="bs sm" onclick="window._bsMoveContactToBiz('${c.id}','${esc(c.name)}')" style="font-size:11px;padding:3px 8px;cursor:pointer;color:var(--accent);">→ Move from Personal</button>`
+                : `<button class="bs sm" onclick="window._bsImportContactToBiz('${c.id}','${esc(c.name)}')" style="font-size:11px;padding:3px 8px;cursor:pointer;color:var(--accent);">📥 Import to Business</button>`
               }
             </td>
           </tr>`).join('')}
@@ -1733,7 +1758,7 @@ window._bsEditContact = async function(contactId) {
       <div class="form-group"><label>Email</label><input type="email" id="bsc-email" value="${esc(c.email || '')}" placeholder="email@example.com"></div>
       <div class="form-group"><label>Phone</label><input type="tel" id="bsc-phone" value="${esc(c.phone || '')}" placeholder="+1 234 567 8900"></div>
     </div>
-    <div class="form-group"><label>Business Address</label><input type="text" id="bsc-address" value="${esc(c.address || '')}" placeholder="123 Main St, City, State"></div>
+    <div class="form-group"><label>Details</label><textarea id="bsc-address" rows="2" placeholder="Address, website, DBA, or any other details…" style="width:100%;resize:vertical;">${esc(c.address || '')}</textarea></div>
     <div class="form-group"><label>Notes</label><textarea id="bsc-notes" rows="2" placeholder="Any extra notes about this contact…" style="width:100%;resize:vertical;">${esc(c.notes || '')}</textarea></div>
     <div class="form-group"><label>Tags</label><input type="text" id="bsc-tags" value="${esc((c.tags || []).join(', '))}" placeholder="e.g. supplier, client, vendor"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
@@ -1943,6 +1968,8 @@ window._bsSaveReceivedBill = async function(saveAs) {
   // Use createEntry for proper entry_number counter tracking
   let entry;
   try {
+    const _bizName = window._getBsSenderName?.() || '';
+    const _bizEmail = window._getBsSenderEmail?.() || user.email;
     entry = await createEntry(user.id, {
       contactId: finalContactId,
       txType: 'bill_received',
@@ -1953,7 +1980,11 @@ window._bsSaveReceivedBill = async function(saveAs) {
       invoiceNumber: refNum || '',
       status: isDraft ? 'draft' : 'posted',
       metadata: Object.keys(metadata).length ? metadata : null,
-      businessId: _bsBusinessId()
+      businessId: _bsBusinessId(),
+      senderContext: 'business',
+      senderBusinessName: _bizName,
+      fromName: _bizName || 'Business',
+      fromEmail: _bizEmail
     });
   } catch (err) {
     console.error('[_bsSaveReceivedBill] createEntry threw:', err);

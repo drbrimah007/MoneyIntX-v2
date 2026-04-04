@@ -809,6 +809,21 @@ async function enterApp(user) {
       .then(({ data, error }) => {
         if (error) console.warn('[on_user_login]', error.message);
         else if (data) console.log('[on_user_login]', data);
+      })
+      .then(async () => {
+        // ── Reconciliation: auto-confirm any pending shares that now have a recipient ──
+        try {
+          const { data: pending } = await supabase.rpc('reconcile_pending_shares', { p_user_id: user.id });
+          if (pending && pending.length > 0) {
+            console.log('[reconciliation] Found', pending.length, 'unresolved shares — auto-confirming');
+            for (const share of pending) {
+              try {
+                const mirror = await confirmShare(share.token_id, user.id);
+                if (mirror) console.log('[reconciliation] Auto-confirmed share', share.token_id, '→', mirror.id);
+              } catch(e) { console.warn('[reconciliation] Failed to confirm share', share.token_id, e.message); }
+            }
+          }
+        } catch(e) { console.warn('[reconciliation]', e.message); }
       });
   }
 

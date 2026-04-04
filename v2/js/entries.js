@@ -62,7 +62,7 @@ export async function getEntry(id) {
 export async function createEntry(userId, {
   contactId, txType, amount, currency = 'USD', note = '',
   date, invoiceNumber = '', templateId = null, templateData = {},
-  status = 'posted'
+  status = 'posted', metadata = null, source = 'manual', recurringRuleId = null
 }) {
   // Increment entry counter atomically via RPC
   let nextNum = 1;
@@ -77,25 +77,37 @@ export async function createEntry(userId, {
     await supabase.from('users').update({ entry_counter: nextNum }).eq('id', userId);
   }
 
+  const insertPayload = {
+    user_id: userId,
+    contact_id: contactId,
+    tx_type: txType,
+    amount: toCents(amount),
+    currency,
+    note,
+    date: date || new Date().toISOString().slice(0, 10),
+    invoice_number: invoiceNumber,
+    entry_number: nextNum,
+    status,
+    source: source || 'manual'
+  };
+  if (recurringRuleId) insertPayload.recurring_rule_id = recurringRuleId;
+  if (templateId) insertPayload.template_id = templateId;
+  if (templateId && templateData && Object.keys(templateData).length > 0) insertPayload.template_data = templateData;
+  if (metadata) insertPayload.metadata = metadata;
+
   const { data, error } = await supabase
     .from('entries')
-    .insert({
-      user_id: userId,
-      contact_id: contactId,
-      tx_type: txType,
-      amount: toCents(amount),
-      currency,
-      note,
-      date: date || new Date().toISOString().slice(0, 10),
-      invoice_number: invoiceNumber,
-      entry_number: nextNum,
-      template_id: templateId,
-      template_data: templateData,
-      status
-    })
+    .insert(insertPayload)
     .select('*, contact:contacts(id, name, email, linked_user_id)')
     .single();
-  if (error) console.error('[createEntry]', error.message);
+  if (error) {
+    console.error('[createEntry]', error.message, error.details, error.hint);
+    if (!data) {
+      const err = new Error(error.message);
+      err.sbError = error;
+      throw err;
+    }
+  }
   return data;
 }
 
