@@ -5,6 +5,7 @@ import { getCurrentUser, getCurrentProfile, getMyBusinessId, contactColor } from
 import { esc, toast, openModal, closeModal, fmtDate, TX_LABELS } from '../ui.js';
 import { supabase } from '../supabase.js';
 import { listContacts } from '../contacts.js';
+import { getCurrentContext } from '../context-service.js';
 import { fmtMoney } from '../entries.js';
 import { listRecurring, createRecurring, updateRecurring, toggleRecurring, deleteRecurring, FREQUENCIES } from '../recurring.js';
 
@@ -69,7 +70,7 @@ window.openEditRecurringModal = async function(ruleId) {
 async function _openRecurringModal(ruleId) {
   const currentUser = getCurrentUser();
   const profile = getCurrentProfile();
-  const contacts = await listContacts('personal', { userId: currentUser.id });
+  const contacts = await listContacts(getCurrentContext());
 
   // If editing, fetch the rule
   let rule = null;

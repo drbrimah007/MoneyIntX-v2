@@ -1,5 +1,6 @@
 // Money IntX v2 — Entries Module
 import { supabase } from './supabase.js';
+import { getCurrentContext, applyEntriesScope, assertScopedResult } from './context-service.js';
 
 // Amount helpers: UI works in dollars, DB stores cents
 export function toCents(dollars) { return Math.round(parseFloat(dollars) * 100); }
@@ -29,10 +30,11 @@ export function invalidateEntryCache(userId) { delete _cache['entries_' + userId
 // ── List entries ──────────────────────────────────────────────────
 // businessId: pass a UUID to scope to that business, pass 'personal' to
 // get only personal-context entries, or omit/null for backwards compat (all).
-export async function listEntries(userId, { status, txType, contactId, limit, offset = 0, orderBy = 'updated_at', ascending = false, businessId } = {}) {
+// NEW: also accepts a context object { type, userId, businessId } from getCurrentContext()
+export async function listEntries(userId, { status, txType, contactId, limit, offset = 0, orderBy = 'updated_at', ascending = false, businessId, ctx } = {}) {
   // For full list (no filters, no explicit limit), use cache
   const useCache = !status && !txType && !contactId && !limit && !offset;
-  const cacheKey = 'entries_' + userId + (businessId ? '_biz_' + businessId : '');
+  const cacheKey = 'entries_' + userId + (businessId ? '_biz_' + businessId : '') + (ctx ? '_ctx_' + ctx.type : '');
   if (useCache) {
     const cached = _cacheGet(cacheKey);
     if (cached) return cached;
@@ -45,10 +47,12 @@ export async function listEntries(userId, { status, txType, contactId, limit, of
     .is('archived_at', null)
     .order(orderBy, { ascending });
 
-  // ── Business scope filter ──
-  // Uses context_type (frozen at creation) because createEntry always sets
-  // business_id even for personal entries (it's a required workspace column).
-  if (businessId === 'personal') {
+  // ── Context-aware scope filter ──
+  // If a ctx object is passed, use applyEntriesScope for canonical SQL scoping.
+  // Otherwise fall back to legacy businessId string.
+  if (ctx) {
+    query = applyEntriesScope(query, ctx);
+  } else if (businessId === 'personal') {
     query = query.eq('context_type', 'personal');
   } else if (businessId) {
     query = query.eq('context_type', 'business').eq('business_id', businessId);
@@ -63,15 +67,20 @@ export async function listEntries(userId, { status, txType, contactId, limit, of
   const { data, error } = await query;
   if (error) console.error('[listEntries]', error.message);
   const result = data || [];
+
+  // Debug: check for context leaks
+  if (ctx) assertScopedResult(result, ctx, 'entries');
+
   if (useCache) _cacheSet(cacheKey, result);
   return result;
 }
 
 // ── Recent entries (dashboard) — uses cache when available ────────
 // businessId: same as listEntries — 'personal' for personal-only
-export async function recentEntries(userId, limit = 15, businessId) {
+// NEW: accepts optional ctx object as 4th arg for context-service scoping
+export async function recentEntries(userId, limit = 15, businessId, ctx) {
   // Reuse full entry cache if available (avoid duplicate query)
-  const ck = 'entries_' + userId + (businessId ? '_biz_' + businessId : '');
+  const ck = 'entries_' + userId + (businessId ? '_biz_' + businessId : '') + (ctx ? '_ctx_' + ctx.type : '');
   const all = _cacheGet(ck);
   if (all) return all.slice(0, limit);
   let query = supabase
@@ -81,7 +90,9 @@ export async function recentEntries(userId, limit = 15, businessId) {
     .is('archived_at', null)
     .order('created_at', { ascending: false })
     .limit(limit);
-  if (businessId === 'personal') {
+  if (ctx) {
+    query = applyEntriesScope(query, ctx);
+  } else if (businessId === 'personal') {
     query = query.eq('context_type', 'personal');
   } else if (businessId) {
     query = query.eq('context_type', 'business').eq('business_id', businessId);
@@ -231,13 +242,16 @@ export async function restoreEntry(id) {
 }
 
 // ── List archived/deleted entries (admin only) ────────────────────
-export async function listArchivedEntries(userId, contextType = null, contextId = null) {
+// ctx: optional context object from getCurrentContext()
+export async function listArchivedEntries(userId, contextType = null, contextId = null, ctx = null) {
   let q = supabase.from('entries')
     .select('*, contact:contacts(id, name, email, phone, address)')
     .eq('user_id', userId)
     .not('archived_at', 'is', null);
-  // Context isolation: if context provided, scope to that context
-  if (contextType && contextId) {
+  // Context isolation
+  if (ctx) {
+    q = applyEntriesScope(q, ctx);
+  } else if (contextType && contextId) {
     q = q.eq('context_type', contextType).eq('context_id', contextId);
   }
   const { data, error } = await q.order('archived_at', { ascending: false });
@@ -302,11 +316,12 @@ export async function getLedgerSummary(userId) {
 // (view may not be deployed). Computes per-currency totals in JavaScript.
 // Returns ALL currencies the user has any entries in, even if balance is zero,
 // so the hero always shows the correct default currency (never hides it).
-export async function getCurrencyLedger(userId, contextType = null, contextId = null) {
+// ctx: optional context object from getCurrentContext()
+export async function getCurrencyLedger(userId, contextType = null, contextId = null, ctx = null) {
   const TERMINAL = new Set(['voided', 'cancelled', 'settled', 'fulfilled']);
 
   // First try the fast DB view (if deployed) — view is user-level, not context-scoped
-  if (!contextType) {
+  if (!contextType && !ctx) {
     try {
       const { data: vData, error: vErr } = await supabase
         .from('currency_ledger')
@@ -321,8 +336,10 @@ export async function getCurrencyLedger(userId, contextType = null, contextId = 
     .select('currency, tx_type, amount, settled_amount, status, no_ledger')
     .eq('user_id', userId)
     .is('archived_at', null);
-  // Context isolation: scope to specific context if provided
-  if (contextType && contextId) {
+  // Context isolation
+  if (ctx) {
+    q = applyEntriesScope(q, ctx);
+  } else if (contextType && contextId) {
     q = q.eq('context_type', contextType).eq('context_id', contextId);
   }
   const { data, error } = await q;

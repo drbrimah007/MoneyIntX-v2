@@ -3,6 +3,7 @@
 import { getCurrentUser, getCurrentProfile, getMyBusinessId, getActiveBusinessId, contactColor, renderPagination, PAGE_SIZE, _invalidateEntries } from './state.js';
 import { fmtMoney, getLedgerSummary } from '../entries.js';
 import { listContacts, createContact, deleteContact } from '../contacts.js';
+import { getCurrentContext } from '../context-service.js';
 import { esc, statusBadge, TX_LABELS, TX_COLORS, fmtDate, toast, openModal, closeModal } from '../ui.js';
 import { supabase } from '../supabase.js';
 
@@ -19,12 +20,10 @@ export async function renderContacts(el, page = 1) {
     contacts = window._impersonatedData.contacts || [];
     ledger   = window._impersonatedData.ledger   || [];
   } else {
-    // Personal context: fetch contacts with business_id IS NULL
-    // Business context: fetch contacts for that business
-    const isBsContext = !!window._bsContext?.businessId;
-    const bizUuid = isBsContext ? getMyBusinessId() : 'personal';
+    // Context-service path: derive context once, scope all queries
+    const ctx = getCurrentContext();
     [contacts, ledger] = await Promise.all([
-      listContacts(bizUuid, { userId: currentUser.id }),
+      listContacts(ctx),
       getLedgerSummary(currentUser.id)
     ]);
   }
@@ -410,18 +409,23 @@ window.saveNewContact = async function(returnCallback) {
   const name = document.getElementById('nc-name').value.trim();
   const email = document.getElementById('nc-email').value.trim().toLowerCase();
   if (!name) return toast('Name is required.', 'error');
-  // Block duplicate emails within same business scope (use active workspace)
-  const bizUuidCheck = getActiveBusinessId();
+  // Block duplicate emails within same context scope
+  const ctx = getCurrentContext();
   if (email) {
     const existing = (window._allContacts || []).find(c => (c.email||'').toLowerCase() === email);
     if (existing) return toast(`Email already used by "${existing.name}".`, 'error');
-    // Also check DB in case contacts list is stale — scope by business_id
-    const { data: dup } = await supabase.from('contacts')
-      .select('id,name').eq('business_id', bizUuidCheck).eq('email', email).maybeSingle();
+    // Also check DB in case contacts list is stale — scope by context
+    let dupQ = supabase.from('contacts').select('id,name').eq('email', email);
+    if (ctx.type === 'personal') {
+      dupQ = dupQ.eq('user_id', ctx.userId).is('business_id', null);
+    } else {
+      dupQ = dupQ.eq('business_id', ctx.businessId);
+    }
+    const { data: dup } = await dupQ.maybeSingle();
     if (dup) return toast(`Email already used by "${dup.name}".`, 'error');
   }
-  // Use active workspace business (BS context if inside BS, otherwise personal)
-  const bizUuid = getActiveBusinessId();
+  // Use context to determine business_id for new contact
+  const bizUuid = ctx.businessId || null;
   const newContact = await createContact(bizUuid, currentUser.id, {
     name, email,
     phone: document.getElementById('nc-phone').value.trim()

@@ -6,6 +6,7 @@ import { esc, toast, fmtDate, openModal, closeModal } from '../ui.js';
 import { fmtMoney } from '../entries.js';
 import { supabase } from '../supabase.js';
 import { listContacts } from '../contacts.js';
+import { getCurrentContext } from '../context-service.js';
 import { createGroup, getGroup, deleteGroup, calcGroupStats, addGroupMember, removeGroupMember, createRound, markContributionPaid, postNotice, getNoticeBoard } from '../groups.js';
 
 let _selectedGroups = new Set();
@@ -121,7 +122,7 @@ export async function renderGroups(el) {
 window.openNewGroupModal = async function() {
   const currentUser = getCurrentUser();
   const currentProfile = getCurrentProfile();
-  const contacts = await listContacts('personal', { userId: getCurrentUser().id });
+  const contacts = await listContacts(getCurrentContext());
   const contactOpts = contacts.map(c=>`<option value="${c.id}" data-name="${esc(c.name)}">${esc(c.name)}</option>`).join('');
   window._newGroupMembers = []; // [{contactId, name}]
 
@@ -341,7 +342,7 @@ window.openGroupDetail = async function(id) {
 };
 
 window.openAddMemberModal = async function(groupId) {
-  const contacts = await listContacts('personal', { userId: getCurrentUser().id });
+  const contacts = await listContacts(getCurrentContext());
   const opts = contacts.map(c=>`<option value="${c.id}" data-name="${esc(c.name)}">${esc(c.name)}</option>`).join('');
   openModal(`
     <h3 style="margin-bottom:16px;">Add Member</h3>

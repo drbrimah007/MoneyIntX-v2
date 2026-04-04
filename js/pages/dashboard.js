@@ -6,6 +6,7 @@ import { getCurrentUser, getCurrentProfile, getMyBusinessId } from './state.js';
 import { contactColor, _fmtAmt } from './state.js';
 import { getDashboardTotals, recentEntries, getLedgerSummary, getCurrencyLedger, fmtMoney, toCents, invalidateEntryCache } from '../entries.js';
 import { listContacts } from '../contacts.js';
+import { getCurrentContext } from '../context-service.js';
 import { getUnreadCount } from '../notifications.js';
 import { listReceivedShares } from '../sharing.js';
 import { esc, statusBadge, TX_LABELS, TX_COLORS, fmtDate } from '../ui.js';
@@ -45,11 +46,12 @@ export async function renderDash(el) {
   } else {
     // Run critical queries first (top 4), then non-critical (ledger + currency) in parallel
     // This paints the hero card faster even if ledger is slow
+    const ctx = getCurrentContext();
     let pendingShares;
     [totals, recent, contacts, unread, pendingShares] = await Promise.all([
       getDashboardTotals(currentUser.id),
-      recentEntries(currentUser.id, 15, 'personal'),
-      listContacts('personal', { userId: currentUser.id }),
+      recentEntries(currentUser.id, 15, null, ctx),
+      listContacts(ctx),
       getUnreadCount(currentUser.id),
       listReceivedShares(currentUser.id).catch(() => [])
     ]);
@@ -57,7 +59,7 @@ export async function renderDash(el) {
     window._allContacts = contacts;
     [ledger, currencyRows] = await Promise.all([
       getLedgerSummary(currentUser.id),
-      getCurrencyLedger(currentUser.id, 'personal', currentUser.id)
+      getCurrencyLedger(currentUser.id, null, null, ctx)
     ]);
   }
 

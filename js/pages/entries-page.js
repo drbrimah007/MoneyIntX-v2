@@ -4,6 +4,7 @@ import { getCurrentUser, getCurrentProfile, getMyBusinessId, getActiveBusinessId
 import { listEntries, getEntry, createEntry, updateEntry, deleteEntry, archiveEntry, unarchiveEntry, restoreEntry, voidEntry, fmtMoney, toCents, toDollars, getDashboardTotals, invalidateEntryCache } from '../entries.js';
 import { bulkArchive, bulkNoLedger, bulkDelete } from '../bulk.js';
 import { listContacts, createContact } from '../contacts.js';
+import { getCurrentContext } from '../context-service.js';
 import { createShareToken, getShareUrl, listReceivedShares, dismissShare } from '../sharing.js';
 import { listTemplates } from '../templates.js';
 import { createScheduledReminder } from '../reminders.js';
@@ -83,8 +84,9 @@ export async function renderEntries(el, page, forceRefresh) {
       } else {
         const currentUser = getCurrentUser();
         const promises = [];
-        // Scope to personal entries only (no business_id) — BS has its own entry views
-        promises.push(needEntries ? listEntries(currentUser.id, { businessId: 'personal' }) : Promise.resolve(null));
+        // Scope entries via context service — personal or business depending on active context
+        const _pgCtx = getCurrentContext();
+        promises.push(needEntries ? listEntries(currentUser.id, { ctx: _pgCtx }) : Promise.resolve(null));
         promises.push(needShares  ? listReceivedShares(currentUser.id).catch(() => []) : Promise.resolve(null));
         const [entriesResult, sharesResult] = await Promise.all(promises);
         if (entriesResult !== null) _entriesAll = _dedupById(entriesResult);
@@ -95,12 +97,9 @@ export async function renderEntries(el, page, forceRefresh) {
 
   const _sm = window._selectMode || false;
   const query = (_entriesFilter || '').toLowerCase();
-  // In personal view, only show entries that belong to user's OWN business
-  // AND exclude entries that have been moved to Business Suite
-  const _myBizId = window.getSession ? window.getSession().businessId : null;
-  const _personalEntries = window._bsActiveContext
-    ? _entriesAll
-    : _entriesAll.filter(e => (!_myBizId || e.business_id === _myBizId) && !e.metadata?.moved_from_personal);
+  // Context-service scoping at SQL level ensures only correct entries are loaded.
+  // No frontend filtering needed — _entriesAll is already correctly scoped.
+  const _personalEntries = _entriesAll;
   const filtered = query
     ? _personalEntries.filter(e => {
         const cName = e.contact?.name || e.from_name || '';
@@ -577,8 +576,7 @@ window.openEditEntryModal = async function(id) {
   const entry = await getEntry(id);
   if (!entry) return toast('Entry not found.', 'error');
   console.log('[openEditEntryModal] entry loaded, fetching contacts...');
-  const _isBs = !!(window._bsActiveContext && window._bsActiveBizId);
-  const contacts = await listContacts(_isBs ? getMyBusinessId() : 'personal', { userId: getCurrentUser().id });
+  const contacts = await listContacts(getCurrentContext());
   const contactOpts = contacts.map(c => `<option value="${c.id}" ${c.id === entry.contact_id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
   const statusOpts = ['draft','posted','sent','viewed','accepted','partially_settled','settled','fulfilled','overdue','disputed','voided','cancelled']
     .map(s => `<option value="${s}" ${s === entry.status ? 'selected' : ''}>${s.charAt(0).toUpperCase() + s.slice(1).replace('_',' ')}</option>`).join('');
@@ -2082,12 +2080,11 @@ const NE_TABS = [
 
 window.openNewEntryModal = async function(defaultDirection, preselectedContactId) {
   if (window._guardImpersonation?.('create entries')) return;
-  // Use active business (BS context if inside BS, otherwise personal contacts)
-  const _isBsModal = !!(window._bsActiveContext && window._bsActiveBizId);
-  const activeBiz = _isBsModal ? getActiveBusinessId() : 'personal';
+  // Use context service to determine scope
+  const _entryCtx = getCurrentContext();
   const [contacts, templates] = await Promise.all([
-    listContacts(activeBiz, { userId: getCurrentUser().id }),
-    listTemplates(activeBiz)
+    listContacts(_entryCtx),
+    listTemplates(_entryCtx.type === 'business' ? _entryCtx.businessId : getMyBusinessId())
   ]);
   window._neContacts = contacts;
   window._neSelectedContactId = preselectedContactId || (contacts.length === 1 ? contacts[0].id : '');

@@ -5,6 +5,7 @@ import { getCurrentUser, getCurrentProfile, getMyBusinessId } from './state.js';
 import { esc, toast, openModal, closeModal, fmtDate, fmtRelative, TX_LABELS } from '../ui.js';
 import { supabase } from '../supabase.js';
 import { listContacts } from '../contacts.js';
+import { getCurrentContext } from '../context-service.js';
 import { fmtMoney, createEntry } from '../entries.js';
 import { listTemplates, createTemplate, updateTemplate, deleteTemplate, copyPublicTemplate, togglePublic } from '../templates.js';
 
@@ -462,7 +463,7 @@ window.useTemplateForEntry = async function(templateId) {
   // Store for calculator engine
   window._activeTpl = t;
   window._activeTplCurrency = t.currency || currentProfile?.default_currency || 'USD';
-  const contacts = await listContacts('personal', { userId: getCurrentUser().id });
+  const contacts = await listContacts(getCurrentContext());
   const fields = t.fields || [];
 
   // Generate invoice number
