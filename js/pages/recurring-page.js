@@ -69,7 +69,7 @@ window.openEditRecurringModal = async function(ruleId) {
 async function _openRecurringModal(ruleId) {
   const currentUser = getCurrentUser();
   const profile = getCurrentProfile();
-  const contacts = await listContacts(getMyBusinessId());
+  const contacts = await listContacts('personal', { userId: currentUser.id });
 
   // If editing, fetch the rule
   let rule = null;

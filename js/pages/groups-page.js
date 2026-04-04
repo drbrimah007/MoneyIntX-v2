@@ -121,7 +121,7 @@ export async function renderGroups(el) {
 window.openNewGroupModal = async function() {
   const currentUser = getCurrentUser();
   const currentProfile = getCurrentProfile();
-  const contacts = await listContacts(getMyBusinessId());
+  const contacts = await listContacts('personal', { userId: getCurrentUser().id });
   const contactOpts = contacts.map(c=>`<option value="${c.id}" data-name="${esc(c.name)}">${esc(c.name)}</option>`).join('');
   window._newGroupMembers = []; // [{contactId, name}]
 
@@ -341,7 +341,7 @@ window.openGroupDetail = async function(id) {
 };
 
 window.openAddMemberModal = async function(groupId) {
-  const contacts = await listContacts(getMyBusinessId());
+  const contacts = await listContacts('personal', { userId: getCurrentUser().id });
   const opts = contacts.map(c=>`<option value="${c.id}" data-name="${esc(c.name)}">${esc(c.name)}</option>`).join('');
   openModal(`
     <h3 style="margin-bottom:16px;">Add Member</h3>

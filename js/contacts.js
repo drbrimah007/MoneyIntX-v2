@@ -1,12 +1,18 @@
 // Money IntX v2 — Contacts Module
 import { supabase } from './supabase.js';
 
-export async function listContacts(businessId, { archived = false } = {}) {
+export async function listContacts(businessId, { archived = false, userId = null } = {}) {
   let query = supabase
     .from('contacts')
-    .select('*')
-    .eq('business_id', businessId)
-    .order('name');
+    .select('*');
+  // If businessId is 'personal' or null/undefined, fetch personal contacts (business_id IS NULL)
+  if (!businessId || businessId === 'personal') {
+    query = query.is('business_id', null);
+    if (userId) query = query.eq('user_id', userId);
+  } else {
+    query = query.eq('business_id', businessId);
+  }
+  query = query.order('name');
   if (!archived) query = query.is('archived_at', null);
   const { data, error } = await query;
   if (error) console.error('[listContacts]', error.message);

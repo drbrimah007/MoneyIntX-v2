@@ -149,7 +149,7 @@ export async function renderInvestments(el) {
 window.openNewInvestmentModal = async function() {
   const currentUser = getCurrentUser();
   const currentProfile = getCurrentProfile();
-  const contacts = await listContacts(getMyBusinessId());
+  const contacts = await listContacts('personal', { userId: getCurrentUser().id });
   const contactOpts = contacts.map(c => `<option value="${c.id}" data-name="${esc(c.name)}">${esc(c.name)}</option>`).join('');
   window._newInvPartners = []; // [{contactId, name}]
 
@@ -494,7 +494,7 @@ window._removeInvMember = async function(memberId, invId) {
 
 window.openAddInvPartnerModal = async function(invId) {
   const currentUser = getCurrentUser();
-  const contacts = await listContacts(getMyBusinessId());
+  const contacts = await listContacts('personal', { userId: getCurrentUser().id });
 
   // Store for searchable typeahead
   window._ipmContacts = contacts;

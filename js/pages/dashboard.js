@@ -49,7 +49,7 @@ export async function renderDash(el) {
     [totals, recent, contacts, unread, pendingShares] = await Promise.all([
       getDashboardTotals(currentUser.id),
       recentEntries(currentUser.id, 15, 'personal'),
-      listContacts(getMyBusinessId()),
+      listContacts('personal', { userId: currentUser.id }),
       getUnreadCount(currentUser.id),
       listReceivedShares(currentUser.id).catch(() => [])
     ]);

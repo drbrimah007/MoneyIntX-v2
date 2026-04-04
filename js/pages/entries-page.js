@@ -577,7 +577,8 @@ window.openEditEntryModal = async function(id) {
   const entry = await getEntry(id);
   if (!entry) return toast('Entry not found.', 'error');
   console.log('[openEditEntryModal] entry loaded, fetching contacts...');
-  const contacts = await listContacts(getMyBusinessId());
+  const _isBs = !!(window._bsActiveContext && window._bsActiveBizId);
+  const contacts = await listContacts(_isBs ? getMyBusinessId() : 'personal', { userId: getCurrentUser().id });
   const contactOpts = contacts.map(c => `<option value="${c.id}" ${c.id === entry.contact_id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
   const statusOpts = ['draft','posted','sent','viewed','accepted','partially_settled','settled','fulfilled','overdue','disputed','voided','cancelled']
     .map(s => `<option value="${s}" ${s === entry.status ? 'selected' : ''}>${s.charAt(0).toUpperCase() + s.slice(1).replace('_',' ')}</option>`).join('');
@@ -2081,10 +2082,11 @@ const NE_TABS = [
 
 window.openNewEntryModal = async function(defaultDirection, preselectedContactId) {
   if (window._guardImpersonation?.('create entries')) return;
-  // Use active business (BS context if inside BS, otherwise personal)
-  const activeBiz = getActiveBusinessId();
+  // Use active business (BS context if inside BS, otherwise personal contacts)
+  const _isBsModal = !!(window._bsActiveContext && window._bsActiveBizId);
+  const activeBiz = _isBsModal ? getActiveBusinessId() : 'personal';
   const [contacts, templates] = await Promise.all([
-    listContacts(activeBiz),
+    listContacts(activeBiz, { userId: getCurrentUser().id }),
     listTemplates(activeBiz)
   ]);
   window._neContacts = contacts;

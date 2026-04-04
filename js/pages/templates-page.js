@@ -462,7 +462,7 @@ window.useTemplateForEntry = async function(templateId) {
   // Store for calculator engine
   window._activeTpl = t;
   window._activeTplCurrency = t.currency || currentProfile?.default_currency || 'USD';
-  const contacts = await listContacts(getMyBusinessId());
+  const contacts = await listContacts('personal', { userId: getCurrentUser().id });
   const fields = t.fields || [];
 
   // Generate invoice number

@@ -19,21 +19,17 @@ export async function renderContacts(el, page = 1) {
     contacts = window._impersonatedData.contacts || [];
     ledger   = window._impersonatedData.ledger   || [];
   } else {
-    // Use businessId from BS context if available, otherwise use userId (personal context)
-    const bizUuid = getMyBusinessId();
+    // Personal context: fetch contacts with business_id IS NULL
+    // Business context: fetch contacts for that business
+    const isBsContext = !!window._bsContext?.businessId;
+    const bizUuid = isBsContext ? getMyBusinessId() : 'personal';
     [contacts, ledger] = await Promise.all([
-      listContacts(bizUuid),
+      listContacts(bizUuid, { userId: currentUser.id }),
       getLedgerSummary(currentUser.id)
     ]);
   }
   const ledgerMap = {};
   (ledger || []).forEach(l => { ledgerMap[l.contact_id] = l; });
-
-  // Personal view: show only contacts without a business_id (true personal contacts)
-  // Business contacts are separate records with business_id set — they live in BS Clients
-  if (!window._bsContext?.businessId) {
-    contacts = contacts.filter(c => !c.business_id);
-  }
 
   // Expose contacts globally for re-renders
   window._allContacts = contacts;
