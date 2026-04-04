@@ -183,10 +183,9 @@ export async function confirmShare(tokenId, recipientId) {
         linked_user_id: token.sender_id,
         tags:           ['shared']
       };
-      // If delivering to a business context, tag + assign business_id on the contact
+      // If delivering to a business context, assign business_id (sole authority for BS membership)
       if (rCtx.context_type === 'business' && rCtx.business_id) {
         contactInsert.business_id = rCtx.business_id;
-        contactInsert.tags = ['shared', 'business_client'];
       }
       const { data: newContact, error: cErr } = await supabase
         .from('contacts')

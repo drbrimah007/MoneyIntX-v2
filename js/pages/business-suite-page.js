@@ -754,7 +754,7 @@ function _bsTxLabel(type) {
 
 // Quick action — opens new entry modal with business presets
 // Sets _bsActiveContext so saveNewEntry knows to return to BS (not personal entries)
-// ── Add Client from BS — tags contact as business_client ──
+// ── Add Client from BS — identified by business_id ──
 window._bsAddClient = function() {
   openModal(`
     <h3 style="margin-bottom:16px;">Add Business Client</h3>
@@ -787,8 +787,7 @@ window._bsSaveClient = async function() {
       user_id:     currentUser.id,
       name,
       email:       email || '',
-      phone:       document.getElementById('nc-phone').value.trim() || '',
-      tags:        ['business_client']
+      phone:       document.getElementById('nc-phone').value.trim() || ''
     })
     .select()
     .single();
@@ -825,7 +824,6 @@ window._bsImportContactToBiz = async function(contactId, contactName) {
     notes: orig.notes || '',
     linked_user_id: orig.linked_user_id,
     linked_business_id: orig.linked_business_id,
-    tags: ['business_client'],
     start_toy: 0,
     start_yot: 0
   });
@@ -1295,16 +1293,16 @@ async function _bsRenderClients(el) {
 
   // Enrich with contact details + include contacts with no entries yet
   // IMPORTANT: prefer live contact name over entry snapshot (entry.contact_name is stale)
+  // isBizClient is determined by business_id (sole authority), NOT the business_client tag
   const clients = Object.entries(clientMap).map(([id, c]) => {
     const contact = contacts.find(ct => ct.id === id);
-    const tags = contact?.tags || [];
-    const isBizClient = tags.includes('business_client');
-    return { id, ...c, name: contact?.name || c.name, email: contact?.email || '', phone: contact?.phone || '', tags, isBizClient };
+    const isBizClient = !!contact?.business_id;
+    return { id, ...c, name: contact?.name || c.name, email: contact?.email || '', phone: contact?.phone || '', isBizClient };
   });
-  // Add contacts tagged as 'business_client' that have no entries yet
+  // Add business contacts that have no entries yet (identified by business_id, not tag)
   contacts.forEach(ct => {
-    if (!clientMap[ct.id] && (ct.tags || []).includes('business_client')) {
-      clients.push({ id: ct.id, name: ct.name, email: ct.email || '', phone: ct.phone || '', total: 0, unpaid: 0, count: 0, lastDate: ct.created_at, tags: ct.tags || [], isBizClient: true });
+    if (!clientMap[ct.id] && ct.business_id) {
+      clients.push({ id: ct.id, name: ct.name, email: ct.email || '', phone: ct.phone || '', total: 0, unpaid: 0, count: 0, lastDate: ct.created_at, isBizClient: true });
     }
   });
   clients.sort((a,b) => b.unpaid - a.unpaid);
@@ -1760,7 +1758,6 @@ window._bsEditContact = async function(contactId) {
     </div>
     <div class="form-group"><label>Details</label><textarea id="bsc-address" rows="2" placeholder="Address, website, DBA, or any other details…" style="width:100%;resize:vertical;">${esc(c.address || '')}</textarea></div>
     <div class="form-group"><label>Notes</label><textarea id="bsc-notes" rows="2" placeholder="Any extra notes about this contact…" style="width:100%;resize:vertical;">${esc(c.notes || '')}</textarea></div>
-    <div class="form-group"><label>Tags</label><input type="text" id="bsc-tags" value="${esc((c.tags || []).join(', '))}" placeholder="e.g. supplier, client, vendor"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
       <button class="bs sm" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary sm" onclick="window._bsSaveContact('${contactId}')">Save Changes</button>
@@ -1776,8 +1773,7 @@ window._bsSaveContact = async function(contactId) {
     email: (document.getElementById('bsc-email')?.value || '').trim(),
     phone: (document.getElementById('bsc-phone')?.value || '').trim(),
     address: (document.getElementById('bsc-address')?.value || '').trim(),
-    notes: (document.getElementById('bsc-notes')?.value || '').trim(),
-    tags: (document.getElementById('bsc-tags')?.value || '').split(',').map(t => t.trim()).filter(Boolean)
+    notes: (document.getElementById('bsc-notes')?.value || '').trim()
   };
   const { error } = await supabase.from('contacts').update(updates).eq('id', contactId);
   if (error) { toast('Save failed: ' + error.message, 'error'); return; }

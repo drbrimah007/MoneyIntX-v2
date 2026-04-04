@@ -464,7 +464,6 @@ window.importContactToBs = async function(id, name) {
     notes: orig.notes || '',
     linked_user_id: orig.linked_user_id,
     linked_business_id: orig.linked_business_id,
-    tags: ['business_client'],
     start_toy: 0,
     start_yot: 0
   });
