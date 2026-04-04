@@ -22,10 +22,12 @@ export async function renderContacts(el, page = 1) {
   } else {
     // Context-service path: derive context once, scope all queries
     const ctx = getCurrentContext();
+    console.log('[contacts-page] ctx:', JSON.stringify(ctx));
     [contacts, ledger] = await Promise.all([
       listContacts(ctx),
       getLedgerSummary(currentUser.id)
     ]);
+    console.log('[contacts-page] loaded', contacts.length, 'contacts for ctx.type:', ctx.type);
   }
   const ledgerMap = {};
   (ledger || []).forEach(l => { ledgerMap[l.contact_id] = l; });
@@ -39,6 +41,7 @@ export async function renderContacts(el, page = 1) {
     <div style="display:flex;gap:6px;align-items:center;">
       <input type="search" id="contacts-search" placeholder="Search…" oninput="filterAndRenderContacts(this.value)" style="width:160px;padding:6px 10px;font-size:13px;">
       ${window._impersonating ? '' : '<button class="btn btn-primary btn-sm" onclick="openNewContactModal()">+ Add</button>'}
+      ${window._impersonating ? '' : `<button class="bs sm" onclick="toggleContactSelectMode()" title="Select contacts" style="font-size:12px;">${window._contactSelectMode ? '✕ Done' : '☐ Select'}</button>`}
       <button class="bs sm" onclick="doExportContacts()" title="Export Contacts CSV">📥</button>
     </div>
   </div>`;
@@ -53,8 +56,10 @@ export async function renderContacts(el, page = 1) {
     const start = (page - 1) * PAGE_SIZE;
     const pageItems = filtered.slice(start, start + PAGE_SIZE);
 
-    // Bulk action bar
-    if (_selectedContacts.size > 0) {
+    // Select mode: only show bulk bar + checkboxes when user explicitly activates select mode
+    const _selectActive = !!window._contactSelectMode;
+
+    if (_selectActive && _selectedContacts.size > 0) {
       html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--accent);border-radius:8px;margin-bottom:12px;color:#fff;">
         <span style="font-size:13px;font-weight:700;">${_selectedContacts.size} selected</span>
         <div style="display:flex;gap:6px;margin-left:auto;">
@@ -65,7 +70,8 @@ export async function renderContacts(el, page = 1) {
     }
 
     html += `<div class="card" style="padding:0;overflow:hidden;"><div class="tbl-wrap"><table><thead><tr>
-      <th style="width:36px;"><input type="checkbox" onchange="toggleAllContacts(this.checked)" ${_selectedContacts.size > 0 && _selectedContacts.size === pageItems.length ? 'checked' : ''} style="cursor:pointer;accent-color:var(--accent);"></th><th>Name</th><th>Owed to Me</th><th class="hide-mobile">I Owe</th><th>Net</th><th style="width:42px;"></th>
+      ${_selectActive ? `<th style="width:36px;"><input type="checkbox" onchange="toggleAllContacts(this.checked)" ${_selectedContacts.size > 0 && _selectedContacts.size === pageItems.length ? 'checked' : ''} style="cursor:pointer;accent-color:var(--accent);"></th>` : ''}
+      <th>Name</th><th>Owed to Me</th><th class="hide-mobile">I Owe</th><th>Net</th><th style="width:42px;"></th>
     </tr></thead><tbody>`;
 
     pageItems.forEach(c => {
@@ -75,7 +81,7 @@ export async function renderContacts(el, page = 1) {
       const net = toy - yot;
       const col = contactColor(c.id);
       html += `<tr class="contact-row" data-search="${esc(c.name + ' ' + (c.email||'')).toLowerCase()}" style="cursor:pointer;" onclick="openContactDetail('${c.id}')">
-        <td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${_selectedContacts.has(c.id)?'checked':''} onchange="toggleContactSel('${c.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>
+        ${_selectActive ? `<td style="width:36px;text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" ${_selectedContacts.has(c.id)?'checked':''} onchange="toggleContactSel('${c.id}',this.checked)" style="cursor:pointer;accent-color:var(--accent);"></td>` : ''}
         <td>
           <div style="font-weight:600;font-size:14px;">${esc(c.name)}</div>
         </td>
@@ -494,8 +500,15 @@ window.toggleAllContacts = function(checked) {
   renderContacts(document.getElementById('content'), _contactsPage);
 };
 
+window.toggleContactSelectMode = function() {
+  window._contactSelectMode = !window._contactSelectMode;
+  if (!window._contactSelectMode) _selectedContacts.clear();
+  renderContacts(document.getElementById('content'), _contactsPage);
+};
+
 window.clearContactSelection = function() {
   _selectedContacts.clear();
+  window._contactSelectMode = false;
   renderContacts(document.getElementById('content'), _contactsPage);
 };
 

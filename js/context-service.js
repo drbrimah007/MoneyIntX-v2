@@ -18,6 +18,7 @@ export function getCurrentContext() {
   const user = getCurrentUser();
   const profile = getCurrentProfile();
   const isBs = !!(window._bsActiveContext && window._bsActiveBizId);
+  console.log('[context-service] isBs:', isBs, 'user:', user?.id, '_bsActiveContext:', window._bsActiveContext, '_bsActiveBizId:', window._bsActiveBizId);
 
   if (isBs) {
     const bizId = window._bsContext?.businessId || window._bsActiveBizId;
