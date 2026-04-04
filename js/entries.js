@@ -40,7 +40,7 @@ export async function listEntries(userId, { status, txType, contactId, limit, of
 
   let query = supabase
     .from('entries')
-    .select('*, contact:contacts(id, name, email, linked_user_id, linked_business_id, preferred_target_type)')
+    .select('*, contact:contacts(id, name, email, phone, address, linked_user_id, linked_business_id, preferred_target_type)')
     .eq('user_id', userId)
     .is('archived_at', null)
     .order(orderBy, { ascending });
@@ -76,7 +76,7 @@ export async function recentEntries(userId, limit = 15, businessId) {
   if (all) return all.slice(0, limit);
   let query = supabase
     .from('entries')
-    .select('*, contact:contacts(id, name, email, linked_user_id, linked_business_id, preferred_target_type)')
+    .select('*, contact:contacts(id, name, email, phone, address, linked_user_id, linked_business_id, preferred_target_type)')
     .eq('user_id', userId)
     .is('archived_at', null)
     .order('created_at', { ascending: false })
@@ -95,7 +95,7 @@ export async function recentEntries(userId, limit = 15, businessId) {
 export async function getEntry(id) {
   const { data, error } = await supabase
     .from('entries')
-    .select('*, contact:contacts(id, name, email, linked_user_id, linked_business_id, preferred_target_type), settlements(*)')
+    .select('*, contact:contacts(id, name, email, phone, address, linked_user_id, linked_business_id, preferred_target_type), settlements(*)')
     .eq('id', id)
     .single();
   if (error) console.error('[getEntry]', error.message);
@@ -178,7 +178,7 @@ export async function createEntry(userId, {
   const { data, error } = await supabase
     .from('entries')
     .insert(insertPayload)
-    .select('*, contact:contacts(id, name, email, linked_user_id, linked_business_id, preferred_target_type)')
+    .select('*, contact:contacts(id, name, email, phone, address, linked_user_id, linked_business_id, preferred_target_type)')
     .single();
   if (error) {
     console.error('[createEntry]', error.message, error.details, error.hint);
@@ -200,7 +200,7 @@ export async function updateEntry(id, updates) {
     .from('entries')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
-    .select('*, contact:contacts(id, name, email)')
+    .select('*, contact:contacts(id, name, email, phone, address)')
     .single();
   if (error) console.error('[updateEntry]', error.message);
   return data;
@@ -233,7 +233,7 @@ export async function restoreEntry(id) {
 // ── List archived/deleted entries (admin only) ────────────────────
 export async function listArchivedEntries(userId, contextType = null, contextId = null) {
   let q = supabase.from('entries')
-    .select('*, contact:contacts(id, name)')
+    .select('*, contact:contacts(id, name, email, phone, address)')
     .eq('user_id', userId)
     .not('archived_at', 'is', null);
   // Context isolation: if context provided, scope to that context

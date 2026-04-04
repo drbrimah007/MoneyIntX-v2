@@ -220,10 +220,7 @@ export function generateInvoiceHTML(entry, contact, profile, settlements = []) {
         </div>
       </div>
       <div class="inv-meta">
-        <p><strong>${escHtml(company)}</strong></p>
-        ${companyEmail ? `<p>${escHtml(companyEmail)}</p>` : ''}
-        ${companyPhone ? `<p>${escHtml(companyPhone)}</p>` : ''}
-        <p style="margin-top:6px;"><strong>Date:</strong> ${date}</p>
+        <p><strong>Date:</strong> ${date}</p>
         <p><strong>Status:</strong> <span class="inv-status" style="background:${entry.status === 'settled' ? '#d1fae5' : entry.status === 'partially_settled' ? '#fef3c7' : '#dbeafe'};color:${entry.status === 'settled' ? '#065f46' : entry.status === 'partially_settled' ? '#92400e' : '#1e40af'};">${escHtml(entry.status || 'pending')}</span></p>
         ${entry.entry_number ? `<p><strong>Ref:</strong> ${escHtml(String(entry.entry_number))}</p>` : ''}
       </div>
