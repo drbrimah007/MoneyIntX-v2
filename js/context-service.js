@@ -52,19 +52,25 @@ export function isPersonalContext() { return getCurrentContext().type === 'perso
 export function isBusinessContext() { return getCurrentContext().type === 'business'; }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// getContextLogoUrl() — returns logo ONLY for business context
-// Personal context → null (falls back to default Money IntX logo in email)
-// Business context → the business profile logo_url
+// getContextLogoUrl() — returns correct logo for active context
+// Personal context → users.logo_url (personal brand/logo)
+// Business context → businesses.logo_url (business brand/logo)
+// The two MUST be separate sources — never cross-contaminate.
 // ═══════════════════════════════════════════════════════════════════════════
 export function getContextLogoUrl() {
   const ctx = getCurrentContext();
   if (ctx.type === 'business') {
-    // Business: use the profile's logo (which is the business brand logo)
+    // Business: use the business record's logo (from _bsContext, set on BS enter)
+    // This is the businesses table logo — completely separate from user profile
+    const bsLogo = window._bsContext?.ownerLogo;
+    if (bsLogo) return bsLogo;
+    // Fallback: profile logo (only if business logo not loaded yet)
     const profile = getCurrentProfile();
     return profile?.logo_url || null;
   }
-  // Personal: NO business logo — use default Money IntX branding
-  return null;
+  // Personal: user's own profile logo — their personal brand identity
+  const profile = getCurrentProfile();
+  return profile?.logo_url || null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

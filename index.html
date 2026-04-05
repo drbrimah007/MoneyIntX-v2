@@ -1384,13 +1384,8 @@ window.printInvoice = async function(entryId) {
       }
     } catch(_) { senderProfile = currentProfile; }
   } else {
-    // Personal entry: strip business branding — use personal identity only
-    senderProfile = {
-      ...currentProfile,
-      company_name: currentProfile?.display_name || '',
-      logo_url: null,  // No business logo on personal invoices
-      company_address: ''
-    };
+    // Personal entry: use personal profile as-is (their own logo, their own details)
+    senderProfile = currentProfile;
   }
 
   const html = generateInvoiceHTML(entry, contact, senderProfile, settlements);
