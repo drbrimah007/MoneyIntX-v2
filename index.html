@@ -1359,9 +1359,10 @@ window.printInvoice = async function(entryId) {
   const contact = entry.contact || {};
   const settlements = entry.settlements || [];
 
-  // If business entry, use business profile for "From" section
-  let senderProfile = currentProfile;
+  // Context-aware sender profile for invoice "From" section
+  let senderProfile;
   if (entry.context_type === 'business' && entry.business_id) {
+    // Business entry: use business record for branding
     try {
       const { data: biz } = await supabase.from('businesses')
         .select('name, email, phone, address, logo_url, website')
@@ -1378,8 +1379,18 @@ window.printInvoice = async function(entryId) {
           company_address: biz.address || currentProfile?.company_address,
           logo_url:        biz.logo_url || currentProfile?.logo_url
         };
+      } else {
+        senderProfile = currentProfile;
       }
-    } catch(_) {}
+    } catch(_) { senderProfile = currentProfile; }
+  } else {
+    // Personal entry: strip business branding — use personal identity only
+    senderProfile = {
+      ...currentProfile,
+      company_name: currentProfile?.display_name || '',
+      logo_url: null,  // No business logo on personal invoices
+      company_address: ''
+    };
   }
 
   const html = generateInvoiceHTML(entry, contact, senderProfile, settlements);

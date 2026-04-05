@@ -71,7 +71,8 @@ export async function processDueReminders(userId, { emailFn } = {}) {
   const { data: senderProfile } = await supabase
     .from('profiles').select('display_name, company_name, logo_url, company_email').eq('id', userId).single();
   const senderName = senderProfile?.display_name || senderProfile?.company_name || 'Someone';
-  const senderLogoUrl = senderProfile?.logo_url || '';
+  // Logo is context-dependent: only use profile logo for business-context entries
+  const _profileLogoUrl = senderProfile?.logo_url || '';
   const senderEmail = senderProfile?.company_email || '';
 
   const processed = [];
@@ -107,6 +108,9 @@ export async function processDueReminders(userId, { emailFn } = {}) {
         currency: rem.entry?.currency
       });
     }
+    // Logo: only use business logo for business-context entries
+    const _entryLogo = (rem.entry?.context_type === 'business') ? _profileLogoUrl : null;
+
     // Email to contact
     if (doContact && contactEmail && emailFn) {
       emailFn(userId, {
@@ -118,7 +122,7 @@ export async function processDueReminders(userId, { emailFn } = {}) {
         message: rem.message || '',
         entryId: rem.entry_id,
         isReminder: true,
-        logoUrl: senderLogoUrl,
+        logoUrl: _entryLogo,
         fromEmail: senderEmail,
         siteUrl: 'https://moneyintx.com'
       }).catch(e => console.warn('[processDueReminders] Contact email failed:', e));
@@ -144,7 +148,7 @@ export async function processDueReminders(userId, { emailFn } = {}) {
         message: rem.message || '',
         entryId: rem.entry_id,
         isReminder: true,
-        logoUrl: senderLogoUrl,
+        logoUrl: _entryLogo,
         siteUrl: 'https://moneyintx.com',
         isSelf: true,
         contactName

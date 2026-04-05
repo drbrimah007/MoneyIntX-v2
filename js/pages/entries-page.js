@@ -4,7 +4,7 @@ import { getCurrentUser, getCurrentProfile, getMyBusinessId, getActiveBusinessId
 import { listEntries, getEntry, createEntry, updateEntry, deleteEntry, archiveEntry, unarchiveEntry, restoreEntry, voidEntry, fmtMoney, toCents, toDollars, getDashboardTotals, invalidateEntryCache } from '../entries.js';
 import { bulkArchive, bulkNoLedger, bulkDelete } from '../bulk.js';
 import { listContacts, createContact } from '../contacts.js';
-import { getCurrentContext } from '../context-service.js';
+import { getCurrentContext, getContextLogoUrl } from '../context-service.js';
 import { createShareToken, getShareUrl, listReceivedShares, dismissShare } from '../sharing.js';
 import { listTemplates } from '../templates.js';
 import { createScheduledReminder } from '../reminders.js';
@@ -1037,7 +1037,7 @@ window.saveMarkPaid = async function(entryId, currency) {
           txType: 'payment_recorded', amount: amountDollars,
           currency: currency || entry?.currency || 'USD',
           message: note, entryId, isReminder: false,
-          logoUrl: getCurrentProfile()?.logo_url, siteUrl: 'https://moneyinteractions.com',
+          logoUrl: getContextLogoUrl(), siteUrl: 'https://moneyinteractions.com',
           isSelf: false, contactName
         });
       } catch(e) { /* non-blocking */ }
@@ -1299,7 +1299,7 @@ window.sendInvoiceNotification = async function(entryId) {
           to: emailTo, fromName, txType: entry.category || entry.tx_type,
           amount: entry.amount,
           currency: entry.currency, message, entryId, isReminder: false,
-          logoUrl: getCurrentProfile()?.logo_url,
+          logoUrl: getContextLogoUrl(),
           fromEmail: getCurrentProfile()?.company_email || getCurrentUser()?.email,
           siteUrl: 'https://moneyinteractions.com',
           shareLink: _shareLink || undefined
@@ -1333,7 +1333,7 @@ window.sendInvoiceNotification = async function(entryId) {
       await sendNotificationEmail(getCurrentUser().id, {
         to: getCurrentUser().email, fromName, txType: entry.category || entry.tx_type,
         amount: entry.amount, currency: entry.currency, message, entryId, isReminder: false,
-        logoUrl: getCurrentProfile()?.logo_url, siteUrl: 'https://moneyinteractions.com',
+        logoUrl: getContextLogoUrl(), siteUrl: 'https://moneyinteractions.com',
         isSelf: true, contactName: cName
       });
     } catch(e) { console.warn('[self-email invoice notif]', e); }
@@ -1990,7 +1990,7 @@ window.doSendReminder = async function(entryId) {
           to: cEmail, fromName, txType: entry.category || entry.tx_type,
           amount: entry.amount,
           currency: entry.currency, message: displayMsg, entryId, isReminder: true,
-          logoUrl: getCurrentProfile()?.logo_url,
+          logoUrl: getContextLogoUrl(),
           fromEmail: getCurrentProfile()?.company_email || getCurrentUser()?.email,
           siteUrl: 'https://moneyinteractions.com'
         });
@@ -2004,7 +2004,7 @@ window.doSendReminder = async function(entryId) {
         await sendNotificationEmail(getCurrentUser().id, {
           to: getCurrentUser().email, fromName, txType: entry.category || entry.tx_type,
           amount: entry.amount, currency: entry.currency, message: displayMsg, entryId, isReminder: true,
-          logoUrl: getCurrentProfile()?.logo_url, siteUrl: 'https://moneyinteractions.com',
+          logoUrl: getContextLogoUrl(), siteUrl: 'https://moneyinteractions.com',
           isSelf: true, contactName: cName
         });
       } catch(e) { console.warn('[self-email reminder]', e); }
@@ -2749,7 +2749,7 @@ window.saveNewEntry = async function(saveAs) {
             to: getCurrentUser().email, fromName,
             txType: category, amount: parseFloat(amount), currency,
             message: combinedMsg || note, entryId, isReminder: false,
-            logoUrl: getCurrentProfile()?.logo_url, siteUrl: 'https://moneyinteractions.com',
+            logoUrl: getContextLogoUrl(), siteUrl: 'https://moneyinteractions.com',
             isSelf: true, contactName
           });
         } catch(e) { console.warn('[self-email entry]', e); }
@@ -2793,7 +2793,7 @@ window.saveNewEntry = async function(saveAs) {
           companyName: getCurrentProfile()?.company_name,
           companyEmail: getCurrentProfile()?.company_email,
           companyAddress: getCurrentProfile()?.company_address,
-          logoUrl: getCurrentProfile()?.logo_url,
+          logoUrl: getContextLogoUrl(),
           dueDate, message: combinedMsg || note, entryId
         });
       } else {
@@ -2803,7 +2803,7 @@ window.saveNewEntry = async function(saveAs) {
           txType: category,
           amount: parseFloat(amount), currency,
           message: combinedMsg || note, entryId,
-          logoUrl: getCurrentProfile()?.logo_url,
+          logoUrl: getContextLogoUrl(),
           fromEmail: getCurrentProfile()?.company_email || getCurrentUser()?.email,
           siteUrl: 'https://moneyinteractions.com'
         });

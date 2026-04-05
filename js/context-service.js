@@ -18,7 +18,7 @@ export function getCurrentContext() {
   const user = getCurrentUser();
   const profile = getCurrentProfile();
   const isBs = !!(window._bsActiveContext && window._bsActiveBizId);
-  console.log('[context-service] isBs:', isBs, 'user:', user?.id, '_bsActiveContext:', window._bsActiveContext, '_bsActiveBizId:', window._bsActiveBizId);
+  // Debug (disable in production): console.log('[context-service] isBs:', isBs, 'user:', user?.id);
 
   if (isBs) {
     const bizId = window._bsContext?.businessId || window._bsActiveBizId;
@@ -50,6 +50,22 @@ export function getCurrentContext() {
 
 export function isPersonalContext() { return getCurrentContext().type === 'personal'; }
 export function isBusinessContext() { return getCurrentContext().type === 'business'; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// getContextLogoUrl() — returns logo ONLY for business context
+// Personal context → null (falls back to default Money IntX logo in email)
+// Business context → the business profile logo_url
+// ═══════════════════════════════════════════════════════════════════════════
+export function getContextLogoUrl() {
+  const ctx = getCurrentContext();
+  if (ctx.type === 'business') {
+    // Business: use the profile's logo (which is the business brand logo)
+    const profile = getCurrentProfile();
+    return profile?.logo_url || null;
+  }
+  // Personal: NO business logo — use default Money IntX branding
+  return null;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // getSenderSnapshot() — frozen sender identity for entries/invoices/shares
