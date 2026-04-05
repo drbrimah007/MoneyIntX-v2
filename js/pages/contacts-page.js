@@ -22,12 +22,10 @@ export async function renderContacts(el, page = 1) {
   } else {
     // Context-service path: derive context once, scope all queries
     const ctx = getCurrentContext();
-    console.log('[contacts-page] ctx:', JSON.stringify(ctx));
     [contacts, ledger] = await Promise.all([
       listContacts(ctx),
       getLedgerSummary(currentUser.id)
     ]);
-    console.log('[contacts-page] loaded', contacts.length, 'contacts for ctx.type:', ctx.type);
   }
   const ledgerMap = {};
   (ledger || []).forEach(l => { ledgerMap[l.contact_id] = l; });
